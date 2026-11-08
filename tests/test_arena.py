@@ -232,134 +232,128 @@ class IntegrationTests(unittest.TestCase):
 
 
 class FakeGitHub:
-    """Transport fixture only. No actual GitHub/provider/solver operations."""
-    repository = "yudocyudoc/IGC"
-
+    """Transport fixture only. No actual GitHub/provider/solver operation."""
+    repository="yudocyudoc/igc-modular"
     def __init__(self):
-        self.settings = config.load(LIVE)["github"]
-        self.calls, self.variables = [], []
-        self.failed = None
-        self.network_uncertain = False
-        self.in_progress = False
-        self.inspections = 0
-        self.unavailable_usage = False
+        self.settings=config.load(LIVE)["github"]
+        self.sha="b"*40
+        self.calls=[]
+        self.failed=False
+        self.network_uncertain=False
+        self.in_progress=False
+        self.inspections=0
+        self.unavailable_usage=False
+        self.wrong_provenance=False
 
-    def inspect(self, settings, *, configure=False):
-        self.inspections += 1
-        if settings != self.settings:
-            raise AssertionError("Different protocol")
+    def inspect(self,settings,*,configure=False):
+        self.inspections+=1
+        assert configure is False
+        return {"frozen_code_sha":self.sha,"admin_writes_required_to_run":False}
 
-    def variable(self, environment, name, value):
-        self.variables.append((environment, name, value))
+    def variable(self,*args):
+        raise AssertionError("Running an experiment must not write administrative variables")
 
-    def dispatch(self, workflow, ref, inputs):
-        self.calls.append((workflow, ref, copy.deepcopy(inputs)))
-        if self.network_uncertain:
-            raise ArenaError("Network disconnected after dispatch")
-        return len(self.calls)*10
+    def dispatch(self,workflow,ref,inputs):
+        self.calls.append((workflow,ref,copy.deepcopy(inputs)))
+        if self.network_uncertain: raise ArenaError("Disconnected after dispatch")
+        return 10
 
-    def run(self, run_id):
-        workflow = self.calls[run_id//10-1][0]
-        failure = self.failed and self.failed in workflow
-        return {"id": run_id, "head_sha": self.settings["freeze_sha"], "head_branch": self.settings["ref"],
-                "event": "workflow_dispatch", "run_attempt": 1, "path": ".github/workflows/"+workflow,
-                "status": "in_progress" if self.in_progress else "completed",
-                "conclusion": "failure" if failure else "success", "html_url": "https://github.com/test/run/"+str(run_id)}
+    def run(self,run_id):
+        return {"id":run_id,"head_sha":self.sha,"head_branch":"main","event":"workflow_dispatch",
+                "run_attempt":1,"path":".github/workflows/arena-run.yml",
+                "status":"in_progress" if self.in_progress else "completed",
+                "conclusion":"failure" if self.failed else "success",
+                "html_url":"https://github.com/test/run/"+str(run_id)}
 
-    def artifact(self, run_id, name):
-        if "postlock-score" in name:
-            return {"score-post-lock.json": json.dumps({"schema": "igc-ct03-paired-prospective-evaluation/1.0",
-                    "candidate_denominator": 13, "lock_sha256": "sha256:"+"a"*64,
-                    "scientific_scope": "SYNTHETIC_INTRAFAMILY_SINGLE_WORLD"}).encode(),
-                    "archive-record.json": json.dumps({"github_run_id": 30, "frozen_code_sha": self.settings["freeze_sha"],
-                    "lock_sha256": "sha256:"+"a"*64}).encode()}
-        if self.unavailable_usage:
-            raise ArenaError("Artifact missing")
-        suffix = f" attempted; GitHub run {run_id}; code {self.settings['freeze_sha']}\n"
-        if "dm-raw" in name:
-            return {"dm-ten/attempts.log": "".join(arm+str(i)+suffix for arm in "DM" for i in range(1,6)).encode(),
-                    "producer-12/m-revision-attempts.log": "".join("M"+str(i)+suffix for i in range(6)).encode()}
-        return {"b-provider-attempts.log": "".join("B-"+mode+suffix for mode in ("initial","revision")).encode(),
-                "b-physical-attempts.log": "".join("B-"+mode+suffix for mode in ("initial","revision")).encode()}
+    def artifact(self,run_id,name):
+        if "diagnostic" in name: raise ArenaError("Diagnostic unavailable in this transport fixture")
+        assert name=="arena-native-result-"+str(run_id)
+        usage={
+            "omc":{"limit":19,"observed_attempts":11 if self.unavailable_usage else 19,
+                   "complete":not self.unavailable_usage,"remaining":None if self.unavailable_usage else 0,"failed_local_attempts":0},
+            "provider_posts":{"limit":2,"observed_attempts":0 if self.unavailable_usage else 2,
+                              "complete":not self.unavailable_usage,"remaining":None if self.unavailable_usage else 0,"failed_local_attempts":0},
+            "workflow":{"limit":1,"observed_attempts":1,"complete":True,"remaining":0,"failed_local_attempts":0}}
+        score={"schema":"igc-ct03-paired-prospective-evaluation/1.0","candidate_denominator":13,
+               "lock_sha256":"sha256:"+"a"*64,"scientific_scope":"SYNTHETIC_INTRAFAMILY_SINGLE_WORLD"}
+        ack={"github_run_id":run_id,"frozen_code_sha":self.sha,"lock_sha256":score["lock_sha256"]}
+        result={"schema":"arena.result/1","evidence_kind":"PHYSICAL_NATIVE_WORKFLOW","score":score,
+                "provenance":{"repository":self.repository,"run_id":str(run_id),
+                              "frozen_code_sha":"c"*40 if self.wrong_provenance else self.sha},
+                "run":{"experiment":"native-test","status":"COMPLETED","backend":"github",
+                       "consumption":usage,"stages":[],
+                       "cost":{"estimated":None,"billed":None,"currency":None}}}
+        return {name:json.dumps(value).encode() for name,value in {
+            "result.json":result,"consumption.json":usage,"score-post-lock.json":score,
+            "archive-record.json":ack}.items()}|{"report.md":b"TRANSPORT FIXTURE ONLY"}
 
 
 class RemoteCoordinatorTests(unittest.TestCase):
-    def test_single_approval_chains_four_original_workflows_with_automatic_ids_and_budget(self):
+    def test_single_approval_dispatches_one_native_workflow_without_admin_writes(self):
         with TemporaryDirectory() as temp:
-            api = FakeGitHub()
-            result = orchestrator.run(LIVE, Path(temp)/"run", Connections({}), authorize=True, adapter=GitHubBackend(api))
-            self.assertEqual(result["run"]["status"], "COMPLETED")
-            self.assertEqual(len(api.calls), 4)
-            self.assertEqual(api.calls[1][2]["public_release_run_id"], "10")
-            self.assertEqual(api.calls[2][2]["producer_run_id"], "20")
-            self.assertEqual(api.calls[3][2]["lock_run_id"], "30")
-            self.assertIn(("arena-ct03-producer", "CT03_APPROVED_RELEASE_RUN_ID", "10"), api.variables)
-            self.assertIn(("arena-ct03-producer", "CT03_EXTERNAL_CUSTODIAN_ACK", "external_private_world_attempted_once"), api.variables)
-            self.assertEqual(result["run"]["consumption"]["omc"]["observed_attempts"], 19)
-            self.assertEqual(result["run"]["consumption"]["provider_posts"]["observed_attempts"], 2)
+            api=FakeGitHub()
+            result=orchestrator.run(LIVE,Path(temp)/"run",Connections({}),authorize=True,adapter=GitHubBackend(api))
+            self.assertEqual(len(api.calls),1)
+            self.assertEqual(api.calls[0][0],"arena-run.yml")
+            self.assertEqual(api.calls[0][2]["freeze_sha"],api.sha)
+            self.assertEqual(api.calls[0][2]["mode"],"live")
+            self.assertEqual(result["controller"]["consumption"]["omc"]["observed_attempts"],19)
+            self.assertEqual(result["controller"]["consumption"]["provider_posts"]["observed_attempts"],2)
+            self.assertEqual(result["controller"]["consumption"]["workflow"]["observed_attempts"],1)
             self.assertIsNone(result["run"]["cost"]["billed"])
 
-    def test_resume_only_monitors_existing_run_and_does_not_ask_approval_again(self):
+    def test_resume_only_monitors_existing_run_without_new_authorization(self):
         with TemporaryDirectory() as temp:
-            out, api = Path(temp)/"run", FakeGitHub()
-            api.in_progress = True
-            with self.assertRaisesRegex(ArenaError, "Resume"):
-                orchestrator.run(LIVE, out, Connections({}), authorize=True,
-                                 adapter=GitHubBackend(api, timeout_seconds=0))
-            self.assertEqual(len(api.calls), 1)
-            api.in_progress = False
-            result = orchestrator.resume(out, Connections({}), adapter=GitHubBackend(api))
-            self.assertEqual(result["run"]["status"], "COMPLETED")
-            self.assertEqual(len(api.calls), 4)
-            self.assertEqual(api.inspections, 1)
+            out,api=Path(temp)/"run",FakeGitHub()
+            api.in_progress=True
+            with self.assertRaisesRegex(ArenaError,"Resume"):
+                orchestrator.run(LIVE,out,Connections({}),authorize=True,adapter=GitHubBackend(api,timeout_seconds=0))
+            self.assertEqual(len(api.calls),1)
+            api.in_progress=False
+            result=orchestrator.resume(out,Connections({}),adapter=GitHubBackend(api))
+            self.assertEqual(result["run"]["status"],"COMPLETED")
+            self.assertEqual(len(api.calls),1)
+            self.assertEqual(api.inspections,1)
 
-    def test_provider_or_solver_stage_failure_never_opens_reserve_or_retries(self):
+    def test_failed_workflow_never_dispatches_another_paid_execution(self):
         with TemporaryDirectory() as temp:
-            out, api = Path(temp)/"run", FakeGitHub()
-            api.failed = "producer"
-            with self.assertRaisesRegex(ArenaError, "Remote stage failed"):
-                orchestrator.run(LIVE, out, Connections({}), authorize=True, adapter=GitHubBackend(api))
-            self.assertEqual(len(api.calls), 2)
-            with self.assertRaisesRegex(ArenaError, "retry refused"):
-                orchestrator.resume(out, Connections({}), adapter=GitHubBackend(api))
-            self.assertEqual(len(api.calls), 2)
+            out,api=Path(temp)/"run",FakeGitHub()
+            api.failed=True
+            with self.assertRaisesRegex(ArenaError,"Native workflow failed"):
+                orchestrator.run(LIVE,out,Connections({}),authorize=True,adapter=GitHubBackend(api))
+            with self.assertRaisesRegex(ArenaError,"retry refused"):
+                orchestrator.resume(out,Connections({}),adapter=GitHubBackend(api))
+            self.assertEqual(len(api.calls),1)
             self.assertIsNone(orchestrator.status(out)["consumption"]["omc"]["remaining"])
 
     def test_ambiguous_dispatch_cannot_be_reissued(self):
         with TemporaryDirectory() as temp:
-            out, api = Path(temp)/"run", FakeGitHub()
-            api.network_uncertain = True
+            out,api=Path(temp)/"run",FakeGitHub()
+            api.network_uncertain=True
             with self.assertRaises(ArenaError):
-                orchestrator.run(LIVE, out, Connections({}), authorize=True, adapter=GitHubBackend(api))
-            self.assertEqual(orchestrator.status(out)["status"], "NEEDS_RECONCILIATION")
-            with self.assertRaisesRegex(ArenaError, "retry refused"):
-                orchestrator.resume(out, Connections({}), adapter=GitHubBackend(api))
-            self.assertEqual(len(api.calls), 1)
+                orchestrator.run(LIVE,out,Connections({}),authorize=True,adapter=GitHubBackend(api))
+            self.assertEqual(orchestrator.status(out)["status"],"NEEDS_RECONCILIATION")
+            with self.assertRaisesRegex(ArenaError,"retry refused"):
+                orchestrator.resume(out,Connections({}),adapter=GitHubBackend(api))
+            self.assertEqual(len(api.calls),1)
 
-    def test_missing_usage_is_reported_unknown_while_preserving_successful_result(self):
+    def test_unconfirmed_usage_stays_unknown_in_controller_and_public_result(self):
         with TemporaryDirectory() as temp:
-            api = FakeGitHub()
-            api.unavailable_usage = True
-            result = orchestrator.run(LIVE, Path(temp)/"run", Connections({}), authorize=True, adapter=GitHubBackend(api))
-            self.assertFalse(result["run"]["consumption"]["omc"]["complete"])
-            self.assertIsNone(result["run"]["consumption"]["provider_posts"]["remaining"])
-            self.assertEqual(result["run"]["consumption"]["omc"]["observed_attempts"], 1)
+            api=FakeGitHub()
+            api.unavailable_usage=True
+            result=orchestrator.run(LIVE,Path(temp)/"run",Connections({}),authorize=True,adapter=GitHubBackend(api))
+            self.assertFalse(result["controller"]["consumption"]["omc"]["complete"])
+            self.assertIsNone(result["controller"]["consumption"]["provider_posts"]["remaining"])
+            self.assertEqual(result["controller"]["consumption"]["omc"]["observed_attempts"],11)
 
-    def test_absent_optional_attempt_log_does_not_become_confirmed_zero(self):
+    def test_result_from_another_frozen_source_is_rejected(self):
         with TemporaryDirectory() as temp:
-            api = FakeGitHub()
-            original = api.artifact
-
-            def artifact(run_id, name):
-                files = original(run_id, name)
-                return {key:value for key,value in files.items() if not key.endswith("m-revision-attempts.log")}
-
-            api.artifact = artifact
-            result = orchestrator.run(LIVE, Path(temp)/"run", Connections({}), authorize=True, adapter=GitHubBackend(api))
-            self.assertFalse(result["run"]["consumption"]["omc"]["complete"])
-            self.assertIsNone(result["run"]["consumption"]["omc"]["remaining"])
-            self.assertTrue(result["run"]["consumption"]["provider_posts"]["complete"])
+            api=FakeGitHub()
+            api.wrong_provenance=True
+            with self.assertRaisesRegex(ArenaError,"does not match"):
+                orchestrator.run(LIVE,Path(temp)/"run",Connections({}),authorize=True,adapter=GitHubBackend(api))
+            self.assertEqual(len(api.calls),1)
 
 
-if __name__ == "__main__":
+if __name__=="__main__":
     unittest.main()

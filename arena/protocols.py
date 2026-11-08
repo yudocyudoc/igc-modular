@@ -27,10 +27,10 @@ class CT03:
                 raise ArenaError("Declare github repository, ref, freeze_sha, poll_seconds.")
             if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", github["repository"]):
                 raise ArenaError("Invalid GitHub repository.")
-            if github["ref"] != "experiment/arena-ct00-ct02-20261107" or not re.fullmatch(r"[0-9a-f]{40}", github["freeze_sha"]):
-                raise ArenaError("Existing CT03 backend requires its approved branch and full frozen SHA.")
-            if budget != {"omc": 19, "provider_posts": 2, "workflow": 4}:
-                raise ArenaError("Existing CT03 protocol has fixed maxima: 19 new OMC, 2 Buffalo POST, 4 workflow dispatches.")
+            if github["ref"] != "main" or not (github["freeze_sha"] == "HEAD" or re.fullmatch(r"[0-9a-f]{40}", github["freeze_sha"])):
+                raise ArenaError("Native CT03 requires main and HEAD or a full frozen SHA.")
+            if budget != {"omc": 19, "provider_posts": 2, "workflow": 1}:
+                raise ArenaError("Existing CT03 protocol has fixed maxima: 19 new OMC, 2 Buffalo POST, 1 workflow dispatch.")
             if type(github["poll_seconds"]) is not int or not 1 <= github["poll_seconds"] <= 60:
                 raise ArenaError("poll_seconds must be between 1 and 60.")
 

@@ -20,9 +20,27 @@ class OriginalM:
         return load("ct03_m_prepare").prepare(Path(output))
 
 
+class OriginalB:
+    def prepare(self, output):
+        from .runtime import verify
+        from .common import write_json
+        info=verify(include_history=False)
+        output=Path(output)
+        if output.exists():
+            raise ArenaError("Refuse to overwrite Buffalo preparation.")
+        output.mkdir(parents=True)
+        manifest={"schema":"arena.buffalo-preparation/1","engine":"UB-IAD/sd-ai::Engine.generate",
+                  "upstream_commit":info["buffalo_commit"],"candidate_count":1,
+                  "status":"ORIGINAL_SOURCE_READY_NOT_GENERATED",
+                  "transport":"ORIGINAL_OPENROUTER_SDK_TO_CLOUDFLARE_ADAPTER",
+                  "provider_posts":0,"new_omc":0}
+        write_json(output/"manifest.json",manifest)
+        return manifest
+
+
 class Engines:
     def __init__(self):
-        self._engines = {"D": OriginalD(), "M": OriginalM()}
+        self._engines = {"D": OriginalD(), "M": OriginalM(), "B": OriginalB()}
 
     def register(self, name, adapter):
         if name in self._engines:

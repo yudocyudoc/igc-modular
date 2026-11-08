@@ -1,0 +1,26 @@
+name: Native Arena runtime
+description: Prepare a runner-only workspace from migrated engine sources
+inputs:
+  role:
+    description: Data role for this job
+    required: true
+outputs:
+  workspace:
+    description: Prepared runner workspace
+    value: ${{ steps.prepare.outputs.workspace }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with: {python-version: '3.12'}
+    - uses: actions/setup-node@v4
+      if: inputs.role == 'b' || inputs.role == 'contracts'
+      with: {node-version: '22'}
+    - id: prepare
+      shell: bash
+      env:
+        ARENA_ROLE: ${{ inputs.role }}
+      run: |
+        set -euo pipefail
+        python -m arena.runtime prepare --role "$ARENA_ROLE" --out "$RUNNER_TEMP/arena-native"
+        echo "workspace=$RUNNER_TEMP/arena-native" >> "$GITHUB_OUTPUT"

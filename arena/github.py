@@ -121,40 +121,19 @@ class GitHub:
             raise ArenaError("Invalid public artifact ZIP.") from None
 
     def inspect(self, settings, *, configure=False):
-        sha, ref = settings["freeze_sha"], settings["ref"]
-        if self.repo("GET", "/commits/" + urllib.parse.quote(ref, safe=""))["sha"] != sha:
-            raise ArenaError("Frozen code differs from the current branch; stop before consuming budget.")
-        workflows = ("public-intake", "producer", "freeze-predictions", "evaluate-postlock")
-        for name in workflows:
-            record = self.repo("GET", "/actions/workflows/arena-ct03-" + name + ".yml")
-            if record["state"] != "active":
-                raise ArenaError("Required workflow is not active: " + name)
-        # Check existing names, never fetch values or recreate historical secrets.
-        repository_secrets = self.secret_names()
-        required = {
-            "arena-ct03-custodian": {"CT03_R2_ACCOUNT_ID", "CT03_R2_ACCESS_KEY_ID", "CT03_R2_SECRET_ACCESS_KEY"},
-            "arena-ct03-producer-b-provider": {"CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"},
-        }
-        for environment, names in required.items():
-            present = repository_secrets | self.secret_names(environment)
-            if names - present:
-                raise ArenaError("Existing credential references missing in " + environment + ": " + ", ".join(sorted(names-present)))
-        for workflow in ("public-intake", "producer"):
-            records = self.repo("GET", "/actions/workflows/arena-ct03-" + workflow + ".yml/runs?event=workflow_dispatch&per_page=1")
-            if records["total_count"]:
-                raise ArenaError("A previous " + workflow + " dispatch exists. Continue its recorded run; do not open another lot.")
-        variables = {
-            "arena-ct03-custodian": {"CT03_APPROVED_FREEZE_SHA": sha,
-                                     "CT03_CUSTODY_ONE_WORLD_AUTH": "CT03_ONE_APPROVED_WORLD"},
-            "arena-ct03-producer": {"CT03_APPROVED_FREEZE_SHA": sha},
-        }
-        pending = []
-        for environment, values in variables.items():
-            for name, value in values.items():
-                if configure:
-                    self.variable(environment, name, value)
-                elif self.variable(environment, name) != value:
-                    pending.append(environment + "/" + name)
-        return {"workflows_registered": True, "existing_secret_names_present": True,
-                "credential_scopes_validated": False, "pending_variables": pending,
-                "private_objects_read": False}
+        """Run readiness needs read access, not secret/admin access.
+
+        Each data role checks its actual credentials inside GitHub before the
+        world starts. No new secret copy or intermediate variable is required.
+        """
+        ref=settings["ref"]
+        actual=self.repo("GET","/commits/"+urllib.parse.quote(ref,safe=""))["sha"]
+        expected=settings["freeze_sha"]
+        if expected!="HEAD" and actual!=expected:
+            raise ArenaError("Frozen code differs from the selected branch.")
+        workflow=self.repo("GET","/actions/workflows/arena-run.yml")
+        if workflow["state"]!="active":
+            raise ArenaError("Native Arena workflow is not registered/active.")
+        return {"workflows_registered":True,"frozen_code_sha":actual,
+                "credential_check":"ROLE_PREFLIGHT_JOBS_BEFORE_COMPUTE",
+                "admin_writes_required_to_run":False,"private_objects_read":False}

@@ -1,0 +1,8 @@
+{
+  "schema": "arena.public-connections/1",
+  "cloudflare": {
+    "account_id": "e0cb52526a69c0f48f001901a5b9a640",
+    "private_bucket": "igc-ct03-private-custody"
+  },
+  "note": "Public resource identifiers only; tokens belong to the two GitHub environments."
+}

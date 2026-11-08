@@ -1,0 +1,360 @@
+name: Arena native - one end-to-end run
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Integration uses fixtures; live uses the single authorized CT03 lot
+        type: choice
+        options: [integration, live]
+        default: integration
+        required: true
+      authorized:
+        description: Approve the complete live lot once, including its one world
+        type: choice
+        options: ['no', 'yes']
+        default: 'no'
+        required: true
+      freeze_sha:
+        description: Optional expected SHA; empty freezes the actual workflow commit automatically
+        type: string
+        required: false
+      max_new_omc:
+        description: Fixed CT03 ceiling including one world and excluding two historical reuses
+        type: number
+        default: 19
+        required: true
+      max_provider_posts:
+        description: Fixed Buffalo POST ceiling; no retries
+        type: number
+        default: 2
+        required: true
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: arena-native-${{ inputs.mode }}
+  cancel-in-progress: false
+jobs:
+  admit:
+    name: Freeze and admit one experiment
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      mode: ${{ steps.admit.outputs.mode }}
+      freeze_sha: ${{ steps.admit.outputs.freeze_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: '${{ github.sha }}', persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - id: admit
+        env:
+          MODE: ${{ inputs.mode }}
+          AUTHORIZED: ${{ inputs.authorized }}
+          FROZEN: ${{ inputs.freeze_sha }}
+          MAX_OMC: ${{ inputs.max_new_omc }}
+          MAX_POST: ${{ inputs.max_provider_posts }}
+        run: |
+          python -m arena.cloud admit --mode "$MODE" --authorized "$AUTHORIZED" --freeze-sha "$FROZEN" --omc "$MAX_OMC" --posts "$MAX_POST"
+  integration:
+    name: Complete integration with fixtures
+    needs: admit
+    if: needs.admit.outputs.mode == 'integration'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: '${{ github.sha }}', persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m arena run examples/smoke.toml --out runs/github-integration
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-integration-${{ github.run_id }}
+          path: |
+            runs/github-integration/result.json
+            runs/github-integration/report.md
+          if-no-files-found: error
+  provider-check:
+    name: Check provider access without inference
+    needs: admit
+    if: needs.admit.outputs.mode == 'live'
+    environment: arena-provider
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: '${{ github.sha }}', persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Read-only provider checks; no paid POST
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python -m arena.cloud provider-preflight
+  storage-check:
+    name: Check custody access without selecting a world
+    needs: admit
+    if: needs.admit.outputs.mode == 'live'
+    environment: arena-custodian
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: '${{ github.sha }}', persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Check only storage access and existing reservation
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CT03_R2_BUCKET: ${{ vars.CT03_R2_BUCKET || 'igc-ct03-private-custody' }}
+          CT03_R2_ACCESS_KEY_ID: ${{ secrets.CT03_R2_ACCESS_KEY_ID }}
+          CT03_R2_SECRET_ACCESS_KEY: ${{ secrets.CT03_R2_SECRET_ACCESS_KEY }}
+        run: python -m arena.cloud storage-preflight
+  world:
+    name: Select and simulate one private world
+    needs: [admit, provider-check, storage-check]
+    if: needs.admit.outputs.mode == 'live'
+    environment: arena-custodian
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: '${{ github.sha }}', persist-credentials: false}
+      - id: runtime
+        uses: ./.github/actions/native-runtime
+        with: {role: custodian}
+      - name: Atomic reservation and one private simulation
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CT03_R2_BUCKET: ${{ vars.CT03_R2_BUCKET || 'igc-ct03-private-custody' }}
+          CT03_R2_ACCESS_KEY_ID: ${{ secrets.CT03_R2_ACCESS_KEY_ID }}
+          CT03_R2_SECRET_ACCESS_KEY: ${{ secrets.CT03_R2_SECRET_ACCESS_KEY }}
+        run: python -m arena.cloud world --workspace "$RUNNER_TEMP/arena-native"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-public-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/arena-native/artifacts/ct03-public/construction.json
+            ${{ runner.temp }}/arena-native/artifacts/ct03-public/world-commitment.json
+            ${{ runner.temp }}/arena-native/artifacts/ct03-public/release-status.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-world-usage-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/native-world-usage.json
+          if-no-files-found: warn
+  dm:
+    name: D and M originals
+    needs: [admit, world]
+    if: needs.admit.outputs.mode == 'live'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: '${{ github.sha }}', persist-credentials: false}
+      - uses: ./.github/actions/native-runtime
+        with: {role: dm}
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-public-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/ct03-public
+      - name: Originals, own feedback and selected M revisions
+        run: python -m arena.cloud dm --workspace "$RUNNER_TEMP/arena-native"
+      - name: Preserve partial D/M consumption after failures
+        if: always()
+        run: python -m arena.cloud dm-usage --workspace "$RUNNER_TEMP/arena-native"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-dm-usage-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/native-dm-usage.json
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-dm-budget-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/ct03-producer/dm-budget.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-dm-join-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/arena-native/artifacts/ct03-producer/dm-twelve-lock-rows.json
+            ${{ runner.temp }}/arena-native/artifacts/ct03-producer/dm-ten/D/manifest.json
+            ${{ runner.temp }}/arena-native/artifacts/ct03-producer/dm-ten/M/manifest.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-dm-audit-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/arena-native/artifacts/ct03-producer/dm-ten/
+            ${{ runner.temp }}/arena-native/artifacts/ct03-producer/dm-feedback/
+            ${{ runner.temp }}/arena-native/artifacts/ct03-producer/dm-budget.json
+          if-no-files-found: warn
+  buffalo:
+    name: Buffalo original and own feedback
+    needs: [admit, world, dm]
+    if: needs.admit.outputs.mode == 'live'
+    environment: arena-provider
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/arena/_vendor/ct02/
+      - uses: ./.github/actions/native-runtime
+        with: {role: b}
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-public-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/ct03-public
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-dm-budget-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/ct03-budget
+      - name: Original Buffalo and own revision, at most two POST
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python -m arena.cloud b --workspace "$RUNNER_TEMP/arena-native"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-b-join-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/ct03-producer/B-thirteenth-row.json
+          if-no-files-found: error
+      - name: Preserve observed/unknown usage after failures
+        if: always()
+        run: python -m arena.cloud b-usage --workspace "$RUNNER_TEMP/arena-native"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-b-usage-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/native-b-usage.json
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-b-audit-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/arena-native/artifacts/ct03-producer/B*/
+            ${{ runner.temp }}/arena-native/artifacts/ct03-producer/b-provider-attempts.log
+            ${{ runner.temp }}/arena-native/artifacts/ct03-producer/b-physical-attempts.log
+          if-no-files-found: warn
+  lock:
+    name: Lock producer predictions
+    needs: [admit, world, dm, buffalo]
+    if: needs.admit.outputs.mode == 'live'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      artifact_id: ${{ steps.archive.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: '${{ github.sha }}', persist-credentials: false}
+      - uses: ./.github/actions/native-runtime
+        with: {role: lock}
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-public-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/ct03-public
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-dm-join-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/dm-join
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-b-join-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/b-join
+      - run: python -m arena.cloud lock --workspace "$RUNNER_TEMP/arena-native"
+      - id: archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-lock-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/native-lock/
+          if-no-files-found: error
+  evaluate:
+    name: Evaluate after immutable lock
+    needs: [admit, world, dm, buffalo, lock]
+    if: needs.admit.outputs.mode == 'live'
+    environment: arena-custodian
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: '${{ github.sha }}', persist-credentials: false}
+      - uses: ./.github/actions/native-runtime
+        with: {role: evaluator}
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.lock.outputs.artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/arena-native/artifacts/native-lock
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-public-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/ct03-public
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-dm-budget-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/ct03-budget
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-world-usage-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/native-usage
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-b-usage-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/native-usage
+      - name: Verify archive before exporting storage credentials
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LOCK_ARTIFACT: ${{ needs.lock.outputs.artifact_id }}
+        run: python -m arena.cloud verify-lock --workspace "$RUNNER_TEMP/arena-native" --artifact-id "$LOCK_ARTIFACT"
+      - name: Read reserve and score; zero new OMC/provider
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LOCK_ARTIFACT: ${{ needs.lock.outputs.artifact_id }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CT03_R2_BUCKET: ${{ vars.CT03_R2_BUCKET || 'igc-ct03-private-custody' }}
+          CT03_R2_ACCESS_KEY_ID: ${{ secrets.CT03_R2_ACCESS_KEY_ID }}
+          CT03_R2_SECRET_ACCESS_KEY: ${{ secrets.CT03_R2_SECRET_ACCESS_KEY }}
+        run: python -m arena.cloud evaluate --workspace "$RUNNER_TEMP/arena-native" --artifact-id "$LOCK_ARTIFACT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arena-native-result-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/native-result/
+          if-no-files-found: error
+
+  diagnose:
+    name: Report blocked or failed execution without retry
+    needs: [admit, provider-check, storage-check, world, dm, buffalo, lock, evaluate]
+    if: always() && needs.admit.outputs.mode == 'live' && needs.evaluate.result != 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: '${{ github.sha }}', persist-credentials: false}
+      - uses: ./.github/actions/native-runtime
+        with: {role: lock}
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: native-*-usage-${{ github.run_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/arena-native/artifacts/native-usage
+      - name: Report available evidence and unknown consumption explicitly
+        env:
+          ARENA_JOB_STATES: ${{ toJson(needs) }}
+        run: python -m arena.cloud failure-report --workspace "$RUNNER_TEMP/arena-native"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arena-native-diagnostic-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/native-diagnostic/
+          if-no-files-found: error

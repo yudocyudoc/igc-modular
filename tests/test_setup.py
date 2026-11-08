@@ -133,38 +133,25 @@ class SetupTests(unittest.TestCase):
 
 
 class GitHubInspectionTests(unittest.TestCase):
-    def test_existing_repository_names_are_reused_and_ack_is_not_written_before_world(self):
+    def test_native_run_readiness_does_not_read_secrets_or_write_admin_variables(self):
         from arena import config
-        root = Path(__file__).resolve().parents[1]
-        settings = config.load(root/"examples/ct03.toml")["github"]
-        api = GitHub("yudocyudoc/IGC", Mock())
-        api.secret_names = Mock(side_effect=lambda environment=None: set() if environment else {
-            "CT03_R2_ACCOUNT_ID", "CT03_R2_ACCESS_KEY_ID", "CT03_R2_SECRET_ACCESS_KEY",
-            "CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"})
-        writes = []
-
-        def repo(method, suffix, payload=None):
-            if method != "GET":
-                writes.append((method, suffix, payload))
-                return {}
-            if suffix.startswith("/commits/"):
-                return {"sha": settings["freeze_sha"]}
-            if "/runs?" in suffix:
-                return {"total_count": 0}
-            if suffix.startswith("/actions/workflows/"):
-                return {"state": "active"}
-            if "/variables/" in suffix:
-                raise ApiError(404)
+        root=Path(__file__).resolve().parents[1]
+        settings=config.load(root/"examples/ct03.toml")["github"]
+        api=GitHub("yudocyudoc/igc-modular",Mock())
+        calls=[]
+        def repo(method,suffix,payload=None):
+            calls.append((method,suffix,payload))
+            if suffix.startswith("/commits/"): return {"sha":"a"*40}
+            if suffix=="/actions/workflows/arena-run.yml": return {"state":"active"}
             raise AssertionError(suffix)
+        api.repo=repo
+        result=api.inspect(settings,configure=False)
+        self.assertEqual(result["frozen_code_sha"],"a"*40)
+        self.assertFalse(result["admin_writes_required_to_run"])
+        self.assertEqual(len(calls),2)
+        self.assertTrue(all(method=="GET" for method,_,_ in calls))
+        self.assertFalse(any("/secrets" in suffix or "/variables" in suffix for _,suffix,_ in calls))
 
-        api.repo = repo
-        result = api.inspect(settings, configure=True)
-        self.assertTrue(result["existing_secret_names_present"])
-        self.assertEqual(len(writes), 3)
-        self.assertTrue(all("/variables" in row[1] for row in writes))
-        self.assertFalse(any("CT03_EXTERNAL_CUSTODIAN_ACK" in json.dumps(row) for row in writes))
-        self.assertFalse(any("/secrets" in row[1] for row in writes))
 
-
-if __name__ == "__main__":
+if __name__=="__main__":
     unittest.main()

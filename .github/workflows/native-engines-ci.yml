@@ -19,6 +19,8 @@ jobs:
         with: {python-version: '3.12'}
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
+      - name: Validate GitHub workflow syntax
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
       - name: Verify the migrated engine bytes and native CT02 evidence
         run: python -m arena.runtime verify
       - name: Original producer, revision, feedback and failure regressions
