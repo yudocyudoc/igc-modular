@@ -12,7 +12,7 @@ import subprocess
 import sys
 
 from .common import ArenaError, read_json, write_json
-from .connections import Secret
+from .connections import Secret, public_config
 from .github import GitHub
 from .runtime import module, verify
 from .cloud import public_input
@@ -122,7 +122,9 @@ def execute_once(workspace):
            "BUFFALO_MODE": "live",
            "BUFFALO_ROUND_KIND": "initial",
            "BUFFALO_LIVE_AUTH": "ONE_UPSTREAM_CALL",
-           "BUFFALO_CT03_LIVE_AUTH": "CT03_ONE_ROUND_EXPRESS_AUTH"}
+           "BUFFALO_CT03_LIVE_AUTH": "CT03_ONE_ROUND_EXPRESS_AUTH",
+           "CLOUDFLARE_ACCOUNT_ID": os.environ.get("CLOUDFLARE_ACCOUNT_ID")
+               or public_config()["cloudflare"]["account_id"]}
     # The original runner rejects a second outbound POST *before* sending it.
     # This wrapper never calls it twice and never invokes OMC or the CT03 batch.
     with (out / "runner.log").open("w", encoding="utf-8") as log:
