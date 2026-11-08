@@ -25,6 +25,14 @@ La cuenta y el bucket existentes están preconfigurados como identificadores pú
 
 Los secretos de IGC no se pueden leer y copiar por API. Si se necesitan credenciales nuevas, se generan y cargan una vez. No se guardan en Git ni se envían por chat. El enlace opcional por API conserva las entradas ya existentes y configura únicamente las faltantes.
 
+## Buffalo-only: diagnóstico independiente, sin alterar CT03
+
+[Buffalo-only (1 POST)](https://github.com/yudocyudoc/igc-modular/actions/workflows/buffalo-only.yml) es un workflow **exclusivamente manual**, separado del lote cerrado CT03. Después de incorporar el PR, seleccionar la rama `main`, pulsar **Run workflow** y elegir `authorized=yes` una sola vez. No hay push/PR-trigger, reintentos, ejecución automática de D/M/OMC, nuevo custodio ni nuevo mundo.
+
+Reutiliza **únicamente** el artefacto público `native-public-42455527897` (artifact ID 13607441674) del [CT03 cerrado](https://github.com/yudocyudoc/igc-modular/actions/runs/42455527897). Revalida procedencia, estado cerrado, identidad, y los tres archivos públicos antes de preparar la llamada. La generación utiliza `UB-IAD/sd-ai::Engine.generate` y el adaptador Cloudflare original, con **16,000 tokens máximos**, `reasoning_effort=low`, un solo POST y sin revisión `currentModel`. Usa únicamente `arena-provider/CLOUDFLARE_API_TOKEN`.
+
+Archiva `provider-raw.json` cuando exista, `receipt.json`, uso de tokens si fue informado, evidencia de intento previo al POST, hash de solicitud, salida de motor y `result.json`, incluso ante `NO_NATIVE`. Una respuesta ausente se informa como **consumo desconocido**, nunca como cero supuesto. La ejecución no actualiza `arena-run.yml`, el lock, el score ni el denominador de 13 plazas del CT03. **0 OMC y 0 mundos nuevos.**
+
 ## Motores dentro de este repositorio
 
 - **D**: generador original, seis alternativas, validación física y feedback propio.
