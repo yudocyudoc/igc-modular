@@ -157,7 +157,9 @@ def finalize(workspace):
         "new_worlds": 0, "omc_attempts": 0, "max_provider_posts": 1,
         "provider_attempt_reserved": attempt,
         "provider_posts_reported": receipt.get("provider_calls") if receipt else None,
-        "provider_consumption_complete": receipt is not None,
+        "provider_attempt_count_complete": receipt is not None,
+        "provider_consumption_complete": bool(receipt is not None and (
+            receipt.get("provider_calls") == 0 or receipt.get("provider_usage") is not None)),
         "raw_provider_response_archived": (native / "provider-raw.json").is_file(),
         "provider_usage": receipt.get("provider_usage") if receipt else None,
         "provider_finish_reason": receipt.get("provider_finish_reason") if receipt else None,
