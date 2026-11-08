@@ -63,7 +63,17 @@ jobs:
         if: ${{ inputs.mode == 'execute' }}
         run: |
           set -euo pipefail
-          python -m arena run examples/ct03.toml --out runs/ct03 --authorize > run-summary.json
+          # One bounded local continuation may monitor a confirmed in-flight
+          # stage after the four-hour wait limit. Resume never dispatches it again.
+          if ! python -m arena run examples/ct03.toml --out runs/ct03 --authorize > run-summary.json; then
+            python -m arena status runs/ct03 > final-status.json
+            if python -c 'import json,sys; sys.exit(0 if json.load(open("final-status.json"))["status"] == "WAITING_REMOTE" else 1)'; then
+              python -m arena resume runs/ct03 > run-summary.json
+            else
+              echo "::error::CT-03 stopped; never launch a second physical lot."
+              exit 1
+            fi
+          fi
           python -m arena status runs/ct03 > final-status.json
       - name: Publish human-readable summary when available
         if: ${{ always() }}
