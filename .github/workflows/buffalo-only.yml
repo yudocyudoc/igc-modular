@@ -1,0 +1,74 @@
+name: Arena diagnostic - buffalo-only one POST
+
+on:
+  workflow_dispatch:
+    inputs:
+      authorized:
+        description: "Run exactly one paid Buffalo POST outside the closed CT03"
+        type: choice
+        options: ['no', 'yes']
+        default: 'no'
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+# Separate from arena-run.yml and CT03. A previous manual dispatch is
+# rejected by the Python admission gate; jobs are never auto-retried.
+concurrency:
+  group: arena-buffalo-only-one-post
+  cancel-in-progress: false
+
+jobs:
+  buffalo-only:
+    name: Original Buffalo - archived public CT03 input - 0 OMC
+    if: inputs.authorized == 'yes' && github.ref == 'refs/heads/main'
+    environment: arena-provider
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
+      - uses: ./.github/actions/native-runtime
+        with:
+          role: b
+      - name: Download ONLY archived public release from closed CT03
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 13607441674
+          run-id: 42455527897
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/arena-native/artifacts/ct03-public
+      - name: Validate original source, artifact, first manual attempt and no previous run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUFFALO_ONLY_AUTH: '${{ inputs.authorized }}'
+        run: python -m arena.buffalo_only admit --workspace "$RUNNER_TEMP/arena-native"
+      - name: Install pinned original quantitative engine dependencies
+        working-directory: ${{ runner.temp }}/arena-native/upstream/sd-ai
+        run: npm ci --ignore-scripts --omit=optional --no-audit --no-fund
+      - name: One original Engine.generate, Cloudflare adapter 16,000 tokens
+        env:
+          BUFFALO_ONLY_AUTH: '${{ inputs.authorized }}'
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python -m arena.buffalo_only run --workspace "$RUNNER_TEMP/arena-native"
+      - name: Record actual or unknown provider usage after any outcome
+        if: always()
+        run: |
+          if [ -d "$RUNNER_TEMP/arena-native/artifacts/buffalo-only" ]; then
+            python -m arena.buffalo_only finalize --workspace "$RUNNER_TEMP/arena-native"
+          else
+            echo "No Buffalo attempt directory: no paid POST was authorized by this job."
+          fi
+      - name: Archive raw provider response, receipt, request hashes and diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: buffalo-only-diagnostic-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/buffalo-only/
+          if-no-files-found: warn
+          retention-days: 90
