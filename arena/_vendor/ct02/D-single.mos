@@ -1,0 +1,6 @@
+getVersion();
+loadFile("/repo/artifacts/ct02-exact-two/D/DStockFlow_5f8781847cb6.mo");
+checkModel(DStockFlow_5f8781847cb6);
+print(getErrorString());
+simulate(DStockFlow_5f8781847cb6,startTime=0,stopTime=8,numberOfIntervals=64,method="euler",outputFormat="csv",fileNamePrefix="artifacts/ct02-exact-two/d00");
+print(getErrorString());

@@ -1,0 +1,417 @@
+{
+  "schema": "arena.engines-sources/1",
+  "igc_commit": "881f92792e4a67de0eb33a04662089029c0e6918",
+  "buffalo_commit": "5199f7b45f3a7ae4a773cb0dd8542940aabe9edc",
+  "license": "Buffalo MIT, see buffalo/LICENSE",
+  "historical_ct02_export": "74a37a9cc3f0d1d9eaad17328ba6f68508cff32e",
+  "files": [
+    {
+      "path": "igc/experiments/cafeteria/CT03_PREEXECUTION_PROTOCOL_2026-11-07.json",
+      "git_blob": "97c40f875a28afa2012f3ab949e1633d6acd6a41"
+    },
+    {
+      "path": "igc/experiments/e0/catalog.json",
+      "git_blob": "8381e7aa7280d71aefffdfb26866e007c7678d32"
+    },
+    {
+      "path": "igc/experiments/e1/backend.py",
+      "git_blob": "cc854a0f29399a8299146271fbe3c56c7c5347b3"
+    },
+    {
+      "path": "igc/experiments/e1/composer.py",
+      "git_blob": "27d9fe2e65db924f204423f9660a576e723bfd9b"
+    },
+    {
+      "path": "igc/experiments/e1/registry.base.json",
+      "git_blob": "956eb9636046165b827275a822f37f3643dc1e59"
+    },
+    {
+      "path": "igc/experiments/e1/registry.extended.json",
+      "git_blob": "63a038ff3c6d88477f2ac3e2fb1a08efd29b15ac"
+    },
+    {
+      "path": "igc/experiments/e1/test_composition.py",
+      "git_blob": "48852a2521f34366b8c6fd57b2fb5ae5d0990f71"
+    },
+    {
+      "path": "igc/experiments/e1/verify_native.py",
+      "git_blob": "9e8f24b3e4ea285ccc5a269d61114459ea65328f"
+    },
+    {
+      "path": "igc/scripts/arena_atms.py",
+      "git_blob": "9e247b614f1bc372afe6d6d21b4376c029e1aa82"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/__init__.py",
+      "git_blob": "0d0b6a2e34906c55ddf5e842ea71a5c19c2cd329"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct02_minimal_batch.py",
+      "git_blob": "793a2c5e77dc9ba1ab7001985f9139ff4c76817f"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_d_prepare.py",
+      "git_blob": "8494458e5499f77c8e5e0607b2817062e48044e0"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_m_construction_diagnostic.py",
+      "git_blob": "141620e33071d02f0897dc9cc253610689483eb6"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_m_prepare.py",
+      "git_blob": "d0a22bda5c7974cdf4feca8bc72816c5b3530086"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_minimal_custody.py",
+      "git_blob": "6c64a70df78ad5bb767e7c4d7ae7547818c4c58d"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_minimal_score.py",
+      "git_blob": "ea05f47b5c0efc9183e2dcd767eabae7c6ef6ba5"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_prospective_lock.py",
+      "git_blob": "d38974f701a4a13bc75b3eb950d7ecb91142af2b"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_public.py",
+      "git_blob": "2808cc5a43826a94a78e15fcc1a7d0e853bf95a5"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_world_custody.py",
+      "git_blob": "e65882a2e552ac6bf068636279761fca1408c85d"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct_feedback_bridge.py",
+      "git_blob": "fe92edc9f3ff4245ff719b20d7fe8419dc77b58c"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/e02_b_feedback.py",
+      "git_blob": "53be5f64a3889b13aae1dadec51daa897b8932aa"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/evidence.py",
+      "git_blob": "08961bf225892738e86976860b258cec554ccaff"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/native_handoff.py",
+      "git_blob": "cd54a2fa4a307c3b452300fd0efbdfd608a52a86"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/observation_eval.py",
+      "git_blob": "864bcc2b4808a44024f0150abb3d8c09b2eb8b32"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/observation_ports.py",
+      "git_blob": "22b3003df5bba0da5eb0802e42b668037f50584c"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/r2_causal_pos_signal.py",
+      "git_blob": "4fef6d0451b9b39e183e9ff7a22083be7f8a1072"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/r2_m_six_causal_g2.py",
+      "git_blob": "3590361d1d154cb79ee9cd669875afdf52c6a413"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/r2_observational_contracts.py",
+      "git_blob": "c6b2688df8d9c69cfdf6fcc84ca02efdd7b463af"
+    },
+    {
+      "path": "igc/scripts/arena_d_v01.py",
+      "git_blob": "9dcab2bf1ee3a3c7430595385f381d89ba023a6d"
+    },
+    {
+      "path": "igc/scripts/arena_event_observability.py",
+      "git_blob": "b5cf7b5d4b9684b230298c2014a3a08b075780fd"
+    },
+    {
+      "path": "igc/scripts/arena_m2_feedback.py",
+      "git_blob": "916616e9472bf43478fff47ef40d5ae0a493a4ef"
+    },
+    {
+      "path": "igc/scripts/arena_m_short_e1.py",
+      "git_blob": "d7a3345f8ee0169445369e573658a1e004fd8146"
+    },
+    {
+      "path": "igc/scripts/arena_m_visible_pulse.py",
+      "git_blob": "23f838407d2e33f8f05890645321bf09ed965de4"
+    },
+    {
+      "path": "igc/scripts/arena_m_visible_verify.py",
+      "git_blob": "b2e5c92a94730500c93464db9ef0e683d8a1ecd6"
+    },
+    {
+      "path": "igc/scripts/arena_memory.py",
+      "git_blob": "cd83254f1e06c7705227423d9669cf0deb8cadc2"
+    },
+    {
+      "path": "igc/scripts/arena_v0_contract.py",
+      "git_blob": "031a0c47c7f09135191d1689e55b010910de3c48"
+    },
+    {
+      "path": "igc/scripts/ledger.py",
+      "git_blob": "a49332d8c956022bc839295be01a102740aba68c"
+    },
+    {
+      "path": "igc/src/modelica/IGCInformationMolecules.mo",
+      "git_blob": "36d97a7e9de4d7ee80bf884beec6094a9bb1cf98"
+    },
+    {
+      "path": "igc/src/modelica/IGCMolecules.mo",
+      "git_blob": "2f83de72d38d0b8f5e866295b806d19067c5194d"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_dm_initial_batch.py",
+      "git_blob": "298b784f78ba7580c9c6f4078778a58118b8f14a"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_dm_feedback_round.py",
+      "git_blob": "b2c001a728fe8bd5de801609e2d503a8e41b292c"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_dm_lock_projection.py",
+      "git_blob": "d845a2376356136657b1739f4388da9e97543389"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_lot_budget.py",
+      "git_blob": "8b40b16c5c9f9d0f060b1288fe25e35332aeadb3"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_b_physical_result.py",
+      "git_blob": "f01053b04a9744174cfde8e0b163f19fdb561bcf"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_b_physical_outcome.py",
+      "git_blob": "fed054a040498f25ffe0e7ba65e6e77d3c1e37de"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_b_physical_feedback.py",
+      "git_blob": "dbde6ef3709eaa741ec36ef8a9a3581759ba238c"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_b_physical_prepare.py",
+      "git_blob": "0f589f9f3b8546afd647aac6d08d6bdc213ca339"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_b_own_feedback.py",
+      "git_blob": "f90a6d10de71237d7d3578dd4e0c182412d310eb"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_b_lock_projection.py",
+      "git_blob": "554fb378c16ee4df17f19a44e7f15db995cc6d5f"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_b_review_export.py",
+      "git_blob": "82d05cbd37c06b8c95adc0d9d82a94e06c4fc8d1"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_b_visible.py",
+      "git_blob": "15c5e91b2bc5e648a1f8b5748a3b5210cfe10804"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_private_choose.py",
+      "git_blob": "eb475bf76b93e29ed2416c0f0fdc47e22bda67e9"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_assemble_entries.py",
+      "git_blob": "327605439abe1368abf417047821bda47f949509"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_producer_freeze_handoff.py",
+      "git_blob": "5787ce20665c19a7b59864ebb804539cc4b4c302"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_reuse_ct02.py",
+      "git_blob": "4141f3d3994bfb74ab1a9abb1499030e1ad18f93"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_b_producer_rounds_once.sh",
+      "git_blob": "43bca192286a9fc094a12f07c8f66691baa66b30"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_b_physical_execute_once.sh",
+      "git_blob": "76e449c93b4160e235eb7bf841c9d2de7937923c"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_dm_execute_ten_once.sh",
+      "git_blob": "5a4e682841694062a2b1550712530205c36ea9e1"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_m_revision_execute_once.sh",
+      "git_blob": "a500d81afa17c95a4a8ba604f08601894f6bf6bb"
+    },
+    {
+      "path": "igc/scripts/arena_b_ct03_native_runner.mjs",
+      "git_blob": "dafd919721c88248b016a28281f0f0cabb43919f"
+    },
+    {
+      "path": "igc/scripts/arena_b_ct03_contract.mjs",
+      "git_blob": "304a4ab0493350a6c24556236655346f27dafd15"
+    },
+    {
+      "path": "igc/scripts/arena_b_ev01_cf_adapter.mjs",
+      "git_blob": "20d45ca25993e02db9e38c48b92817889b0dd47c"
+    },
+    {
+      "path": "igc/scripts/arena_b_cf_protocol_adapter.mjs",
+      "git_blob": "724843043e699efbfc20fa79be3c0edb08a95c98"
+    },
+    {
+      "path": "igc/scripts/arena_b_native_g1_diagnostic.mjs",
+      "git_blob": "7f430d35046b51d6dca6da3d9e08d0cee0131ce5"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_m_revision_prepare.py",
+      "git_blob": "c2c55cb970222839fd85526b85faeefd73ad2211"
+    },
+    {
+      "path": "igc/scripts/arena_cafe/ct03_m_revision_physical.py",
+      "git_blob": "3ad6e1962eda66057ebcf5e2a730e628f3b5bd01"
+    },
+    {
+      "path": "igc/scripts/arena_b_native_to_modelica.py",
+      "git_blob": "7ea2d40c7d451ef93e322f4dafe47167d79045d5"
+    },
+    {
+      "path": "buffalo/engines/quantitative/engine.js",
+      "git_blob": "d8846fc316d8f52d5cfe7c83909d6c2be8998bbe"
+    },
+    {
+      "path": "buffalo/package.json",
+      "git_blob": "f75cad0890c65d2c7edfcaea2c821cfa6b63c976"
+    },
+    {
+      "path": "buffalo/package-lock.json",
+      "git_blob": "fc2328f70a0d7b617563691a0b500194b0e9e264"
+    },
+    {
+      "path": "buffalo/LICENSE",
+      "git_blob": "c306740613b37b9ffac447dde839cc3c25fd7cb2"
+    },
+    {
+      "path": "buffalo/engines/quantitative/QuantitativeEngineBrain.js",
+      "git_blob": "63c518cc1b4c4c6ae45de830e8e7fb1e6170ff7c"
+    },
+    {
+      "path": "buffalo/utilities/logger.js",
+      "git_blob": "9e8b2d7957e049db435b34aa0f52f652fd69cc63"
+    },
+    {
+      "path": "buffalo/utilities/utils.js",
+      "git_blob": "39f280aacbdea84b49e02b7277349cd1b38fdc74"
+    },
+    {
+      "path": "buffalo/utilities/LLMWrapper.js",
+      "git_blob": "5d4e450914d37e735390ed3b164202b414271b88"
+    },
+    {
+      "path": "buffalo/utilities/jsonUtils.js",
+      "git_blob": "16251150e3fdd3187a08ec8f45ae9505316b3f01"
+    },
+    {
+      "path": "buffalo/utilities/TokenUsageReporter.js",
+      "git_blob": "12b1b20624e4457b1e09eed47f3d03e346fe5c60"
+    },
+    {
+      "path": "buffalo/config.js",
+      "git_blob": "10aadb8de57f621879afbc84f268867dea512d43"
+    },
+    {
+      "path": "buffalo/utilities/pricing.js",
+      "git_blob": "3dc30eb9160aa43a7bcae6d2ab2f313bbec919b6"
+    },
+    {
+      "path": "buffalo/utilities/costAccounting.js",
+      "git_blob": "d778878a71bf0b63e520413cd982f3ad52e388b8"
+    },
+    {
+      "path": "ct02/D-omc.log",
+      "git_blob": "5600ac43c5792fe5428f7cbd896c299d23ea40ed"
+    },
+    {
+      "path": "ct02/D-single.mos",
+      "git_blob": "7b6f3174ece70fa4ea1e2a2f3f92bc67cdbd7436"
+    },
+    {
+      "path": "ct02/D/DStockFlow_1b03f4d80336.mo",
+      "git_blob": "9c32d53329aab420215438e0860839d831311344"
+    },
+    {
+      "path": "ct02/D/DStockFlow_5bc57655500f.mo",
+      "git_blob": "db16d18fc50ebcad18040d3c726e32079d864989"
+    },
+    {
+      "path": "ct02/D/DStockFlow_5f8781847cb6.mo",
+      "git_blob": "da67bf49837d6aa9aa35d2b843a12ae62bc68c7b"
+    },
+    {
+      "path": "ct02/D/DStockFlow_9a46b6a3ba32.mo",
+      "git_blob": "cc9ddb14057f5d74c08c641481c216fb745a29f7"
+    },
+    {
+      "path": "ct02/D/DStockFlow_b4030cf49cc3.mo",
+      "git_blob": "dc722e732212283948e2345268b4b524762b1577"
+    },
+    {
+      "path": "ct02/D/DStockFlow_ba433938dfc8.mo",
+      "git_blob": "c50f12276346b25662f945b8fe419d00316f609d"
+    },
+    {
+      "path": "ct02/D/manifest.json",
+      "git_blob": "c063bfa9e864eaac3e8b3bbd7fc903001872d9bf"
+    },
+    {
+      "path": "ct02/D/simulate.mos",
+      "git_blob": "6ff6f9eed4c3acc2d68135a9baaf3152dda80ffa"
+    },
+    {
+      "path": "ct02/M-omc.log",
+      "git_blob": "f3dead183d52af741215c4b3d24d3a8e197c2119"
+    },
+    {
+      "path": "ct02/M-single.mos",
+      "git_blob": "dcd29e48cee552e7e29c8a7972065c1c8172be32"
+    },
+    {
+      "path": "ct02/M/manifest.json",
+      "git_blob": "d8f420111488d27c84344eda48379d4644d23a1d"
+    },
+    {
+      "path": "ct02/M/native.mo",
+      "git_blob": "29bd6e8867e39c8345e85ea94ea8d062eb7d2e07"
+    },
+    {
+      "path": "ct02/M/simulate.mos",
+      "git_blob": "68defc7cd77f921ce1b39ac6c75812c89e67a6c1"
+    },
+    {
+      "path": "ct02/attempts.log",
+      "git_blob": "80782b94c532af1d02fd96d61ee06b413ef74198"
+    },
+    {
+      "path": "ct02/batch.json",
+      "git_blob": "18eb0fda00e1d512950f18c84a55d2d37eb61c10"
+    },
+    {
+      "path": "ct02/conformity.json",
+      "git_blob": "a8df4252a36b8903609c1fa7c67a21ecc5b2483f"
+    },
+    {
+      "path": "ct02/d00_res.csv",
+      "git_blob": "3762be5b37731d13abd1cfa4dd007dd1428f11e7"
+    },
+    {
+      "path": "ct02/m00_res.csv",
+      "git_blob": "8b7541b7ccdef0b4a37a39612447fd26f91f3dfe"
+    },
+    {
+      "path": "ct02/runtime-identity.txt",
+      "git_blob": "33e507e5b2bfad8092cbc96f99bcbf3a786a456f"
+    },
+    {
+      "path": "igc/migrations/0001_ledger.sql",
+      "git_blob": "b1e730de135c19615ec246a2c7111b89eddb0670"
+    }
+  ]
+}

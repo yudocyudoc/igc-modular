@@ -1,0 +1,21 @@
+"OpenModelica 1.26.5"
+true
+"Check of DStockFlow_5f8781847cb6 completed successfully.
+Class DStockFlow_5f8781847cb6 has 6 equation(s) and 6 variable(s).
+4 of these are trivial equation(s)."
+
+record SimulationResult
+    resultFile = "/repo/artifacts/ct02-exact-two/d00_res.csv",
+    simulationOptions = "startTime = 0.0, stopTime = 8.0, numberOfIntervals = 64, tolerance = 1e-6, method = 'euler', fileNamePrefix = 'artifacts/ct02-exact-two/d00', options = '', outputFormat = 'csv', variableFilter = '.*', cflags = '', simflags = ''",
+    messages = "LOG_SUCCESS       | info    | The initialization finished successfully without homotopy method.
+LOG_SUCCESS       | info    | The simulation finished successfully.
+",
+    timeFrontend = 0.0017556590000000001,
+    timeBackend = 0.007089979000000001,
+    timeSimCode = 0.0010062790000000001,
+    timeTemplates = 0.002238289,
+    timeCompile = 1.045639479,
+    timeSimulation = 0.013594986000000002,
+    timeTotal = 1.071440087
+end SimulationResult;
+

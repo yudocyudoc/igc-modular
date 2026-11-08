@@ -1,0 +1,49 @@
+name: Native engines - cloud-only migration contracts
+on:
+  push:
+    branches: [main, migration/native-engines]
+    paths: ['arena/**', 'tests/**', '.github/workflows/native-engines-ci.yml', '.github/workflows/arena-run.yml', 'pyproject.toml']
+  pull_request:
+    paths: ['arena/**', 'tests/**', '.github/workflows/native-engines-ci.yml', '.github/workflows/arena-run.yml', 'pyproject.toml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  engines:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verify the migrated engine bytes and native CT02 evidence
+        run: python -m arena.runtime verify
+      - name: Original producer, revision, feedback and failure regressions
+        working-directory: arena/_vendor/igc
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_*.py' -v
+          node --test tests/test_arena_b_ct03_contract.mjs tests/test_arena_b_cf_protocol_adapter.mjs tests/test_arena_b_native_g1_diagnostic.mjs
+      - name: Prepare a runner-only execution workspace
+        run: python -m arena.runtime prepare --role contracts --out "$RUNNER_TEMP/arena-native"
+      - name: Verify both historical physical originals without downloading IGC
+        run: python -m arena.runtime ct02 --workspace "$RUNNER_TEMP/arena-native"
+      - name: Install the original Buffalo dependency lock, no lifecycle scripts
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/arena-native/upstream/sd-ai"
+          npm ci --ignore-scripts --omit=optional --no-audit --no-fund
+      - name: Original Buffalo initial, memory retrieval and own-parent revision with offline transport
+        run: python -m arena.engine_contracts --workspace "$RUNNER_TEMP/arena-native"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-engine-migration-contracts-zero-consumption
+          path: |
+            ${{ runner.temp }}/arena-native/artifacts/engine-contracts/summary.json
+            ${{ runner.temp }}/arena-native/artifacts/engine-contracts/initial/receipt.json
+            ${{ runner.temp }}/arena-native/artifacts/engine-contracts/revision/receipt.json
+            ${{ runner.temp }}/arena-native/artifacts/ct03-reuse/reused-original-two.json
+          if-no-files-found: error
