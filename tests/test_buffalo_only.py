@@ -100,6 +100,8 @@ class BuffaloOnlyTests(unittest.TestCase):
                                  ["node", "scripts/arena_b_ct03_native_runner.mjs"])
                 self.assertEqual(kwargs["env"]["BUFFALO_ROUND_KIND"], "initial")
                 self.assertEqual(kwargs["env"]["BUFFALO_MODE"], "live")
+                self.assertEqual(kwargs["env"]["CLOUDFLARE_ACCOUNT_ID"],
+                                 buffalo_only.public_config()["cloudflare"]["account_id"])
                 self.assertNotIn("omc", args[0])
                 self.assertEqual(read_json(out / "attempt.json")["max_provider_posts"], 1)
                 with self.assertRaisesRegex(ArenaError, "retry refused"):
