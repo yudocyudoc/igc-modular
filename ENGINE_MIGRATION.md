@@ -59,3 +59,7 @@ La conexión disponible para editar código no expone escritura de Actions secre
 Las credenciales iniciales y una autorización explícita mode=live/authorized=yes son necesarias para consumir el lote. Su código ya está conectado; no hace falta otro coordinador, intermediario de firmas o archivista externo.
 
 Referencias: [S3 conditional PutObject](https://developers.cloudflare.com/r2/api/s3/extensions/), [R2 consistency](https://developers.cloudflare.com/r2/reference/consistency/), [GitHub artifact download](https://github.com/actions/download-artifact), [Buffalo upstream](https://github.com/UB-IAD/sd-ai/tree/5199f7b45f3a7ae4a773cb0dd8542940aabe9edc).
+
+## Incorporación del trabajo del coder
+
+Se conserva la corrección de despacho del PR #1: `return_run_details: true` solicita a GitHub el identificador confirmado de la ejecución. Se incorporan sus dos regresiones al recorrido nativo. El workflow del puente al repositorio IGC queda sustituido por `arena-run.yml`; no se requiere `IGC_ACTIONS_TOKEN`.

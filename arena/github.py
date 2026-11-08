@@ -86,7 +86,7 @@ class GitHub:
 
     def dispatch(self, workflow, ref, inputs):
         reply = self.repo("POST", "/actions/workflows/" + workflow + "/dispatches",
-                          {"ref": ref, "inputs": inputs})
+                          {"ref": ref, "inputs": inputs, "return_run_details": True})
         run_id = reply.get("workflow_run_id") if isinstance(reply, dict) else None
         if type(run_id) is not int or run_id <= 0:
             raise ArenaError("Dispatch has no confirmed run ID. Preserve this run and reconcile it; do not dispatch again.")
