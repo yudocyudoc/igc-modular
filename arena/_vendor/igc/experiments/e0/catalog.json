@@ -1,0 +1,191 @@
+{
+  "schema_version": "igc-v3/e0.1",
+  "purpose": "Declarative engineering catalog. Modelica Real ports are not natively typed; the IGC linter must enforce semantic ports.",
+  "units": "units/hour for rates, units for stocks, hours for time",
+  "source_packages": {
+    "physical": {
+      "path": "src/modelica/IGCMolecules.mo",
+      "sha": "2f83de72d38d0b8f5e866295b806d19067c5194d"
+    },
+    "information": {
+      "path": "src/modelica/IGCInformationMolecules.mo",
+      "sha": "36d97a7e9de4d7ee80bf884beec6094a9bb1cf98"
+    }
+  },
+  "classes": [
+    {
+      "id": "accepted-source",
+      "modelica": "IGCMolecules.AcceptedSource",
+      "provenance": "physical",
+      "roles": [
+        "source"
+      ],
+      "ports": [
+        {
+          "name": "externalRate",
+          "direction": "in",
+          "type": "SIGNAL<OrderRate>",
+          "unit": "units/hour"
+        },
+        {
+          "name": "outflow",
+          "direction": "out",
+          "type": "FLOW<Order>",
+          "unit": "units/hour"
+        }
+      ],
+      "parameters": {},
+      "states": {}
+    },
+    {
+      "id": "bounded-queue",
+      "modelica": "IGCMolecules.BoundedQueue",
+      "provenance": "physical",
+      "roles": [
+        "preparation",
+        "dispatch",
+        "transit"
+      ],
+      "ports": [
+        {
+          "name": "arrival",
+          "direction": "in",
+          "type": "FLOW<T>",
+          "unit": "units/hour"
+        },
+        {
+          "name": "completed",
+          "direction": "out",
+          "type": "FLOW<U>",
+          "unit": "units/hour"
+        },
+        {
+          "name": "waiting",
+          "direction": "out",
+          "type": "STATE<T>",
+          "unit": "units"
+        }
+      ],
+      "role_bindings": {
+        "preparation": {
+          "T": "Order",
+          "U": "ReadyOrder"
+        },
+        "dispatch": {
+          "T": "ReadyOrder",
+          "U": "Shipment"
+        },
+        "transit": {
+          "T": "Shipment",
+          "U": "Shipment"
+        }
+      },
+      "parameters": {
+        "maxThroughput": {
+          "min": 0.01,
+          "max": 100,
+          "unit": "units/hour",
+          "required": true
+        },
+        "responseTime": {
+          "min": 0.1,
+          "max": 5,
+          "unit": "hours",
+          "required": true
+        }
+      },
+      "states": {
+        "stock": {
+          "initial": 0,
+          "unit": "units"
+        }
+      },
+      "mechanism": "Stock-regulated bounded output: release clipped by maxThroughput. Repeated instances are the same class, not new molecules."
+    },
+    {
+      "id": "delivery-counter",
+      "modelica": "IGCMolecules.DeliveryCounter",
+      "provenance": "physical",
+      "roles": [
+        "receipt"
+      ],
+      "ports": [
+        {
+          "name": "arrival",
+          "direction": "in",
+          "type": "FLOW<Shipment>",
+          "unit": "units/hour"
+        },
+        {
+          "name": "total",
+          "direction": "out",
+          "type": "STATE<Delivered>",
+          "unit": "units"
+        }
+      ],
+      "parameters": {},
+      "states": {
+        "delivered": {
+          "initial": 0,
+          "unit": "units"
+        }
+      }
+    },
+    {
+      "id": "first-order-report-filter",
+      "modelica": "IGCInformationMolecules.FirstOrderReportFilter",
+      "provenance": "information",
+      "roles": [
+        "report"
+      ],
+      "ports": [
+        {
+          "name": "physicalArrivalRate",
+          "direction": "in",
+          "type": "SIGNAL<DeliveryRate>",
+          "unit": "units/hour"
+        },
+        {
+          "name": "reportedRate",
+          "direction": "out",
+          "type": "SIGNAL<DeliveryRate>",
+          "unit": "units/hour"
+        }
+      ],
+      "parameters": {
+        "reportResponseTime": {
+          "min": 0.1,
+          "max": 5,
+          "unit": "hours",
+          "required": true
+        }
+      },
+      "states": {
+        "reportFilter": {
+          "initial": 0,
+          "unit": "units/hour"
+        }
+      },
+      "invariant": "May not alter material state or deliveryRate."
+    }
+  ],
+  "adapters": [
+    {
+      "id": "receipt-rate-tap",
+      "from": "FLOW<Shipment>",
+      "to": "SIGNAL<DeliveryRate>",
+      "kind": "nonintrusive_observation",
+      "rule": "At receipt, observe the numeric physical incoming flow as a rate signal; no new stock or physical flow is created."
+    }
+  ],
+  "forbidden": [
+    "FLOW<Shipment> -> SIGNAL<DeliveryRate> without registered receipt-rate-tap",
+    "SIGNAL<DeliveryRate> -> FLOW<Shipment>",
+    "TRANSIT role with a reporting filter"
+  ],
+  "resource_limits": {
+    "max_transit_instances": 2,
+    "max_report_filter_instances": 1
+  },
+  "note": "This is a molecular contract and typing inventory. It does not contain valid/true graph names or hidden-world structures."
+}

@@ -1,0 +1,25 @@
+# References only. Existing names are reused; no secrets belong in this file.
+github_environments = ["arena-ct03-custodian", "arena-ct03-producer", "arena-ct03-producer-b-provider"]
+
+[connections.github]
+token = ["env:GH_TOKEN", "env:GITHUB_TOKEN", "vault:github/token", "gh:github.com"]
+
+[connections.buffalo]
+account_id = ["env:CLOUDFLARE_ACCOUNT_ID", "vault:cloudflare/account_id"]
+api_token = ["env:CLOUDFLARE_API_TOKEN", "vault:buffalo/api_token"]
+
+[connections.storage]
+account_id = ["env:CT03_R2_ACCOUNT_ID", "env:CLOUDFLARE_ACCOUNT_ID", "vault:cloudflare/account_id"]
+access_key_id = ["env:CT03_R2_ACCESS_KEY_ID", "vault:storage/access_key_id"]
+secret_access_key = ["env:CT03_R2_SECRET_ACCESS_KEY", "vault:storage/secret_access_key"]
+
+# Idempotent setup: existing repository/environment secrets are reused untouched.
+[github_bindings.arena-ct03-custodian]
+CT03_R2_ACCOUNT_ID = "storage.account_id"
+CT03_R2_ACCESS_KEY_ID = "storage.access_key_id"
+CT03_R2_SECRET_ACCESS_KEY = "storage.secret_access_key"
+
+[github_bindings.arena-ct03-producer-b-provider]
+CLOUDFLARE_ACCOUNT_ID = "buffalo.account_id"
+CLOUDFLARE_API_TOKEN = "buffalo.api_token"
+

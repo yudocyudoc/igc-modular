@@ -1,0 +1,117 @@
+{
+  "schema": "igc-v3/e1.1",
+  "extends_e0_catalog": "../e0/catalog.json",
+  "experiment_type": "COMPOSITION_INFRASTRUCTURE_ONLY",
+  "mandatory_roles": [
+    "source",
+    "preparation",
+    "dispatch",
+    "receipt"
+  ],
+  "roles": {
+    "source": {
+      "class_id": "accepted-source",
+      "max_instances": 1,
+      "parameters": {}
+    },
+    "preparation": {
+      "class_id": "bounded-queue",
+      "max_instances": 1,
+      "parameters": {
+        "maxThroughput": 20,
+        "responseTime": 0.5
+      }
+    },
+    "dispatch": {
+      "class_id": "bounded-queue",
+      "max_instances": 1,
+      "parameters": {
+        "maxThroughput": 20,
+        "responseTime": 0.5
+      }
+    },
+    "transit": {
+      "class_id": "bounded-queue",
+      "max_instances": 2,
+      "parameters": {
+        "maxThroughput": 100,
+        "responseTime": 1.6
+      }
+    },
+    "receipt": {
+      "class_id": "delivery-counter",
+      "max_instances": 1,
+      "parameters": {}
+    },
+    "report": {
+      "class_id": "first-order-report-filter",
+      "max_instances": 1,
+      "parameters": {
+        "reportResponseTime": 1.6
+      }
+    },
+    "amplifier": {
+      "class_id": "signal-gain",
+      "max_instances": 1,
+      "parameters": {
+        "k": 1.25
+      }
+    }
+  },
+  "endpoints": {
+    "source": {
+      "role": "source",
+      "output": "outflow",
+      "stimulus_input": "externalRate"
+    },
+    "receipt": {
+      "role": "receipt",
+      "input": "arrival",
+      "total_output": "total"
+    },
+    "dispatch_observation": {
+      "role": "dispatch",
+      "output": "completed"
+    },
+    "receipt_rate_tap": {
+      "id": "receipt-rate-tap",
+      "observable": "SIGNAL<DeliveryRate>"
+    }
+  },
+  "max_candidates": 64,
+  "new_classes": [
+    {
+      "id": "signal-gain",
+      "modelica": "Modelica.Blocks.Math.Gain",
+      "provenance": "ModelicaStandardLibrary 4.0.0 built-in; no new equation written",
+      "roles": [
+        "amplifier"
+      ],
+      "ports": [
+        {
+          "name": "u",
+          "direction": "in",
+          "type": "SIGNAL<DeliveryRate>",
+          "unit": "units/hour"
+        },
+        {
+          "name": "y",
+          "direction": "out",
+          "type": "SIGNAL<DeliveryRate>",
+          "unit": "units/hour"
+        }
+      ],
+      "parameters": {
+        "k": {
+          "min": 0.5,
+          "max": 2,
+          "unit": "dimensionless",
+          "required": true
+        }
+      },
+      "states": {},
+      "invariant": "Signal-only transform; must not change material flows."
+    }
+  ],
+  "scope": "Typed flow-chain enumeration and information-only signal chains; NOT a hidden-world or causal inference model. Extension registers existing MSL Gain with physical flow unchanged."
+}

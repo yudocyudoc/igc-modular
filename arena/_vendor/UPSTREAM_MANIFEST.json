@@ -1,0 +1,203 @@
+{
+  "repository": "yudocyudoc/IGC",
+  "commit": "881f92792e4a67de0eb33a04662089029c0e6918",
+  "source_snapshot": "pr172_fc676af with verified overlay to 881f927",
+  "extraction": "Import closure, native generators and existing lock/scorer; no originals edited",
+  "files": [
+    {
+      "path": "experiments/cafeteria/CT03_PREEXECUTION_PROTOCOL_2026-11-07.json",
+      "sha256": "cf0d3238dd636429000412af24ff1f9f14df5f1a7717bab50e660183165f332d",
+      "git_blob": "97c40f875a28afa2012f3ab949e1633d6acd6a41"
+    },
+    {
+      "path": "experiments/e0/catalog.json",
+      "sha256": "d4b615301ab3c104f85f282180ac68c616c6dcd18677024440e2bd8623cd0191",
+      "git_blob": "8381e7aa7280d71aefffdfb26866e007c7678d32"
+    },
+    {
+      "path": "experiments/e1/backend.py",
+      "sha256": "4ac7ba2beeafce7a338b63d32a308cf32c76017b3602b3f44b06c53bf55f7175",
+      "git_blob": "cc854a0f29399a8299146271fbe3c56c7c5347b3"
+    },
+    {
+      "path": "experiments/e1/composer.py",
+      "sha256": "145df0d84be6e3da6bbb9e203be879c388ec78de66bf17760afaee6955e51c73",
+      "git_blob": "27d9fe2e65db924f204423f9660a576e723bfd9b"
+    },
+    {
+      "path": "experiments/e1/registry.base.json",
+      "sha256": "3316063a47d4201dff45104e40e1e272ec936bc4643e8ce75d51dda6d4a27fe9",
+      "git_blob": "956eb9636046165b827275a822f37f3643dc1e59"
+    },
+    {
+      "path": "experiments/e1/registry.extended.json",
+      "sha256": "4c2b2441e704f97d6de006cf2a8a996618a964cf9ec63dfe3245a18694f7880d",
+      "git_blob": "63a038ff3c6d88477f2ac3e2fb1a08efd29b15ac"
+    },
+    {
+      "path": "experiments/e1/test_composition.py",
+      "sha256": "69de6a34e90f38761a11a89698c2c9d0e3b47cf932097a2d6b77414a59b45055",
+      "git_blob": "48852a2521f34366b8c6fd57b2fb5ae5d0990f71"
+    },
+    {
+      "path": "experiments/e1/verify_native.py",
+      "sha256": "8518f73e59352cfbb0849b6996ed02c0a5d8685ea6677104a2d1d98dd7a92a5c",
+      "git_blob": "9e8f24b3e4ea285ccc5a269d61114459ea65328f"
+    },
+    {
+      "path": "scripts/arena_atms.py",
+      "sha256": "4e3f46e87f3c90c79a9989ef6dbea75dddd30bf9f84b094e2a50086ecaa3ddce",
+      "git_blob": "9e247b614f1bc372afe6d6d21b4376c029e1aa82"
+    },
+    {
+      "path": "scripts/arena_cafe/__init__.py",
+      "sha256": "dd874a6de303a1ebd17d4ada4ac4d3f1e0ebb739f6af80a768dafc0269eb97f5",
+      "git_blob": "0d0b6a2e34906c55ddf5e842ea71a5c19c2cd329"
+    },
+    {
+      "path": "scripts/arena_cafe/ct02_minimal_batch.py",
+      "sha256": "c13d967492a48c43931cbb635161e64b62847af692ca79371772d91ac0f01cc3",
+      "git_blob": "793a2c5e77dc9ba1ab7001985f9139ff4c76817f"
+    },
+    {
+      "path": "scripts/arena_cafe/ct03_d_prepare.py",
+      "sha256": "a1346c57af2ea9e39d25910160914943870a835ff7e2b35e9e2b0893b9c9667e",
+      "git_blob": "8494458e5499f77c8e5e0607b2817062e48044e0"
+    },
+    {
+      "path": "scripts/arena_cafe/ct03_m_construction_diagnostic.py",
+      "sha256": "c704738fc09fb237a6fceec607c2a20fec9a7c6fafb7222677aa5d77d4f6dd95",
+      "git_blob": "141620e33071d02f0897dc9cc253610689483eb6"
+    },
+    {
+      "path": "scripts/arena_cafe/ct03_m_prepare.py",
+      "sha256": "72422db68fbd811d4e52c50bad1f85418ce224805591f39accc5b2d467d04c2e",
+      "git_blob": "d0a22bda5c7974cdf4feca8bc72816c5b3530086"
+    },
+    {
+      "path": "scripts/arena_cafe/ct03_minimal_custody.py",
+      "sha256": "817d058baff5bc32d281f5e0e95ee7f10533a171122c36286837938dacf47a38",
+      "git_blob": "6c64a70df78ad5bb767e7c4d7ae7547818c4c58d"
+    },
+    {
+      "path": "scripts/arena_cafe/ct03_minimal_score.py",
+      "sha256": "9534debf25c5fd3a7317a75911e78da593494ff847d05bd12cd15c347afd4eb8",
+      "git_blob": "ea05f47b5c0efc9183e2dcd767eabae7c6ef6ba5"
+    },
+    {
+      "path": "scripts/arena_cafe/ct03_prospective_lock.py",
+      "sha256": "b31064a74306f65db84d10104ea740479b6c3bfa16997de17bd7ed6de03ce411",
+      "git_blob": "d38974f701a4a13bc75b3eb950d7ecb91142af2b"
+    },
+    {
+      "path": "scripts/arena_cafe/ct03_public.py",
+      "sha256": "c218ff0973673eed60526001469cf95a74a899012259042eba3325b7cbf19fdc",
+      "git_blob": "2808cc5a43826a94a78e15fcc1a7d0e853bf95a5"
+    },
+    {
+      "path": "scripts/arena_cafe/ct03_world_custody.py",
+      "sha256": "a4ef97ec441517f0e03f271ca6ed01e4e70240c87bb41daaaf8efc9c78334e67",
+      "git_blob": "e65882a2e552ac6bf068636279761fca1408c85d"
+    },
+    {
+      "path": "scripts/arena_cafe/ct_feedback_bridge.py",
+      "sha256": "3f626ed7f39fcba161c7b732aa6a3c14d8ee53d6e7e06ddaf23c0e6581ff1e93",
+      "git_blob": "fe92edc9f3ff4245ff719b20d7fe8419dc77b58c"
+    },
+    {
+      "path": "scripts/arena_cafe/e02_b_feedback.py",
+      "sha256": "bbd64cced815a87bed3fe8f4c07eeac83293f8bccf27b2bb7bb400589bbbf5d6",
+      "git_blob": "53be5f64a3889b13aae1dadec51daa897b8932aa"
+    },
+    {
+      "path": "scripts/arena_cafe/evidence.py",
+      "sha256": "f72670995911ab8243d490d38a53c87ba4221a75dcba4710d9d96a5785198ac7",
+      "git_blob": "08961bf225892738e86976860b258cec554ccaff"
+    },
+    {
+      "path": "scripts/arena_cafe/native_handoff.py",
+      "sha256": "04ddf9b8f5a39ca4aa1f5f68a4fa76480bd9afe30be38fa41c1f209dece112f6",
+      "git_blob": "cd54a2fa4a307c3b452300fd0efbdfd608a52a86"
+    },
+    {
+      "path": "scripts/arena_cafe/observation_eval.py",
+      "sha256": "fe728a21b24a224b7ba4335614c966fdc6da990a21863602cdec98f9ab2dae78",
+      "git_blob": "864bcc2b4808a44024f0150abb3d8c09b2eb8b32"
+    },
+    {
+      "path": "scripts/arena_cafe/observation_ports.py",
+      "sha256": "f799b767759deb5cbd22f112485951075b1bda550ed6fee025df745cd6c40fac",
+      "git_blob": "22b3003df5bba0da5eb0802e42b668037f50584c"
+    },
+    {
+      "path": "scripts/arena_cafe/r2_causal_pos_signal.py",
+      "sha256": "25c7718472f1d41c8bb9671dbe0314dacc1083a2bfb22a98664332659cb0cf6a",
+      "git_blob": "4fef6d0451b9b39e183e9ff7a22083be7f8a1072"
+    },
+    {
+      "path": "scripts/arena_cafe/r2_m_six_causal_g2.py",
+      "sha256": "596c09c8575840c8248271f12db15b34ba38cebaed4a51a096e0ac7b06ed4529",
+      "git_blob": "3590361d1d154cb79ee9cd669875afdf52c6a413"
+    },
+    {
+      "path": "scripts/arena_cafe/r2_observational_contracts.py",
+      "sha256": "ee648c39331d31fea061cfb43a63458cb6ace4a24daad4c4a12ccd353362333c",
+      "git_blob": "c6b2688df8d9c69cfdf6fcc84ca02efdd7b463af"
+    },
+    {
+      "path": "scripts/arena_d_v01.py",
+      "sha256": "08f0bb83256960bbbf9c82bb78c24b3deab7028298cf34ac6128dfdd28f8b90c",
+      "git_blob": "9dcab2bf1ee3a3c7430595385f381d89ba023a6d"
+    },
+    {
+      "path": "scripts/arena_event_observability.py",
+      "sha256": "5e877909606ebf0837d6c01e4b26edb9fa747c82cd7a07303703c9978b8b0b44",
+      "git_blob": "b5cf7b5d4b9684b230298c2014a3a08b075780fd"
+    },
+    {
+      "path": "scripts/arena_m2_feedback.py",
+      "sha256": "ec421db34fc9e429737541024d9e4835eec8bb1a241d1aeb50babb6cecaa14a4",
+      "git_blob": "916616e9472bf43478fff47ef40d5ae0a493a4ef"
+    },
+    {
+      "path": "scripts/arena_m_short_e1.py",
+      "sha256": "3f5bd8279ae3fd0fe86b7a8d8431db45595060e19d2b92074f1c6f62757e9c72",
+      "git_blob": "d7a3345f8ee0169445369e573658a1e004fd8146"
+    },
+    {
+      "path": "scripts/arena_m_visible_pulse.py",
+      "sha256": "ad38972aaac644da689ecc2aec4bef57f8cc4cf13aeafb128bc2d6de535c605f",
+      "git_blob": "23f838407d2e33f8f05890645321bf09ed965de4"
+    },
+    {
+      "path": "scripts/arena_m_visible_verify.py",
+      "sha256": "9e39bd639f545a46e9d83a22f5c7e039308be43843710744d350d722732322e2",
+      "git_blob": "b2e5c92a94730500c93464db9ef0e683d8a1ecd6"
+    },
+    {
+      "path": "scripts/arena_memory.py",
+      "sha256": "6d0bdce0fea9d355522c53a9432cc4953645bf64addc2e9329902c7abced0268",
+      "git_blob": "cd83254f1e06c7705227423d9669cf0deb8cadc2"
+    },
+    {
+      "path": "scripts/arena_v0_contract.py",
+      "sha256": "3e0cdd7f2ab6e959f5f36cd73778a39f5e4c7ceb9449ee38fdbd79fcb56ce5b3",
+      "git_blob": "031a0c47c7f09135191d1689e55b010910de3c48"
+    },
+    {
+      "path": "scripts/ledger.py",
+      "sha256": "1e01583d148d24adaff621775522b0d908d7b0366a9221c31bca3d254f257028",
+      "git_blob": "a49332d8c956022bc839295be01a102740aba68c"
+    },
+    {
+      "path": "src/modelica/IGCInformationMolecules.mo",
+      "sha256": "05350e33c3f0c332f1e2570b95ca8e2ab49bfe66fcfc4853a69b1972530c4245",
+      "git_blob": "36d97a7e9de4d7ee80bf884beec6094a9bb1cf98"
+    },
+    {
+      "path": "src/modelica/IGCMolecules.mo",
+      "sha256": "1c5f6e505944039604e4059fd487643efc649e91554b4fdf070f21d9a605697a",
+      "git_blob": "2f83de72d38d0b8f5e866295b806d19067c5194d"
+    }
+  ]
+}

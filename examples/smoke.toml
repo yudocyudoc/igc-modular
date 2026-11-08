@@ -1,0 +1,15 @@
+id = "ct03-integration-fixture"
+protocol = "ct03"
+backend = "fixture"
+
+[source]
+path = "public-cuts.csv"
+time_column = "time"
+value_column = "delivered"
+time_unit = "hours"
+
+[budget]
+omc = 0
+provider_posts = 0
+workflow = 0
+

@@ -1,0 +1,32 @@
+name: Arena modular - offline end-to-end
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integration:
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.11', '3.13']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Original source conservation
+        run: python -m arena verify-upstream
+      - name: Module regressions and complete CLI integration
+        run: python -m unittest discover -s tests -v
+      - name: Complete integration, zero provider or solver calls
+        run: python -m arena run examples/smoke.toml --out runs/ci-smoke
+      - uses: actions/upload-artifact@v4
+        with:
+          name: integration-${{ matrix.os }}-${{ matrix.python }}
+          path: |
+            runs/ci-smoke/result.json
+            runs/ci-smoke/report.md

@@ -1,0 +1,22 @@
+{
+  "upstream_commit": "881f92792e4a67de0eb33a04662089029c0e6918",
+  "upstream_files_preserved": 39,
+  "unit_tests": {
+    "run": 32,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "installed_wheel_integration": "INTEGRATION_COMPLETED",
+  "evidence_kind": "INTEGRATION_FIXTURE",
+  "real_omc": 0,
+  "real_buffalo_posts": 0,
+  "github_dispatches": 0,
+  "github_setup_writes": 0,
+  "os_vault": {
+    "native_read_tested": true,
+    "real_credentials_written": 0
+  },
+  "github_setup_test_scope": "Transport/encryption boundary doubles; real upload not performed. Optional PyNaCl unavailable locally.",
+  "wheel_sha256": "29c3bc7ad0e67b0665d25aaeabd957bf1c9dec447511ffb80337816a3f3ee184"
+}

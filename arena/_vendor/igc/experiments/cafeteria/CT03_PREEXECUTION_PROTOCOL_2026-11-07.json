@@ -1,0 +1,129 @@
+{
+  "schema": "igc-ct03-preexecution-protocol/1.0",
+  "status": "PROTOCOL_ONLY_NOT_AUTHORIZED_NOT_EXECUTED",
+  "governing_roadmap": "ARENA_IGC_HOJA_DE_RUTA_V4_0_2026-11-07.md",
+  "purpose": "Pareado por brazo: efecto de su propio feedback sobre error reservado, no prueba de intervención FIFO ni de D2",
+  "prerequisite": [
+    "CT00 cheap numerical gate verified; inherited physical-m3 job not rerun",
+    "CT01 source identity and archive availability checked",
+    "CT02 preparatory producer-feedback-ledger-policy links verified offline, plus exactly two original D/M numerical conformity OMC checks completed; the CT03 prospective cycle is NOT a CT02 prerequisite",
+    "CT03 actual producer and custodian permissions/mounts verified for procedural separation before live world selection; external archive/RSA authorities optional",
+    "one complete CT03 live batch and stopping rules explicitly authorized at its own milestone"
+  ],
+  "world": {
+    "domain": "abstract conserved items",
+    "units": "items",
+    "time_unit": "hours",
+    "input": {
+      "rate": 1.7,
+      "active_interval_hours": [
+        0,
+        2
+      ],
+      "after_rate": 0,
+      "total_mass": 3.4
+    },
+    "initial_stocks": 0,
+    "family": "two or three stages of existing bounded proportional-release conservative classes, no losses or new physics",
+    "unknown_to_producers": [
+      "true stage count",
+      "true shared capacity",
+      "true shared responseTime",
+      "custody seed",
+      "reserved y6 and y8"
+    ],
+    "parameter_ranges": {
+      "capacity_items_per_hour": [
+        1.2,
+        2.8
+      ],
+      "response_time_hours": [
+        0.5,
+        1.5
+      ]
+    },
+    "world_count": 1,
+    "world_selected": false,
+    "construction_times_hours": [
+      0,
+      1,
+      2,
+      4
+    ],
+    "heldout_times_hours": [
+      6,
+      8
+    ],
+    "simulation": {
+      "start_h": 0,
+      "stop_h": 8,
+      "method": "Euler",
+      "dt_hours": 0.125,
+      "modelica_version": "1.26.5",
+      "MSL": "4.0.0",
+      "SystemDynamics": "2.1.2"
+    }
+  },
+  "arms": {
+    "D": {
+      "candidates": 6,
+      "parameters": {
+        "capacity": 2,
+        "response_time": 1,
+        "loss_time": 3
+      },
+      "provenance": "EXPLICIT_UNVALIDATED_ASSUMPTION",
+      "policy": "fixed set with D2_NOT_APPLICABLE_MISSING_RESET_TRIAL"
+    },
+    "M": {
+      "candidates": 6,
+      "material_groups": 3,
+      "parent": "Short E1 full AST and original priors",
+      "policy": "M-E1-OWN-FEEDBACK-SET/1.0 original own_policy per parent",
+      "revisions_at_most": 6
+    },
+    "B": {
+      "initial_live_at_most": 1,
+      "feedback_revision_live_at_most": 1,
+      "engine": "UB-IAD/sd-ai@5199f7b...",
+      "transport": "OPEN_ROUTER SDK → Workers AI original Cloudflare adapter",
+      "parent": "currentModel exact own native"
+    }
+  },
+  "observables": {
+    "primary": "cumulative deliveries of same system boundary",
+    "construction_points": 4,
+    "reserved_points": 2
+  },
+  "read_boundary": {
+    "producer": "construction, own candidate, own feedback, own ledger slice only",
+    "evaluator": "sealed true model and t6/t8; never accessible by producer",
+    "isolation": "NOT_TESTED_OR_CERTIFIED_YET"
+  },
+  "metric": {
+    "candidate": "MAE(t6,t8), MAE_final - MAE_initial, error per time; all failures in denominator",
+    "sets": "median-of-medians over 6 D groups, 3 M material groups",
+    "baselines": [
+      "persist y4",
+      "linear (y4-y2)/2 from t4 bounded by available input mass"
+    ],
+    "no_future_recalibration": true
+  },
+  "cost": {
+    "ct03_max_new_provider_post": 2,
+    "ct03_max_new_omc": 21,
+    "ct02_technical_omc_max": 2,
+    "total_ct02_ct03_ct04_provider_ceiling": 6,
+    "total_ct02_ct03_ct04_omc_ceiling": 29,
+    "currently_authorized_new_provider_post": 0,
+    "currently_authorized_new_omc": 0
+  },
+  "no_run": [
+    "no provider secrets or network authorization in CT00-02",
+    "no OMC or DES in this preparation",
+    "no new grid or PM",
+    "no scoring using unavailable future truth"
+  ],
+  "freeze_status": "NOT_LOCKED_NO_WORLD_GENERATED",
+  "note": "Protocol is prepared, not frozen to a CT03 world or authorized. CT02 preparatory linkage is accepted with two real original native technical conformities, run 42409210062, and no requirement to know prospective t6/t8 results. CT03 remains an independent batch: custodian separation, genuine producer run, own feedback/revision, lock and score pending. No scientific t6/t8 has been opened."
+}
