@@ -41,6 +41,7 @@ jobs:
           artifact-ids: 13607441674
           run-id: 42455527897
           github-token: ${{ github.token }}
+          merge-multiple: true
           path: ${{ runner.temp }}/arena-native/artifacts/ct03-public
       - name: Validate original source, artifact, first manual attempt and no previous run
         env:
