@@ -361,5 +361,31 @@ class RemoteCoordinatorTests(unittest.TestCase):
             self.assertTrue(result["run"]["consumption"]["provider_posts"]["complete"])
 
 
+
+class DispatchResponseTests(unittest.TestCase):
+    def test_dispatch_requests_confirmed_run_id_on_2026_api(self):
+        api = GitHub("yudocyudoc/IGC", Secret("fixture-token", "env:GH_TOKEN"))
+        received = []
+
+        def reply(method, path, payload=None):
+            received.append((method, path, payload))
+            return {"workflow_run_id": 314, "run_url": "https://api.github.com/run/314",
+                    "html_url": "https://github.com/run/314"}
+
+        api.repo = reply
+        run = api.dispatch("arena-ct03-public-intake.yml", "some-branch", {"authorized": "yes"})
+        self.assertEqual(run, 314)
+        self.assertEqual(received, [("POST",
+            "/actions/workflows/arena-ct03-public-intake.yml/dispatches",
+            {"ref": "some-branch", "inputs": {"authorized": "yes"}, "return_run_details": True})])
+
+    def test_empty_legacy_dispatch_reply_is_not_treated_as_a_safe_retry(self):
+        api = GitHub("yudocyudoc/IGC", Secret("fixture-token", "env:GH_TOKEN"))
+        api.repo = lambda *args, **kwargs: None
+        with self.assertRaisesRegex(ArenaError, "no confirmed run ID"):
+            api.dispatch("arena-ct03-public-intake.yml", "some-branch", {"authorized": "yes"})
+
+
+
 if __name__ == "__main__":
     unittest.main()
