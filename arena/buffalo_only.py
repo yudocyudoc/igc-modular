@@ -39,6 +39,80 @@ def identity():
     return sha, int(run)
 
 
+# Only this original Engine.generate step can initiate a paid POST.
+PROVIDER_STEP = "One original Engine.generate, Cloudflare adapter 16,000 tokens"
+PROVIDER_JOB = "Original Buffalo - archived public CT03 input - 0 OMC"
+
+
+def _proven_no_post(api, previous):
+    """Require affirmative Actions evidence that the paid Node step never started."""
+    run_id = previous.get("id")
+    if (type(run_id) is not int or run_id <= 0
+        or previous.get("status") != "completed"
+        or previous.get("run_attempt") != 1
+        or previous.get("event") != "workflow_dispatch"
+        or previous.get("path") != WORKFLOW):
+        return False
+    jobs = api.repo("GET", f"/actions/runs/{run_id}/jobs?per_page=100")
+    rows = jobs.get("jobs")
+    if jobs.get("total_count") != 1 or not isinstance(rows, list) or len(rows) != 1:
+        return False
+    job = rows[0]
+    if (job.get("name") != PROVIDER_JOB or job.get("status") != "completed"
+        or job.get("run_attempt", 1) != 1):
+        return False
+    # Job-level skips run no steps at all (authorized=no, or non-main).
+    if job.get("conclusion") == "skipped":
+        return True
+    if (previous.get("conclusion") not in ("failure", "cancelled")
+        or job.get("conclusion") not in ("failure", "cancelled")):
+        return False
+    steps = job.get("steps")
+    if not isinstance(steps, list):
+        return False
+    paid = [step for step in steps if step.get("name") == PROVIDER_STEP]
+    if len(paid) != 1:
+        return False
+    paid = paid[0]
+    earlier = [step for step in steps if
+               type(step.get("number")) is int and
+               type(paid.get("number")) is int and
+               step["number"] < paid["number"]]
+    # A terminal failure/cancellation preceding a skipped/unstarted paid step.
+    broke_before = any(step.get("status") == "completed"
+                       and step.get("conclusion") in ("failure", "cancelled")
+                       for step in earlier)
+    if not broke_before:
+        return False
+    paid_skipped = paid.get("status") == "completed" and paid.get("conclusion") == "skipped"
+    paid_unstarted = (paid.get("status") in ("pending", "queued", "waiting")
+                      and paid.get("conclusion") is None
+                      and not paid.get("started_at"))
+    return paid_skipped or paid_unstarted
+
+
+def eligible_history(api, listing, *, current_id):
+    """Allow a new first attempt only when every older dispatch provably spent zero."""
+    rows = listing.get("workflow_runs")
+    count = listing.get("total_count")
+    if (type(count) is not int or count < 0 or count > 100
+        or not isinstance(rows, list) or len(rows) != count):
+        raise ArenaError("Cannot reconcile all prior buffalo-only dispatches; provider attempt blocked.")
+    verified = []
+    for record in rows:
+        previous_id = record.get("id")
+        if type(previous_id) is not int or previous_id <= 0:
+            raise ArenaError("Invalid buffalo-only workflow run history; provider attempt blocked.")
+        if previous_id == current_id:
+            continue
+        # Fetch exact run and its jobs; a list summary alone cannot authorize POST.
+        detail = api.run(previous_id)
+        if detail.get("id") != previous_id or not _proven_no_post(api, detail):
+            raise ArenaError("Previous buffalo-only run has a possible or uncertain provider attempt; retry refused.")
+        verified.append(previous_id)
+    return verified
+
+
 def admission(workspace, *, api=None):
     """Read-only origin checks. No provider credential is used here."""
     sha, run_id = identity()
@@ -68,9 +142,7 @@ def admission(workspace, *, api=None):
             "Evaluate after immutable lock"} <= complete:
         raise ArenaError("CT03 source run is not demonstrably closed.")
     previous = api.repo("GET", "/actions/workflows/buffalo-only.yml/runs?event=workflow_dispatch&per_page=100")
-    if previous.get("total_count", 0) > 100 or any(int(item["id"]) != run_id
-             for item in previous.get("workflow_runs", [])):
-        raise ArenaError("A buffalo-only dispatch already exists; do not create another provider attempt.")
+    earlier = eligible_history(api, previous, current_id=run_id)
     root = Path(workspace)
     public_input(root)  # validates exactly three public files and four original observations
     path = root / "artifacts/buffalo-only"
@@ -78,6 +150,7 @@ def admission(workspace, *, api=None):
     receipt = {"schema": "arena.buffalo-only-admission/1",
                "source_run_id": SOURCE_RUN, "source_artifact_id": SOURCE_ARTIFACT_ID,
                "source_commit_sha": SOURCE_SHA, "execution_run_id": run_id,
+               "earlier_verified_no_post_runs": earlier,
                "execution_commit_sha": sha, "provenance": "CLOSED_CT03_PUBLIC_ONLY",
                "new_worlds": 0, "max_provider_posts": 1, "max_omc": 0,
                "scientific_scope": "SEPARATE_DIAGNOSTIC_NOT_CT03_REEVALUATION"}
