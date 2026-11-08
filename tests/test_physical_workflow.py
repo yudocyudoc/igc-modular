@@ -27,6 +27,7 @@ class PhysicalWorkflowContractTests(unittest.TestCase):
         self.assertIn("python -m arena check examples/ct03.toml", text)
         self.assertIn("python -m arena run examples/ct03.toml --out runs/ct03 --authorize", text)
         self.assertIn("runs/ct03/run.sqlite", text)
+        self.assertIn("python -m arena resume runs/ct03", text)
         self.assertIn("if: ${{ always() }}", text)
         self.assertNotIn("secrets.CLOUDFLARE_API_TOKEN", text)
         self.assertNotIn("secrets.CT03_R2_SECRET_ACCESS_KEY", text)
