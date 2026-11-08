@@ -1,0 +1,37 @@
+"OpenModelica 1.26.5"
+true
+true
+true
+"Check of ArenaCT03M.CT03M_18247fc54a54 completed successfully.
+Class ArenaCT03M.CT03M_18247fc54a54 has 95 equation(s) and 95 variable(s).
+85 of these are trivial equation(s)."
+Notification: Skipped loading package Modelica (4.0.0) using MODELICAPATH /thirdparty/msl:/thirdparty/systemdynamics (uses-annotation may be wrong).
+Notification: Skipped loading package SystemDynamics (2.1.2) using MODELICAPATH /thirdparty/msl:/thirdparty/systemdynamics (uses-annotation may be wrong).
+Notification: Skipped loading package Modelica (4.0.0) using MODELICAPATH /thirdparty/msl:/thirdparty/systemdynamics (uses-annotation may be wrong).
+Notification: Skipped loading package SystemDynamics (2.1.2) using MODELICAPATH /thirdparty/msl:/thirdparty/systemdynamics (uses-annotation may be wrong).
+Notification: Skipped loading package Modelica (4.0.0) using MODELICAPATH /thirdparty/msl:/thirdparty/systemdynamics (uses-annotation may be wrong).
+Notification: Skipped loading package SystemDynamics (2.1.2) using MODELICAPATH /thirdparty/msl:/thirdparty/systemdynamics (uses-annotation may be wrong).
+Notification: Skipped loading package Modelica (4.0.0) using MODELICAPATH /thirdparty/msl:/thirdparty/systemdynamics (uses-annotation may be wrong).
+Notification: Skipped loading package SystemDynamics (2.1.2) using MODELICAPATH /thirdparty/msl:/thirdparty/systemdynamics (uses-annotation may be wrong).
+Notification: Skipped loading package Complex (4.0.0) using MODELICAPATH /thirdparty/msl:/thirdparty/systemdynamics (uses-annotation may be wrong).
+Notification: Skipped loading package ModelicaServices (4.0.0) using MODELICAPATH /thirdparty/msl:/thirdparty/systemdynamics (uses-annotation may be wrong).
+Notification: Automatically loaded package Modelica 4.0.0 due to usage.
+Notification: Automatically loaded package SystemDynamics 2.1.2 due to usage.
+Notification: Automatically loaded package ModelicaServices 4.0.0 due to usage.
+
+record SimulationResult
+    resultFile = "/repo/artifacts/ct02-exact-two/m00_res.csv",
+    simulationOptions = "startTime = 0.0, stopTime = 8.0, numberOfIntervals = 64, tolerance = 1e-6, method = 'euler', fileNamePrefix = 'artifacts/ct02-exact-two/m00', options = '', outputFormat = 'csv', variableFilter = '.*', cflags = '', simflags = ''",
+    messages = "LOG_SUCCESS       | info    | The initialization finished successfully without homotopy method.
+LOG_SUCCESS       | info    | The simulation finished successfully.
+",
+    timeFrontend = 0.229395806,
+    timeBackend = 0.015463715000000001,
+    timeSimCode = 0.003440054,
+    timeTemplates = 0.007189898,
+    timeCompile = 1.033915573,
+    timeSimulation = 0.017189056,
+    timeTotal = 1.3067251149999999
+end SimulationResult;
+Notification: Skipped loading package Complex (4.0.0) using MODELICAPATH /thirdparty/msl:/thirdparty/systemdynamics (uses-annotation may be wrong).
+

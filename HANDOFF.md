@@ -1,39 +1,28 @@
-# Relevo a gpt-web: implementación en GitHub
+# Relevo: gpt-web coder / Codex-Astra revisor
 
-El usuario acordó que **gpt-web sea coder y Codex/Astra revisor**, por costes. El repositorio de desarrollo es `yudocyudoc/igc-modular`. La plataforma de ejecución es GitHub Actions. Esta publicación inicial entrega la extracción modular y su integración offline; no afirma que CT-03 físico se haya ejecutado aquí.
+Repositorio de desarrollo y ejecución: yudocyudoc/igc-modular. La migración y conexión solicitadas expresamente al revisor están implementadas; los cambios ordinarios siguientes los realiza gpt-web en PR y Codex/Astra los revisa.
 
-## Punto de partida comprobado
+## Estado útil
 
-- Origen: `yudocyudoc/IGC`, PR #172, corte `881f92792e4a67de0eb33a04662089029c0e6918`.
-- 39 fuentes/recursos originales conservados, con manifiesto; generadores D/M originales, contratos públicos, lock y evaluador reutilizados.
-- 32 pruebas locales aprobadas; wheel construido e integración completada desde el paquete instalado.
-- El CI de este repositorio ejecuta integración en Linux/Windows y Python 3.11/3.13. Publica `result.json` y `report.md`; no necesita secretos y consume cero OMC/Buffalo.
-- La integración usa fixtures explícitos: trece plazas, dos pares de prueba, once plazas sin par. No es un resultado científico.
-- El backend `github` encadena los cuatro workflows físicos existentes en **IGC**. Sus nombres, rama y SHA están limitados al adaptador CT-03; todavía no constituye un ejecutor físico independiente dentro de igc-modular.
-- No se han movido secretos entre repositorios ni seleccionado un nuevo mundo. La bóveda Windows está implementada y se comprobó una lectura de entrada inexistente; no se migraron credenciales reales.
-- El enlace por API reutiliza secretos existentes y configura solo enlaces faltantes. Las escrituras y el transporte se probaron con dobles; el cifrado opcional PyNaCl y una subida real de secretos no se ejecutaron en el entorno local.
+- Los motores D/M/B, sus dependencias de código y la evidencia histórica D0/M0 están dentro de este repositorio.
+- arena-run.yml ofrece un solo despacho para el recorrido completo en GitHub.
+- No hay dependencia operativa de IGC ni sd-ai. Se conservan sus referencias solo como procedencia. Las dependencias estándar/npm se instalan según las versiones fijadas.
+- integration usa fixtures y cero consumo. live exige una autorización de lote y conserva 19 OMC nuevos incluido el mundo, dos POST y trece plazas.
+- La reserva permanece en R2; el artifact inmutable y el cierre de productores se verifican antes de leerla.
+- Los checks de acceso se ejecutan antes de seleccionar el mundo. Un fallo de acceso no es permiso para ejecutar otro experimento ni para crear otro servicio de custodia.
+- Se requieren tres valores secretos iniciales en dos entornos, descritos en README. Las credenciales no se volvieron a pedir por etapa ni se fingió su copia desde IGC.
+- La conexión de edición disponible no permite escribir Actions secrets; una vez configurados se reutilizan. Un operador puede llevar todo el flujo.
 
-## Próxima entrega del coder
+## Siguiente acción
 
-Un recorrido físico operable desde GitHub mediante **un único despacho**, que prepare los datos, ejecute los productores originales, cierre predicciones y entregue evaluación e informe de consumo. Reutilizar el código existente mediante adaptadores; no reescribir los métodos científicos ni copiar toda la secuencia de PR #172.
+Con las tres credenciales cargadas, seleccionar live/authorized=yes en el workflow y ejecutar el lote si conserva la autorización experimental correspondiente. No añadir otro coordinador ni otra auditoría general. No presentar una corrida de integración como física.
 
-1. Confirmar la CI de esta publicación. Corregir únicamente fallos reproducibles que impidan su ejecución.
-2. Decidir dentro del PR cómo ejecutar las etapas físicas desde Actions usando los adaptadores. El coordinador debe resolver IDs y transferencias; el usuario no debe copiarlos ni administrar aprobaciones entre etapas. La política de custodia queda dentro del adaptador, con jobs separados cuando se necesite aislamiento de datos.
-3. Mantener las conexiones fuera de los experimentos. Usar primero los secretos y rutas ya probados de IGC; el puente existente permite conservarlos durante la transición. Si se porta el ejecutor al nuevo repositorio, automatizar una vinculación inicial y acreditar exactamente qué acceso falta, sin pedir recrear Buffalo ni tratar la ausencia de una copia local como ausencia del secreto en GitHub.
-4. La configuración y comprobación de accesos debe completarse antes de consumir solver/proveedor. No ejecutar OMC para comprobar un secreto ni utilizar inferencia pagada como prueba de autenticación.
-5. Validar primero el recorrido completo de integración y sus fallos relevantes. Después, con la autorización experimental vigente, ejecutar el lote físico y conservar comandos, fuentes, resultados y logs. No declarar completada la migración física con mocks o CI offline.
+Si aparece un error, localizar el job y su evidencia, corregir solo el defecto reproducible y conservar intentos y cuota. No reiniciar un mundo o proveedor fallido para conseguir un resultado favorable. El evaluador puede volver a operar sobre el mismo lock cerrado sin nueva física.
 
-No hace falta otra auditoría general antes de implementar. Los cambios del coder se entregan en PR para revisión concreta de Codex/Astra.
+## Reglas que siguen vigentes
 
-## Condiciones científicas que conserva CT-03
+Motores, ecuaciones, solver, bibliotecas, métricas y condiciones científicas originales. No abrir grillas, PM, DES ni otro mundo para eludir resultados. No alterar denominadores, sustituir fallos por ceros ni reparar nativos Buffalo desde Arena. La fuente video2 sigue siendo observación parcial cuando no acredita identidad/continuidad; la migración no cambia esa conclusión.
 
-- Máximo de **19 OMC nuevos, incluido el único mundo**, y **2 POST Buffalo**; los dos OMC técnicos CT-02 ya ejecutados no se repiten.
-- Trece plazas: seis D, seis M y una B. Conservar ausencias y fallos en el denominador.
-- Productores: datos comunes t0/t1/t2/t4, modelos propios y feedback propio. Evaluador: reserva t6/t8 después del lock archivado.
-- Buffalo conserva `UB-IAD/sd-ai::Engine.generate` y la ruta Workers AI ya probada. No reparar sus modelos desde Arena ni introducir otro motor.
-- Conservar ecuaciones, solver, bibliotecas, métricas y reglas de parada fijadas. La modularización no concede G2/G3 ni modifica condiciones de activación.
-- Si ya existe un intake o productor real, continuar su evidencia; no seleccionar otro mundo ni crear otro lote para superar un bloqueo de software.
+## Qué entregar
 
-## Resultado exigible al siguiente PR
-
-Un comando o despacho reproducible; integración completa en GitHub; evidencia física cuando haya autorización y acceso efectivos; informe de consumo; errores accionables; ninguna gestión manual de IDs entre etapas. Mantener explícitos los límites pendientes y distinguir ejecución remota real de transporte simulado.
+El enlace de ejecución y resultado físico cuando haya ocurrido; consumo real y límites, o el error preciso con su evidencia. Separar fixtures, SDK con transporte mock, ejecución física y validez científica. Mantener los PR acotados y revisables.

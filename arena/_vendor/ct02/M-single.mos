@@ -1,0 +1,8 @@
+getVersion();
+loadFile("/repo/src/modelica/IGCMolecules.mo");
+loadFile("/repo/src/modelica/IGCInformationMolecules.mo");
+loadFile("/repo/artifacts/ct02-exact-two/M/native.mo");
+checkModel(ArenaCT03M.CT03M_18247fc54a54);
+print(getErrorString());
+simulate(ArenaCT03M.CT03M_18247fc54a54,startTime=0,stopTime=8,numberOfIntervals=64,method="euler",outputFormat="csv",fileNamePrefix="artifacts/ct02-exact-two/m00");
+print(getErrorString());

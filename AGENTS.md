@@ -3,7 +3,7 @@
 ## Roles acordados con el usuario
 
 - **gpt-web: coder.** Implementa las funcionalidades y correcciones en ramas/PR de este repositorio.
-- **Codex/Astra: revisor.** Revisa implementación, evidencia, resultados, consumo y fidelidad al protocolo. No toma el desarrollo ordinario ni duplica la implementación, salvo petición expresa del usuario. La publicación inicial y sus ajustes mínimos de entrega están autorizados.
+- **Codex/Astra: revisor.** Revisa implementación, evidencia, resultados, consumo y fidelidad al protocolo. No toma el desarrollo ordinario ni duplica la implementación, salvo petición expresa del usuario. La publicación inicial y la migración/conexión nativa de motores fueron solicitadas expresamente. Tras esa entrega se retoma el rol de revisor.
 - **Usuario:** prioridades y autorización de consumo experimental. La autorización de un lote no se vuelve a pedir entre sus etapas.
 
 ## Prioridad de producto

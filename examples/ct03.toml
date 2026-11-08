@@ -5,10 +5,10 @@ backend = "github"
 [budget]
 omc = 19
 provider_posts = 2
-workflow = 4
+workflow = 1
 
 [github]
-repository = "yudocyudoc/IGC"
-ref = "experiment/arena-ct00-ct02-20261107"
-freeze_sha = "881f92792e4a67de0eb33a04662089029c0e6918"
-poll_seconds = 5
+repository = "yudocyudoc/igc-modular"
+ref = "main"
+freeze_sha = "HEAD"
+poll_seconds = 15

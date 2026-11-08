@@ -1,0 +1,73 @@
+{
+  "schema": "arena.ct02-migration/1",
+  "source_repository": "yudocyudoc/IGC",
+  "source_run_id": 42409210062,
+  "source_code_sha": "6534ec6bbbe0c48265d1e4eb0d1d243c7fe55b4d",
+  "source_artifact_id": 13588621967,
+  "source_artifact_digest": "sha256:7c77650e2d49a8e4dea64eeb0053e80da5b9137a3607a3b26edbf7c7b358ccac",
+  "export_commit": "74a37a9cc3f0d1d9eaad17328ba6f68508cff32e",
+  "export_content_verified": {
+    "construction_observations_read": false,
+    "custody_limit": "LOCAL_CONTENT_CHECKS_REQUIRE_GITHUB_ACTIONS_ARTIFACT_ORIGIN_CHECK",
+    "input_source_sha256": "sha256:b7e4b9b98d0e137b0efe56327b2d1c91da452c212914bd950d309294a9940d0b",
+    "items": [
+      {
+        "arm": "D",
+        "candidate_id": "D-5f8781847cb6",
+        "forecast": [
+          {
+            "delivered": 3.379100198824965,
+            "time": 6
+          },
+          {
+            "delivered": 3.39753242195592,
+            "time": 8
+          }
+        ],
+        "model_sha256": "sha256:4139d748b6fb91d755f0fb66fde25ed4909edb2c133c7c6be7af1a35d80af3df",
+        "original_full_ast_sha256": null,
+        "receipt_sha256": "sha256:5a44bde69cb8af4b6d160c3c35440eb578e079b6f56c92dd808f4b66ed47cc50",
+        "script_sha256": "sha256:15000f2553058d9762b2d8c5782d63b9c3ab5c014184cbb42fca5e62283294f2",
+        "solver_log_sha256": "sha256:2760028fdc789644a51e3083a30707b9dac7436e2b35c20a153a257ea86b9267",
+        "status": "REUSED_ORIGINAL_NATIVE_INITIAL_NOT_CT03_SCORE",
+        "trace_sha256": "sha256:41befc4227c2f1ec7d5c2dc60c2f2a478a7b0cf5d493bddcec53506b53c1c668"
+      },
+      {
+        "arm": "M",
+        "candidate_id": "18247fc54a548b4149dcf6942e8a35eb3500677535e25188f4172b307af1b16e",
+        "forecast": [
+          {
+            "delivered": 3.398933866844736,
+            "time": 6
+          },
+          {
+            "delivered": 3.399984796863248,
+            "time": 8
+          }
+        ],
+        "model_sha256": "sha256:8ebeaec94bedb53285ef5c8b7518b8a408b3ae61cea1d40e66811e3bb0d6b37e",
+        "original_full_ast_sha256": "sha256:e199feb807134b6bcbc83d52304360980f7b14655a4eb150f9696669d99ea79e",
+        "receipt_sha256": "sha256:7e5ccbf37f2bacda89b109c0b47e743953982e83409547fc0c19a9079664ce1b",
+        "script_sha256": "sha256:bfbfb8138f124aa187973597ebe5eacf916dfd9ff86bdb1534a0724c1ec22c58",
+        "solver_log_sha256": "sha256:665d8def1480172a71c0329dde6aeb906d9e3a5fb27de7d8eb368bba26ab50c8",
+        "status": "REUSED_ORIGINAL_NATIVE_INITIAL_NOT_CT03_SCORE",
+        "trace_sha256": "sha256:e25fe09b2267f98debbc64a751240ac28507ed11bda3b68412682e1a2b23be3e"
+      }
+    ],
+    "new_omc": 0,
+    "new_provider_posts": 0,
+    "own_feedback_or_decision_reused": false,
+    "reserved_world_truth_read": false,
+    "runtime_image_digest": "openmodelica/openmodelica@sha256:8993c8273224aeacbc018f351c00d60879c5aec386c77a58019318c44c938c9b",
+    "schema": "igc-ct03-reuse-two-ct02-initial-consequences/1.0",
+    "scientific_limit": "NOT_ALL_THIRTEEN_CT03_OR_EXTERNAL_VALIDATION",
+    "source_artifact_sha256": "sha256:7c77650e2d49a8e4dea64eeb0053e80da5b9137a3607a3b26edbf7c7b358ccac",
+    "source_code_sha": "6534ec6bbbe0c48265d1e4eb0d1d243c7fe55b4d",
+    "source_github_artifact_id": 13588621967,
+    "source_github_run_id": "42409210062",
+    "status": "TWO_ORIGINAL_INITIAL_CONSEQUENCES_ELIGIBLE_FOR_REUSE",
+    "world_selected": false
+  },
+  "new_omc": 0,
+  "provider_posts": 0
+}

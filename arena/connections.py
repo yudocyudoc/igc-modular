@@ -10,7 +10,7 @@ import subprocess
 import tomllib
 from pathlib import Path
 
-from .common import ArenaError
+from .common import ArenaError, read_json
 
 
 @dataclass(frozen=True)
@@ -146,3 +146,8 @@ class Connections:
             self.vault.set(target, value)
         return {"stored_entries": sorted(pending), "values_displayed": False}
 
+
+
+def public_config():
+    """Non-secret resource identifiers shared by cloud execution adapters."""
+    return read_json(Path(__file__).resolve().parent/"resources/connections.json")
