@@ -13,13 +13,19 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class StubGitHub:
-    def __init__(self, *, previous=None):
+    def __init__(self, *, previous=None, details=None, prior_jobs=None, count=None):
         self.previous = previous or []
+        self.details = details or {}
+        self.prior_jobs = prior_jobs or {}
+        self.count = count
+
     def run(self, run_id):
-        assert run_id == buffalo_only.SOURCE_RUN
-        return {"conclusion": "success", "event": "workflow_dispatch",
-                "run_attempt": 1, "head_sha": buffalo_only.SOURCE_SHA,
-                "path": ".github/workflows/arena-run.yml"}
+        if run_id == buffalo_only.SOURCE_RUN:
+            return {"conclusion": "success", "event": "workflow_dispatch",
+                    "run_attempt": 1, "head_sha": buffalo_only.SOURCE_SHA,
+                    "path": ".github/workflows/arena-run.yml"}
+        return self.details[run_id]
+
     def repo(self, method, path):
         assert method == "GET"
         if path == f"/actions/artifacts/{buffalo_only.SOURCE_ARTIFACT_ID}":
@@ -31,9 +37,38 @@ class StubGitHub:
                                           "D and M originals", "Buffalo original and own feedback",
                                           "Lock producer predictions", "Evaluate after immutable lock")]}
         if path.startswith("/actions/workflows/buffalo-only.yml/runs?"):
-            return {"total_count": len(self.previous),
+            return {"total_count": self.count if self.count is not None else len(self.previous),
                     "workflow_runs": [{"id": run} for run in self.previous]}
+        for run_id, value in self.prior_jobs.items():
+            if path == f"/actions/runs/{run_id}/jobs?per_page=100":
+                return value
         raise AssertionError(path)
+
+
+def prior_run(*, id=123, conclusion="success", status="completed",
+              run_attempt=1, path=buffalo_only.WORKFLOW):
+    return {"id": id, "status": status, "conclusion": conclusion,
+            "run_attempt": run_attempt, "event": "workflow_dispatch", "path": path}
+
+
+def prior_job(*, conclusion="success", paid_conclusion="success",
+              paid_status="completed", paid_started="2026-11-08T00:00:00Z",
+              preceding_failure=False, steps_present=True):
+    steps = [
+        {"name": "Install pinned original quantitative engine dependencies",
+         "number": 5, "status": "completed",
+         "conclusion": "failure" if preceding_failure else "success"},
+        {"name": buffalo_only.PROVIDER_STEP, "number": 6,
+         "status": paid_status, "conclusion": paid_conclusion,
+         "started_at": paid_started},
+    ]
+    result = {"name": buffalo_only.PROVIDER_JOB,
+              "status": "completed", "conclusion": conclusion, "run_attempt": 1}
+    if steps_present:
+        result["steps"] = steps
+    return {"total_count": 1, "jobs": [result]}
+
+
 
 
 class BuffaloOnlyTests(unittest.TestCase):
@@ -61,14 +96,80 @@ class BuffaloOnlyTests(unittest.TestCase):
                 with self.assertRaises(FileExistsError):
                     buffalo_only.admission(d, api=StubGitHub())
 
-    def test_a_previous_manual_dispatch_blocks_new_provider_attempt(self):
+    def check_prior(self, run, job, *, permitted):
         with TemporaryDirectory() as d:
+            api = StubGitHub(previous=[123], details={123: run},
+                             prior_jobs={123: job})
             with (patch.dict(os.environ, self.identity()),
                   patch.object(buffalo_only, "verify"),
                   patch.object(buffalo_only, "public_input", return_value={})):
-                with self.assertRaisesRegex(ArenaError, "already exists"):
-                    buffalo_only.admission(d, api=StubGitHub(previous=[123]))
-                self.assertFalse((Path(d) / "artifacts/buffalo-only").exists())
+                if permitted:
+                    result = buffalo_only.admission(d, api=api)
+                    self.assertEqual(result["provider_posts"], 0)
+                    record = read_json(Path(d) / "artifacts/buffalo-only/admission.json")
+                    self.assertEqual(record["earlier_verified_no_post_runs"], [123])
+                else:
+                    with self.assertRaisesRegex(ArenaError, "possible or uncertain"):
+                        buffalo_only.admission(d, api=api)
+                    self.assertFalse((Path(d) / "artifacts/buffalo-only").exists())
+
+    def test_authorized_no_job_skipped_does_not_spend_right_to_execute(self):
+        self.check_prior(prior_run(conclusion="success"),
+                         prior_job(conclusion="skipped", steps_present=False),
+                         permitted=True)
+
+    def test_failed_npm_before_node_does_not_spend_right_to_execute(self):
+        self.check_prior(prior_run(conclusion="failure"),
+                         prior_job(conclusion="failure", preceding_failure=True,
+                                   paid_conclusion="skipped", paid_started=None),
+                         permitted=True)
+
+    def test_cancelled_unequivocally_before_node_does_not_spend(self):
+        self.check_prior(prior_run(conclusion="cancelled"),
+                         prior_job(conclusion="cancelled", preceding_failure=True,
+                                   paid_conclusion=None, paid_status="pending",
+                                   paid_started=None),
+                         permitted=True)
+
+    def test_provider_step_started_or_completed_never_allows_another_post(self):
+        for paid_conclusion, status, started in (
+                ("success", "completed", "2026-11-08T00:00:00Z"),
+                ("failure", "completed", "2026-11-08T00:00:00Z"),
+                (None, "in_progress", "2026-11-08T00:00:00Z")):
+            with self.subTest(paid=paid_conclusion):
+                self.check_prior(prior_run(conclusion="failure"),
+                                 prior_job(conclusion="failure", preceding_failure=True,
+                                           paid_conclusion=paid_conclusion,
+                                           paid_status=status, paid_started=started),
+                                 permitted=False)
+
+    def test_run_failure_is_not_itself_proof_of_no_provider_post(self):
+        self.check_prior(prior_run(conclusion="failure"),
+                         prior_job(conclusion="failure", preceding_failure=False,
+                                   paid_conclusion="skipped", paid_started=None),
+                         permitted=False)
+
+    def test_unknown_in_progress_or_retried_history_fails_closed(self):
+        for history in (prior_run(status="in_progress", conclusion=None),
+                        prior_run(run_attempt=2),
+                        prior_run(conclusion="failure", path=".github/workflows/other.yml")):
+            with self.subTest(history=history):
+                self.check_prior(history, prior_job(conclusion="skipped"),
+                                 permitted=False)
+
+    def test_missing_job_steps_is_not_proof_of_no_attempt(self):
+        self.check_prior(prior_run(conclusion="failure"),
+                         prior_job(conclusion="failure", steps_present=False),
+                         permitted=False)
+
+    def test_incomplete_paginated_history_fails_closed(self):
+        with TemporaryDirectory() as d:
+            api = StubGitHub(previous=[], count=101)
+            with (patch.dict(os.environ, self.identity()),
+                  patch.object(buffalo_only, "verify"),
+                  patch.object(buffalo_only, "public_input", return_value={})):
+                with self.assertRaisesRegex(ArenaError, "reconcile all prior"):
+                    buffalo_only.admission(d, api=api)
 
     def test_rerun_or_wrong_branch_is_refused(self):
         for key, value in (("GITHUB_RUN_ATTEMPT", "2"),
