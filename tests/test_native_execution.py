@@ -81,11 +81,11 @@ class NativeSafetyTests(unittest.TestCase):
         variables={"CLOUDFLARE_ACCOUNT_ID":"a"*32,"CLOUDFLARE_API_TOKEN":"TEST_ONLY"}
         with patch.dict(os.environ,variables,clear=True),patch("urllib.request.urlopen",side_effect=[response,forbidden]) as opened:
             report=cloud.provider_preflight()
-            self.assertTrue(report["r2_access_denied"])
+            self.assertTrue(report["r2_bucket_listing_denied"])
             self.assertEqual(report["provider_posts"],0)
             self.assertTrue(all(call.args[0].get_method()=="GET" for call in opened.call_args_list))
         with patch.dict(os.environ,variables,clear=True),patch("urllib.request.urlopen",return_value=response):
-            with self.assertRaisesRegex(ArenaError,"R2 access is not denied"):
+            with self.assertRaisesRegex(ArenaError,"R2 bucket listing is not denied"):
                 cloud.provider_preflight()
 
     def test_archive_rejection_occurs_before_constructing_storage_client(self):

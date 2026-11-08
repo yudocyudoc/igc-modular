@@ -1,5 +1,8 @@
 name: Arena native - one end-to-end run
 on:
+  push:
+    branches: [main, migration/native-engines]
+    paths: ['arena/**', 'examples/**', '.github/workflows/arena-run.yml', '.github/actions/native-runtime/action.yml']
   workflow_dispatch:
     inputs:
       mode:
@@ -32,7 +35,7 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: arena-native-${{ inputs.mode }}
+  group: arena-native-${{ inputs.mode || 'integration' }}
   cancel-in-progress: false
 jobs:
   admit:
@@ -49,11 +52,11 @@ jobs:
         with: {python-version: '3.12'}
       - id: admit
         env:
-          MODE: ${{ inputs.mode }}
-          AUTHORIZED: ${{ inputs.authorized }}
+          MODE: ${{ inputs.mode || 'integration' }}
+          AUTHORIZED: ${{ inputs.authorized || 'no' }}
           FROZEN: ${{ inputs.freeze_sha }}
-          MAX_OMC: ${{ inputs.max_new_omc }}
-          MAX_POST: ${{ inputs.max_provider_posts }}
+          MAX_OMC: ${{ inputs.max_new_omc || 19 }}
+          MAX_POST: ${{ inputs.max_provider_posts || 2 }}
         run: |
           python -m arena.cloud admit --mode "$MODE" --authorized "$AUTHORIZED" --freeze-sha "$FROZEN" --omc "$MAX_OMC" --posts "$MAX_POST"
   integration:

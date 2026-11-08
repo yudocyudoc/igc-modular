@@ -1,143 +1,89 @@
-# Arena modular
+# IGC Arena modular
 
-Una aplicación para importar datos, preparar motores, ejecutar etapas, archivar predicciones y evaluar, con conexiones reutilizables y consumo visible. La implementación está separada del repositorio histórico y conserva los originales necesarios del corte `881f92792e4a67de0eb33a04662089029c0e6918` de `yudocyudoc/IGC`.
-
-Repositorio de continuidad: [yudocyudoc/igc-modular](https://github.com/yudocyudoc/igc-modular). No modifica PR #171/#172. El adaptador físico remoto todavía utiliza los workflows originales registrados en IGC; el CI de integración se ejecuta en este repositorio. La ejecución física conserva sus condiciones y presupuestos.
-
-**Forma de trabajo:** gpt-web implementa; Codex/Astra revisa. El usuario fija prioridades y autoriza los lotes de consumo. El relevo técnico está en [HANDOFF.md](HANDOFF.md) y las reglas de contribución en [AGENTS.md](AGENTS.md).
+Motores D/M/B y ejecución consolidada en GitHub. gpt-web implementa y Codex/Astra revisa. La migración y conexión inicial fueron solicitadas expresamente por el usuario; los siguientes cambios ordinarios corresponden al coder.
 
 ## Ejecutar en GitHub
 
-Cada push o pull request ejecuta [Arena modular - offline end-to-end](https://github.com/yudocyudoc/igc-modular/actions/workflows/ci.yml). También está disponible con **Run workflow**. Recorre la integración completa en Linux y Windows, Python 3.11 y 3.13, y conserva el informe y el JSON como artifacts. No pide secretos ni consume OMC/Buffalo.
+Abrir [Arena native — one end-to-end run](https://github.com/yudocyudoc/igc-modular/actions/workflows/arena-run.yml) y pulsar **Run workflow**.
 
-El destino operativo es GitHub Actions. La bóveda de Windows es una opción para desarrollo local, no un requisito para ejecutar este CI. Los secretos de IGC no se trasladan automáticamente al nuevo repositorio: el puente físico actual sigue utilizando los jobs y secretos de IGC. La siguiente implementación corresponde a gpt-web: consolidar el recorrido físico en GitHub conservando los motores y la reserva, con los criterios de HANDOFF.md.
+- **integration**: recorre importación, preparación D/M, salidas de prueba, lock y evaluación con fixtures. No necesita secretos y consume cero OMC/Buffalo. También se ejecuta automáticamente ante cambios de código.
+- **live** y **authorized=yes**: autoriza una vez el lote CT-03 completo, con máximos fijos de 19 OMC nuevos y dos POST Buffalo. El SHA se congela automáticamente; el campo freeze_sha permite exigir uno específico.
 
-## Probar el recorrido completo de integración
+Las etapas transportan archivos e IDs automáticamente. Una misma persona puede operar el experimento. No hay aprobaciones intermedias, firmas RSA ni servidores de custodia adicionales.
 
-Desde esta carpeta, con Python 3.11 o superior:
+## Configuración inicial, una vez
 
-```powershell
+En [Settings → Environments](https://github.com/yudocyudoc/igc-modular/settings/environments), cargar:
+
+| Entorno reutilizable | Secreto | Acceso |
+| --- | --- | --- |
+| arena-provider | CLOUDFLARE_API_TOKEN | Workers AI Edit; sin R2 |
+| arena-custodian | CT03_R2_ACCESS_KEY_ID | Conexión S3 del bucket privado |
+| arena-custodian | CT03_R2_SECRET_ACCESS_KEY | Mismo acceso S3 |
+
+La cuenta y el bucket existentes están preconfigurados como identificadores públicos en arena/resources/connections.json. No se necesitan nuevas variables de aprobación, tokens administrativos durante la corrida ni una sesión gh local para usar el botón de GitHub.
+
+Los secretos de IGC no se pueden leer y copiar por API. Si se necesitan credenciales nuevas, se generan y cargan una vez. No se guardan en Git ni se envían por chat. El enlace opcional por API conserva las entradas ya existentes y configura únicamente las faltantes.
+
+## Motores dentro de este repositorio
+
+- **D**: generador original, seis alternativas, validación física y feedback propio.
+- **M**: Short E1, compositor/backend, catálogo, moléculas, seis AST, política M2 y sus revisiones.
+- **B**: Buffalo original Engine.generate, dependencias fijadas y ruta OpenRouter SDK → Cloudflare Workers AI ya probada.
+
+arena/_vendor conserva las fuentes y los recursos necesarios, incluida la evidencia histórica D0/M0. El código no clona IGC ni sd-ai ni descarga sus artifacts durante una corrida. El origen histórico queda documentado, y Buffalo mantiene su licencia MIT.
+
+Las bibliotecas estándar Modelica/SystemDynamics y la imagen OMC siguen fijadas. La migración no cambia ecuaciones, prompts, políticas, métricas o cuotas y no repite los dos OMC de CT-02.
+
+## Arquitectura
+
+| Módulo | Responsabilidad |
+| --- | --- |
+| protocols | Registro y condiciones de cada protocolo |
+| data | Importación, capacidades, intervalos y censura |
+| engines / runtime | Adaptadores D/M/B y workspace del runner |
+| cloud | Etapas nativas del protocolo en GitHub |
+| custody | Almacenamiento privado y acceso posterior al lock |
+| connections / setup | Referencias reutilizables y enlace inicial |
+| store / remote | Estado, cuota y seguimiento de un único despacho |
+| reporting | Resultado legible y consumo explícito |
+
+Una integración de protocolo registra validate/verify/backend/check. Los motores se añaden mediante adaptadores, conservando sus métodos. La condición particular de CT-03 no se transforma en una restricción universal de importación.
+
+## Datos
+
+Se admiten CSV y JSON, también como observaciones parciales. Se conservan originales, intervalos, censura, mediciones no numéricas y columnas ambiguas. La admisión de una fuente no concede aptitud para una pregunta.
+
+No se inventan pedidos, identidad, continuidad ni tiempos de servicio. El observable público CT-03 exige cuatro cortes explícitos t0/t1/t2/t4; la reserva t6/t8 solo entra en el evaluador posterior al lock.
+
+## Resultados y consumo
+
+El workflow conserva fuentes, comandos, logs, intentos, estados de las trece plazas, lock, score e informes. La configuración verdadera, Modelica privado y CSV completo del mundo se conservan exclusivamente en R2.
+
+Se muestran límites, intentos observados y saldo. Los fallos pueden consumir cuota. Si falta evidencia se marca consumo incompleto y saldo sin confirmar. No se inventan facturas o tokens que el proveedor no haya informado.
+
+Un reporte de fallo permite localizar la etapa y los intentos sin repetir el experimento. La evaluación posterior puede reutilizar el mismo lock y los productores originales cerrados, sin nuevas llamadas físicas.
+
+## Desarrollo opcional por CLI
+
+La ejecución principal es GitHub; no hace falta instalar todos los motores en el equipo del usuario.
+
+~~~powershell
 python -m arena check examples/smoke.toml
 python -m arena run examples/smoke.toml --out runs/smoke
 python -m arena report runs/smoke
-```
+~~~
 
-No necesita credenciales, instalación de dependencias, Docker, OMC ni acceso a una nube. Recorre importación → preparación D/M original → salidas de productores de prueba → lock original → evaluación original → informe.
+El controlador remoto opcional usa examples/ct03.toml y una conexión GitHub con permiso de despacho; ya no necesita leer secretos ni escribir variables administrativas para ejecutar. Su autorización cubre un único workflow.
 
-**El resultado es `INTEGRATION_FIXTURE`, no una corrida física de D/M/B.** Los datos privados, las predicciones y los recibos de esta prueba son fixtures explícitos. Se conservan las trece plazas, incluidas las ausencias: dos pares de prueba y once plazas sin par. No se evalúa la eficacia de los motores ni se concede evidencia experimental por estos fixtures.
+La bóveda nativa de Windows sirve para desarrollo local. connections status distingue ausencia local de ausencia en Actions; capture conserva variables ya suministradas. No se exige esa bóveda en Linux/GitHub.
 
-Cada ejecución genera `result.json`, `report.md` y `run.sqlite`. No sobrescribe una ejecución anterior. `status` muestra su estado; `resume` continúa una ejecución registrada sin crear otra corrida.
+## Validación
 
-## Organización y extensión
+[CI de plataforma](https://github.com/yudocyudoc/igc-modular/actions/workflows/ci.yml) y [CI de motores nativos](https://github.com/yudocyudoc/igc-modular/actions/workflows/native-engines-ci.yml).
 
-```text
-arena/
-  cli.py             Interfaz de comandos
-  orchestrator.py    API de aplicación: check / run / resume / status
-  config.py          Configuración común del experimento
-  protocols.py       Registro de protocolos y adaptación CT-03
-  data.py            Importación, capacidades y proyección pública
-  engines.py         Registro y preparación original de motores
-  connections.py    Referencias a credenciales, sin valores en experimentos
-  windows_vault.py   Bóveda nativa del usuario de Windows
-  setup.py           Enlace idempotente de conexiones con GitHub
-  store.py           Estado, intentos y consumo persistentes
-  github.py          Adaptador de transporte REST
-  remote.py          Ejecución del recorrido original en GitHub
-  fixture.py         Recorrido completo de integración sin consumo externo
-  reporting.py       Informe legible
-  legacy.py          Acceso explícito a fuentes originales conservadas
-  _vendor/           Código y recursos originales necesarios
-```
+Se comprueban fuentes originales, historial CT-02, regresiones de feedback/revisión y el SDK Buffalo con transporte mock, además del recorrido con fixtures y el linter de workflows. Estos controles no son una ejecución física ni un resultado científico positivo.
 
-Los protocolos se registran mediante `protocols.register(nombre, adaptador)`. Sus métodos son `validate`, `verify`, `backend` y `check`. El backend expone `execute(store, authorize=False)`. Un protocolo nuevo puede usar su propio backend y presupuesto sin editar el coordinador. La prueba `test_protocols.py` ejecuta esa extensión.
+La corrida física queda detrás de la configuración inicial y de mode=live/authorized=yes. Durante la migración no se consumió OMC/Buffalo ni se seleccionó otro mundo.
 
-Los motores se registran mediante `Engines.register`; su preparación no puede reemplazar silenciosamente un motor existente. D/M conservan generadores, AST, ecuaciones y comprobaciones originales. Buffalo live se ejecuta mediante su workflow original y la ruta de proveedor existente; esta extracción no reimplementa Buffalo localmente. La fábrica y las reglas particulares CT-03 se mantienen en sus adaptadores, no en el almacenamiento ni en el transporte HTTP.
-
-El manifiesto `_vendor/UPSTREAM_MANIFEST.json` enumera los 39 archivos originales con SHA-256 y blob Git. `python -m arena verify-upstream` comprueba su conservación. No se exige generar nuevos certificados por corrida.
-
-## Datos parciales sin falsas trayectorias
-
-```powershell
-python -m arena ingest observaciones.csv --time-column tiempo --value-column medicion --time-unit seconds
-python -m arena ingest anotaciones.json
-```
-
-La importación admite CSV y JSON; conserva campos originales, intervalos, censura y ausencia de identificación. No convierte registros en pedidos, no certifica continuidad ni imputa tiempos de servicio. Distingue admisión de una fuente de aptitud para una pregunta.
-
-El adaptador público CT-03 necesita unidades explícitas y exactamente los cortes t0/t1/t2/t4, sin reserva. Una fuente que no cumpla eso puede seguir admitida como observación parcial. El fixture ejecutable usa los cuatro cortes fijos de `examples/public-cuts.csv`; no sustituye la admisión de un experimento nuevo con datos arbitrarios.
-
-## Conexiones y bóveda: configurar una vez
-
-`connections.toml` contiene referencias; nunca valores. Los experimentos no contienen secretos. La resolución utiliza las variables existentes, después la bóveda y, para GitHub, una sesión `gh` existente. Se conservan los nombres históricos `CLOUDFLARE_ACCOUNT_ID` y `CLOUDFLARE_API_TOKEN`.
-
-En Windows se usa directamente el Administrador de credenciales del usuario mediante `CredReadW`/`CredWriteW`. No requiere instalar una bóveda ni inventar una clave maestra. En macOS/Linux está disponible el extra opcional `vault`, que utiliza el almacén nativo mediante keyring. No hay fallback a archivos de texto.
-
-```powershell
-python -m arena connections status
-python -m arena connections capture
-```
-
-`status` muestra disponibilidad y origen, nunca valores. No confunde presencia con autenticación válida. `capture` guarda de una vez las variables ya suministradas y devuelve solo los nombres de entradas; no crea tokens nuevos. También se puede guardar una entrada mediante un prompt oculto:
-
-```powershell
-python -m arena connections save github token
-```
-
-La bóveda pertenece al usuario de Windows que ejecuta el proceso. No se afirma independencia frente a ese usuario o a un administrador. La prueba de lectura nativa se hizo con un nombre inexistente; no se almacenaron ni migraron credenciales reales en esta implementación.
-
-## Reutilizar secretos de GitHub sin copiarlos de nuevo
-
-```powershell
-python -m arena connections link-github --repository yudocyudoc/IGC
-```
-
-Consulta nombres y muestra qué falta. Los secretos existentes de repositorio o environment se conservan y no requieren una copia local. La API de GitHub no devuelve sus valores.
-
-Si realmente faltan conexiones, el mismo comando con `--apply` crea solo los environments y enlaces faltantes, usando los valores disponibles mediante las referencias de `connections.toml`. Una segunda aplicación no reemplaza secretos existentes. Para subir un secreto nuevo usa el cifrado libsodium exigido por GitHub, disponible en el extra opcional `github-setup`:
-
-```powershell
-python -m pip install '.[github-setup]'
-python -m arena connections link-github --repository yudocyudoc/IGC --apply
-```
-
-La configuración comprueba todas las entradas locales necesarias antes de escribir. Si un secreto falta en todas las fuentes, informa la referencia exacta: no puede recuperar un valor que GitHub no permite leer. Esta operación no despacha workflows ni consume OMC/Buffalo.
-
-El acceso de configuración es del coordinador. Los productores conservan la distribución de secretos de sus jobs originales; el coordinador no les envía su token GitHub, credenciales R2 ni una copia completa de la bóveda. La presencia de nombres no certifica el alcance real de los tokens.
-
-## Recorrido físico remoto: una autorización y seguimiento automático
-
-```powershell
-python -m arena check examples/ct03.toml
-python -m arena run examples/ct03.toml --out runs/ct03 --authorize
-python -m arena status runs/ct03
-python -m arena resume runs/ct03
-```
-
-El ejemplo fija el código `881f927`. `check` no cambia configuración ni despacha. El backend comprueba el SHA, workflows, nombres de secretos y existencia de una corrida previa; necesita un acceso GitHub que permita esas lecturas y, al ejecutar, los despachos y las variables de los environments existentes. Una sesión válida se reutiliza; un token inválido no se transforma en una solicitud de recrear credenciales Buffalo.
-
-Una autorización cubre el lote completo. El coordinador actualiza las variables operativas previstas, despacha intake → productor → lock → evaluador, transporta IDs automáticamente y descarga solo el resultado público. La variable que reconoce la simulación del mundo se escribe después del intake exitoso. No accede al contenido privado de R2.
-
-El flujo conserva las ejecuciones separadas y el evaluador original posterior al lock. Mantiene el máximo de **19 OMC nuevos, incluido el mundo, y 2 POST Buffalo**; la cuota separada de cuatro despachos GitHub no es consumo Buffalo. No repite los dos OMC ya ejecutados en CT-02.
-
-Se registra la intención antes de cada despacho. Con un ID confirmado, `resume` vuelve a consultar esa ejecución. Un fallo del lote no se reintenta. Si la respuesta de un despacho se pierde y no hay un ID confirmado, se detiene con `NEEDS_RECONCILIATION`: no puede garantizarse una ejecución única repitiendo a ciegas una API sin clave de idempotencia. El mensaje indica conservar esa ejecución y consultar GitHub, no empezar otro lote.
-
-## Consumo transparente
-
-El informe distingue límites, intentos observados, intentos fallidos y saldo. Las llamadas fallidas cuentan. Los intentos remotos se contrastan con sus logs retenidos. Cuando falta evidencia, el consumo se marca incompleto y el saldo queda sin confirmar: no se sustituye por cero. No se inventan tokens, precios o facturación que el proveedor no haya informado.
-
-La prueba local ya completó el recorrido con cero OMC y cero Buffalo. El transporte remoto y el enlace de secretos se probaron con dobles de API, sin modificar GitHub. No se ha ejecutado CT-03 físico desde esta extracción. La sesión `gh` disponible en la revisión anterior reportaba autenticación inválida; este código permite reutilizar una conexión válida cuando esté disponible.
-
-## Validación y distribución
-
-```powershell
-python -m unittest discover -s tests -v
-python -m pip wheel . --no-deps --no-build-isolation --no-cache-dir --wheel-dir dist
-```
-
-Las regresiones cubren CLI completo, conservación de fuentes, extensión de protocolo, datos parciales, reserva posterior al lock, cuota persistente, reanudación, despacho incierto, ocultación de credenciales y configuración idempotente. Las pruebas de escritura de bóveda y de API usan dobles; no escriben secretos reales.
-
-El wheel incluye los originales necesarios. El CI incluido ejecuta la integración offline y las regresiones sin secretos. Para llevar esta carpeta a otro repositorio se conserva el manifiesto de origen; no se trasladan `.env`, bases de ejecuciones, secretos ni resultados privados.
-
-Referencias técnicas: [CredReadW](https://learn.microsoft.com/en-us/windows/win32/api/wincred/nf-wincred-credreadw), [CredWriteW](https://learn.microsoft.com/en-us/windows/win32/api/wincred/nf-wincred-credwritew), [keyring](https://keyring.readthedocs.io/en/latest/), [GitHub workflow dispatch](https://docs.github.com/en/rest/actions/workflows), [cifrado de secretos para GitHub](https://docs.github.com/en/rest/guides/encrypting-secrets-for-the-rest-api).
-
+Detalles de procedencia y límites en [ENGINE_MIGRATION.md](ENGINE_MIGRATION.md). Relevo del coder en [HANDOFF.md](HANDOFF.md); reglas en [AGENTS.md](AGENTS.md).

@@ -79,8 +79,8 @@ def provider_preflight():
     # A broad token must not let the producer read custody storage.
     r2_status,_=get("/accounts/"+account+"/r2/buckets?per_page=1")
     if r2_status!=403:
-        raise ArenaError("Provider token R2 access is not denied; use its dedicated Workers AI connection.")
-    return {"workers_ai_metadata":"AVAILABLE","r2_access_denied":True,
+        raise ArenaError("Provider token R2 bucket listing is not denied; use its dedicated Workers AI connection.")
+    return {"workers_ai_metadata":"AVAILABLE","r2_bucket_listing_denied":True,"credential_policy":"DEDICATED_WORKERS_AI_EDIT_ONLY",
             "inference_write_permission":"NOT_TESTED_WITH_PAID_POST","provider_posts":0,"new_omc":0}
 
 
