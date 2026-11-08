@@ -107,6 +107,12 @@ El acceso de configuración es del coordinador. Los productores conservan la dis
 
 ## Recorrido físico remoto: una autorización y seguimiento automático
 
+**Entrada única alojada en el nuevo repositorio:** una vez incorporado el workflow al branch principal, abrir [Arena CT-03 - physical single entry](https://github.com/yudocyudoc/igc-modular/actions/workflows/physical-ct03.yml) → **Run workflow**. Elegir `mode=check` para verificar acceso sin consumir OMC/Buffalo. Elegir `mode=execute` y `authorized=yes` solo para el lote físico explícitamente aprobado. Los pushes y PR **no** ejecutan el lote físico. El workflow encadena intake → productores D/M/B → lock → evaluación; conserva artefactos públicos y estado de ejecución.
+
+**Conexión inicial del runner alojado (una sola vez):** en `igc-modular` → **Settings → Secrets and variables → Actions**, guardar un secreto de repositorio `IGC_ACTIONS_TOKEN` con un token limitado al repositorio `yudocyudoc/IGC`. El `GITHUB_TOKEN` automático de `igc-modular` no tiene permisos entre repositorios. El token remoto necesita Actions read/write, Environments read/write, Secrets read y Contents read, según los endpoints utilizados. No se copian aquí los secretos Buffalo/R2, que siguen en los environments originales de IGC. El workflow falla **antes de consumir cómputo** si falta el token o la comprobación remota falla. Un token disponible no certifica por sí solo que sus permisos funcionen.
+
+**Límite del estado actual:** esta entrada coordina los cuatro workflows físicos todavía alojados en IGC; no los traslada ni afirma haber ejecutado CT-03. Un intento de despacho sin ID confirmado queda incierto y no se repite; el estado y los recibos que existan se archivan para conciliación. No iniciar otro `execute` para recuperar un lote interrumpido. El CI y los fixtures no requieren este token.
+
 ```powershell
 python -m arena check examples/ct03.toml
 python -m arena run examples/ct03.toml --out runs/ct03 --authorize
