@@ -1,0 +1,96 @@
+name: Arena CT-03 - physical single entry
+run-name: "CT-03 ${{ inputs.mode }} (manual)"
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "check = no external compute; execute = one physical lot"
+        required: true
+        type: choice
+        options: [check, execute]
+        default: check
+      authorized:
+        description: "Explicitly approve up to 19 new OMC and 2 Buffalo POST"
+        required: true
+        type: choice
+        options: ['no', 'yes']
+        default: 'no'
+
+# This workflow never fires from push/PR. A repository-scoped GITHUB_TOKEN
+# cannot dispatch the historical IGC workflows in a different repository.
+permissions:
+  contents: read
+concurrency:
+  group: ct03-one-physical-lot
+  cancel-in-progress: false
+
+jobs:
+  coordinate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    env:
+      GH_TOKEN: ${{ secrets.IGC_ACTIONS_TOKEN }}
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify original sources
+        run: python -m arena verify-upstream
+      - name: Guard manual authorization and remote access
+        shell: bash
+        env:
+          MODE: ${{ inputs.mode }}
+          AUTH: ${{ inputs.authorized }}
+        run: |
+          set -euo pipefail
+          if [[ "$MODE" != "check" && "$MODE" != "execute" ]]; then
+            echo "::error::Unknown operation"; exit 1
+          fi
+          if [[ "$MODE" == "execute" && "$AUTH" != "yes" ]]; then
+            echo "::error::Physical CT-03 requires explicit authorized=yes"; exit 1
+          fi
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::error::Configure the one-time IGC_ACTIONS_TOKEN repository secret in igc-modular (remote IGC Actions/Environments/Secrets read/write as needed). No compute was dispatched."
+            exit 1
+          fi
+      - name: Read-only remote preflight
+        run: python -m arena check examples/ct03.toml > preflight.json
+      - name: Execute approved CT-03 through four original stages
+        if: ${{ inputs.mode == 'execute' }}
+        run: |
+          set -euo pipefail
+          python -m arena run examples/ct03.toml --out runs/ct03 --authorize > run-summary.json
+          python -m arena status runs/ct03 > final-status.json
+      - name: Publish human-readable summary when available
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          if [[ -f runs/ct03/report.md ]]; then
+            cat runs/ct03/report.md >> "$GITHUB_STEP_SUMMARY"
+          elif [[ -f runs/ct03/run.sqlite ]]; then
+            python -m arena status runs/ct03 > final-status.json
+            echo "CT-03 has a recorded run state; do not dispatch another lot to recover from a failure." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Only preflight was attempted; physical status is not established by this workflow." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Retain local public run state for review or reconciliation
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ct03-coordinator-${{ github.run_id }}
+          path: |
+            preflight.json
+            run-summary.json
+            final-status.json
+            runs/ct03/run.sqlite
+            runs/ct03/result.json
+            runs/ct03/report.md
+            runs/ct03/status.json
+            runs/ct03/usage-note.json
+            runs/ct03/results/
+          if-no-files-found: warn
+          retention-days: 90
