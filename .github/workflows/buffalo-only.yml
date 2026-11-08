@@ -14,8 +14,8 @@ permissions:
   contents: read
   actions: read
 
-# Separate from arena-run.yml and CT03. A previous manual dispatch is
-# rejected by the Python admission gate; jobs are never auto-retried.
+# Separate from arena-run.yml and CT03. Admission permits prior dispatches
+# ONLY with affirmative proof the paid Node step never started; no retries.
 concurrency:
   group: arena-buffalo-only-one-post
   cancel-in-progress: false
@@ -43,7 +43,7 @@ jobs:
           github-token: ${{ github.token }}
           merge-multiple: true
           path: ${{ runner.temp }}/arena-native/artifacts/ct03-public
-      - name: Validate original source, artifact, first manual attempt and no previous run
+      - name: Validate source and prove no earlier provider-attempt step was started
         env:
           GH_TOKEN: ${{ github.token }}
           BUFFALO_ONLY_AUTH: '${{ inputs.authorized }}'
