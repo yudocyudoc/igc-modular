@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from arena.buffalo import execution, physical
 from arena.buffalo.gates import validate_candidate, CandidateBlocked
-from arena.buffalo.capabilities import pulse_fixture
+from arena.buffalo.capabilities import pulse_fixture, native_hash
 from arena.common import read_json, write_json
 
 
@@ -78,6 +78,90 @@ class BuffaloLiveTests(unittest.TestCase):
             validate_candidate(altered)
         # The validator never mutates the candidate it receives.
         self.assertEqual(source["equation"],"1.7")
+
+    def _mock_generation_workspace(self, root):
+        from arena.buffalo.feedback import freeze_profile
+        batch=root/"artifacts/buffalo-adjust-v1"
+        evidence=root/"evidence"
+        (evidence/"parent/initial").mkdir(parents=True)
+        batch.mkdir(parents=True)
+        native=pulse_fixture()
+        parent=evidence/"parent/initial/native-engine-result.json"
+        write_json(parent,native)
+        profile=freeze_profile()
+        write_json(batch/"bf02-profile.json",profile)
+        write_json(batch/"bf02-own-feedback.json",{
+            "profile_sha256":profile["utf8_sha256"],
+            "parent_native_sha256":native_hash(native),
+            "world_public_id":"PUBLIC","source_snapshot_hash":"sha256:source",
+            "own_semantic_diagnostics":{"diagnostics":[]}})
+        write_json(batch/"live-admission.json",{
+            "run_id":123,"sha":"a"*40,
+            "profile_sha256":profile["utf8_sha256"]})
+        return batch,evidence,native,profile
+
+    def _run_mock_bf03_bf04(self, *, reject_bf03=False):
+        with TemporaryDirectory() as d:
+            root=Path(d)
+            batch,evidence,native,profile=self._mock_generation_workspace(root)
+            observed=[]
+            construction={"world_public_id":"PUBLIC",
+                          "source_snapshot_hash":"sha256:source"}
+            def visible(_root,*args):
+                path=Path(args[-1])
+                write_json(path,{"question":"public-construction"})
+                return 0
+            def called(argv,**kwargs):
+                env=kwargs["env"]
+                phase=env["BUFFALO_ADJUST_ROUND"]
+                observed.append((phase,env.get("BUFFALO_PARENT_NATIVE"),
+                                 env.get("BUFFALO_OWN_FEEDBACK")))
+                output=Path(env["BUFFALO_ADJUST_OUTPUT"])
+                output.mkdir()
+                write_json(output/"receipt.json",{
+                    "provider_calls":1,"proxy_requests":1,
+                    "raw_provider_saved":True,
+                    "generation_profile_sha256":profile["utf8_sha256"],
+                    "round_kind":phase,"source_snapshot_hash":"sha256:source",
+                    "world_public_id":"PUBLIC","runner_error":None,
+                    "model_returned":True,"provider_usage":{"completion_tokens":10}})
+                write_json(output/"provider-raw.json",{"success":True})
+                write_json(output/"native-engine-result.json",native)
+                return SimpleNamespace(returncode=0)
+            def validate(_):
+                if reject_bf03:
+                    raise CandidateBlocked("G1_INVALID_PARENT")
+                return {"status":"ADMISSIBLE_IN_PINNED_MODELICA_SUBSET_NOT_YET_SIMULATED",
+                        "translated_modelica_text":"model Neutral end Neutral;",
+                        "observation_operator":{"modelica_csv_column":"Delivered"},
+                        "public_input_flow_name":"Arrivals"}
+            with (patch.object(execution,"identity",return_value=("a"*40,123)),
+                  patch.object(execution,"public_input",return_value=construction),
+                  patch.object(execution,"module",side_effect=visible),
+                  patch.object(execution,"validate_candidate",side_effect=validate),
+                  patch.dict(os.environ,{"CLOUDFLARE_API_TOKEN":"unit-test-not-real"})):
+                if reject_bf03:
+                    with self.assertRaisesRegex(Exception,"G1_BLOCKED_STOP"):
+                        execution.generate(root,evidence,runner=called)
+                    self.assertFalse((batch/"bf04-attempt.json").exists())
+                else:
+                    result=execution.generate(root,evidence,runner=called)
+                    self.assertEqual(result["provider_posts_reported"],2)
+                    self.assertTrue((batch/"bf03-g1.json").exists())
+                    self.assertTrue((batch/"bf04-g1.json").exists())
+            return observed
+
+    def test_paid_sequence_two_original_invocations_and_parent_only_in_bf03(self):
+        calls=self._run_mock_bf03_bf04()
+        self.assertEqual([c[0] for c in calls],["bf03","bf04"])
+        self.assertTrue(calls[0][1])
+        self.assertTrue(calls[0][2])
+        self.assertEqual(calls[1][1],"")
+        self.assertEqual(calls[1][2],"")
+
+    def test_bf03_rejected_stops_bf04_and_omc_without_retry(self):
+        calls=self._run_mock_bf03_bf04(reject_bf03=True)
+        self.assertEqual([c[0] for c in calls],["bf03"])
 
     def test_failed_parent_is_never_accepted_for_bf04_or_omc(self):
         with TemporaryDirectory() as d:
