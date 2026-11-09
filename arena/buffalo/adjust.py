@@ -1,8 +1,9 @@
 """BF-00/BF-01/BF-02 offline bundle from immutable CT03/Buffalo-only archives.
 
 A single public artifact. Does not call the LLM, solver, private R2 or custodian.
-The exact pulse has a static Modelica representation, but paid BF03-BF05
-remain unimplemented and unauthorized. XMILE/PySD parity is unproven.
+The exact pulse has a static Modelica representation. This command remains
+OFFLINE ONLY; paid BF03-BF05 live execution is isolated in execution.py behind
+a first-attempt manual GitHub workflow. XMILE/PySD parity is unproven.
 """
 import argparse
 from hashlib import sha256
@@ -121,7 +122,7 @@ def offline_bundle(root, evidence):
        "future_fixed_budget":{"bf03_posts":1,"bf04_posts":1,"bf05_omc":1,
                              "provider_posts_max":MAX_POSTS,"new_omc_max":MAX_OMC,
                              "des_max":0,"dm_max":0,"new_worlds_max":0},
-       "gate":"BLOCKED_PAID_PHASES_NOT_IMPLEMENTED_OR_AUTHORIZED",
+       "gate":"OFFLINE_ONLY_NOT_A_PAID_AUTHORIZATION",
        "ct03_lock_or_score_touched":False,
        "actual_consumption":{"provider_posts":0,"new_omc":0,"new_worlds":0},
        "no_automatic_retries":True,
@@ -137,7 +138,7 @@ def main(argv=None):
     parser.add_argument("--evidence",required=True,type=Path)
     args=parser.parse_args(argv)
     if args.phase=="authorize-live":
-        raise ArenaError("BF03_BF04_BF05_NOT_IMPLEMENTED_OR_AUTHORIZED: no provider or OMC call.")
+        raise ArenaError("BF03_BF04_BF05_MANUAL_WORKFLOW_ONLY: use execution.py; this offline command never pays.")
     result=offline_bundle(args.workspace,args.evidence)
     print(json.dumps(result,indent=2))
 
