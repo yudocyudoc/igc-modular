@@ -158,15 +158,17 @@ def evaluate_csv(root,plan):
     if missing:
         raise ArenaError("BF05_CSV_REQUIRED_VARIABLES_MISSING:"+",".join(missing))
     dataset,view=regular_grid_view(rows,required)
-    # Archive a deterministic derived regular view AND provenance. The raw
-    # physical_res.csv remains untouched and is uploaded alongside these.
+    # Archive the deterministic view AND provenance; the source is immutable.
     destination=path.parent
-    write_json(destination/"physical-grid-selection.json",view,exclusive=True)
+    view["original_csv"]="physical_res.csv"
+    view["raw_csv_sha256"]="sha256:"+hashlib.sha256(path.read_bytes()).hexdigest()
     grid_csv=destination/"physical-grid.csv"
     with grid_csv.open("x",newline="",encoding="utf-8") as stream:
         writer=csv.DictWriter(stream,fieldnames=["time",*required])
         writer.writeheader()
         writer.writerows(dataset)
+    view["derived_csv_sha256"]="sha256:"+hashlib.sha256(grid_csv.read_bytes()).hexdigest()
+    write_json(destination/"physical-grid-selection.json",view,exclusive=True)
     source_area=0.
     residuals=[]
     material_initial=sum(dataset[0][s] for s in stocks)
@@ -199,6 +201,8 @@ def evaluate_csv(root,plan):
                  total_mass_ok,conservation_ok)) else "G2_PHYSICAL_CONSTRAINT_FAILED",
              "omc_attempts":1,
              "csv_grid_policy":CSV_VIEW_POLICY,
+             "raw_csv_sha256":view["raw_csv_sha256"],
+             "regular_grid_sha256":view["derived_csv_sha256"],
              "raw_csv_rows":view["raw_data_rows"],
              "selected_grid_rows":view["regular_grid_rows"],
              "event_rows_not_integrated":view["event_rows_not_used_as_euler_steps"],
