@@ -276,7 +276,7 @@ class BuffaloAdjustTests(unittest.TestCase):
             self.assertEqual(result["bf01"]["normalized_native_sha256"],
                              native_hash(archived))
             self.assertEqual(result["gate"],
-                             "BLOCKED_PAID_PHASES_NOT_IMPLEMENTED_OR_AUTHORIZED")
+                             "OFFLINE_ONLY_NOT_A_PAID_AUTHORIZATION")
             self.assertEqual(result["actual_consumption"],
                              {"provider_posts":0,"new_omc":0,"new_worlds":0})
 
@@ -286,7 +286,10 @@ class BuffaloAdjustTests(unittest.TestCase):
            ".github/workflows/buffalo-only.yml").read_text()
         self.assertIn("adjust-check",w)
         self.assertIn("adjust-live",w)
-        self.assertIn("authorize-live",w)
+        self.assertIn("python -m arena.buffalo.execution admit",w)
+        self.assertIn("python -m arena.buffalo.execution generate",w)
+        self.assertIn("python -m arena.buffalo.execution physical",w)
+        self.assertIn("if: always()",w)
         self.assertNotIn("arena-custodian",w)
         self.assertNotIn("python -m arena.cloud world",w)
         self.assertNotIn("python -m arena.cloud dm",w)

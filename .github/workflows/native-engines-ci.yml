@@ -21,6 +21,8 @@ jobs:
         with: {node-version: '22'}
       - name: Validate GitHub workflow syntax
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
+      - name: Verify BF03/BF04 original Engine adapter has valid ESM syntax
+        run: node --check arena/buffalo/original_runner.mjs
       - name: Verify the migrated engine bytes and native CT02 evidence
         run: python -m arena.runtime verify
       - name: Original producer, revision, feedback and failure regressions
@@ -40,6 +42,13 @@ jobs:
           npm ci --ignore-scripts --omit=optional --no-audit --no-fund
       - name: Original Buffalo initial, memory retrieval and own-parent revision with offline transport
         run: python -m arena.engine_contracts --workspace "$RUNNER_TEMP/arena-native"
+      - name: BF03/BF04 original Engine.generate integration with local mocked Cloudflare response
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          node tests/buffalo_adjust_node_contract.mjs bf03 "$RUNNER_TEMP/arena-native"
+          node tests/buffalo_adjust_node_contract.mjs bf04 "$RUNNER_TEMP/arena-native"
       - uses: actions/upload-artifact@v4
         with:
           name: native-engine-migration-contracts-zero-consumption
