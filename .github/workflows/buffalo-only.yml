@@ -1,9 +1,6 @@
 name: Arena diagnostic - buffalo-only one POST
 
 on:
-  push:
-    branches: [feat/buffalo-adjust-v1-offline]
-    paths: ['arena/buffalo/**', '.github/workflows/buffalo-only.yml']
   workflow_dispatch:
     inputs:
       mode:
@@ -85,7 +82,7 @@ jobs:
 
   adjust:
     name: BF00-02 - archived real evidence, no provider or OMC
-    if: github.event_name == 'push' || inputs.mode == 'adjust-check' || inputs.mode == 'adjust-live'
+    if: github.event_name == 'workflow_dispatch' && (inputs.mode == 'adjust-check' || inputs.mode == 'adjust-live')
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
@@ -119,7 +116,7 @@ jobs:
           merge-multiple: true
           path: ${{ runner.temp }}/buffalo-evidence/parent
       - name: BF00 BF01 BF02 static check, pinned source hashes and public-only packet
-        if: github.event_name == 'push' || inputs.mode == 'adjust-check'
+        if: inputs.mode == 'adjust-check'
         run: |
           python -m arena.buffalo.adjust check --workspace "$RUNNER_TEMP/arena-native" --evidence "$RUNNER_TEMP/buffalo-evidence"
       - name: Paid BF03-BF05 GATE - explicitly blocked until exact pulse contract exists
