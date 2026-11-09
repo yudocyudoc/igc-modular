@@ -82,7 +82,7 @@ jobs:
 
   adjust:
     name: BF00-02 - archived real evidence, no provider or OMC
-    if: github.event_name == 'workflow_dispatch' && (inputs.mode == 'adjust-check' || inputs.mode == 'adjust-live')
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'adjust-check'
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
@@ -119,15 +119,86 @@ jobs:
         if: inputs.mode == 'adjust-check'
         run: |
           python -m arena.buffalo.adjust check --workspace "$RUNNER_TEMP/arena-native" --evidence "$RUNNER_TEMP/buffalo-evidence"
-      - name: Paid BF03-BF05 GATE - not implemented or authorized
-        if: inputs.mode == 'adjust-live'
-        run: |
-          python -m arena.buffalo.adjust authorize-live --workspace "$RUNNER_TEMP/arena-native" --evidence "$RUNNER_TEMP/buffalo-evidence"
       - name: Preserve complete offline BF00-BF02 results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: buffalo-adjust-v1-offline-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/buffalo-adjust-v1/
+          if-no-files-found: warn
+          retention-days: 90
+
+  live:
+    name: Buffalo-adjust v1 BF03-BF04-BF05 (2 POST, 1 OMC)
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'adjust-live' && inputs.authorized == 'yes' && github.ref == 'refs/heads/main'
+    environment: arena-provider
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: '${{ github.sha }}'
+          persist-credentials: false
+      - uses: ./.github/actions/native-runtime
+        with: {role: b}
+      - name: BF00-02 fetch frozen CT03 public construction
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 13607441674
+          run-id: 42455527897
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/arena-native/artifacts/ct03-public
+      - name: BF00-02 fetch original failed CT03 response
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 13607158216
+          run-id: 42455527897
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/buffalo-evidence/ct03
+      - name: BF00-02 fetch independent original Buffalo-only native
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 13639473968
+          run-id: 42536740649
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/buffalo-evidence/parent
+      - name: Validate fixed sources, frozen profile and previous manual-batch history
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUFFALO_ADJUST_AUTH: '${{ inputs.authorized }}'
+          BUFFALO_ADJUST_MODE: '${{ inputs.mode }}'
+        run: python -m arena.buffalo.execution admit --workspace "$RUNNER_TEMP/arena-native" --evidence "$RUNNER_TEMP/buffalo-evidence"
+      - name: Prepare pinned Modelica image and standard libraries BEFORE spending provider tokens
+        run: python -m arena.runtime libraries
+      - name: Install original Buffalo SDK dependencies before generation
+        working-directory: ${{ runner.temp }}/arena-native/upstream/sd-ai
+        run: npm ci --ignore-scripts --omit=optional --no-audit --no-fund
+      - name: BF03 then BF04 - original Engine.generate max two POST total no retries
+        env:
+          BUFFALO_ADJUST_AUTH: '${{ inputs.authorized }}'
+          BUFFALO_ADJUST_MODE: '${{ inputs.mode }}'
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python -m arena.buffalo.execution generate --workspace "$RUNNER_TEMP/arena-native" --evidence "$RUNNER_TEMP/buffalo-evidence"
+      - name: BF05 - at most one pinned isolated OpenModelica simulation
+        env:
+          BUFFALO_ADJUST_AUTH: '${{ inputs.authorized }}'
+          BUFFALO_ADJUST_MODE: '${{ inputs.mode }}'
+        run: python -m arena.buffalo.execution physical --workspace "$RUNNER_TEMP/arena-native"
+      - name: Finalize independent Buffalo-adjust diagnostic (even on failure)
+        if: always()
+        run: |
+          if [ -d "$RUNNER_TEMP/arena-native/artifacts/buffalo-adjust-v1" ]; then
+            python -m arena.buffalo.execution finalize --workspace "$RUNNER_TEMP/arena-native"
+          fi
+      - name: Archive all rounds, raw responses, usage, G1 and G2 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: buffalo-adjust-v1-live-${{ github.run_id }}
           path: ${{ runner.temp }}/arena-native/artifacts/buffalo-adjust-v1/
           if-no-files-found: warn
           retention-days: 90
