@@ -69,17 +69,20 @@ class BuffaloLiveTests(unittest.TestCase):
                 paid_step_names,(generation,omc)),start=9):
             if label==missing:
                 continue
+            timestamp=("2026-11-09T01:29:49Z" if result=="skipped"
+                       else "2026-11-08T20:00:01Z" if
+                       begun and label==paid_step_names[0] else None)
             steps.append({"name":label,"number":number,
                 "status":"completed" if result!="in_progress" else "in_progress",
                 "conclusion":None if result=="in_progress" else result,
-                "started_at":("2026-11-08T20:00:01Z" if
-                              begun and label==paid_step_names[0] else None)})
+                "started_at":timestamp,
+                "completed_at":timestamp if result=="skipped" else None})
         return {"name":execution.LIVE_JOB,"status":"completed",
                 "conclusion":job_conclusion,"steps":steps}
 
     def test_f6_02_failed_download_libraries_or_npm_before_post_is_recoverable(self):
-        # The step name is irrelevant; verified timing and skipped paid steps
-        # are the entire safety property, including pre-provider cancellation.
+        # An earlier preparation failure plus two completed/skipped paid
+        # steps proves no spend, even when GitHub timestamps skipped steps.
         for earlier in ("failure","cancelled"):
             with self.subTest(earlier=earlier):
                 job=self._previous_live_after_preparation(
@@ -87,9 +90,40 @@ class BuffaloLiveTests(unittest.TestCase):
                 self.assertEqual(execution.reconcile_history(
                     FakeHistory(jobs=[job]),123),[987])
 
+    def test_f6_02_actual_github_skipped_step_timestamps_allow_first_post(self):
+        # Real GitHub Actions metadata from run 42545847086, job 128930588499:
+        # completed/skipped can carry started_at AND completed_at timestamps.
+        real_skipped={
+            "name":"Paid BF03-BF05 GATE - explicitly blocked until exact pulse contract exists",
+            "status":"completed","conclusion":"skipped",
+            "started_at":"2026-11-09T01:29:49Z",
+            "completed_at":"2026-11-09T01:29:49Z"}
+        self.assertEqual(real_skipped["status"],"completed")
+        self.assertEqual(real_skipped["conclusion"],"skipped")
+        job=self._previous_live_after_preparation()
+        for step in job["steps"]:
+            if step["name"] in (execution.PAID_GENERATION_STEP,
+                                execution.PAID_OMC_STEP):
+                for key in ("status","conclusion","started_at","completed_at"):
+                    step[key]=real_skipped[key]
+        self.assertEqual(execution.reconcile_history(FakeHistory(jobs=[job]),123),
+                         [987])
+        # A matching or zero-length timestamp is NOT sufficient: a failed
+        # paid step still blocks the batch, irrespective of time metadata.
+        job["steps"][1]["conclusion"]="failure"
+        with self.assertRaisesRegex(Exception,"ALREADY_STARTED_OR_UNCERTAIN"):
+            execution.reconcile_history(FakeHistory(jobs=[job]),123)
+
+    def test_f6_02_paid_step_order_must_match_workflow(self):
+        job=self._previous_live_after_preparation()
+        job["steps"][1]["number"],job["steps"][2]["number"]=(
+            job["steps"][2]["number"],job["steps"][1]["number"])
+        with self.assertRaisesRegex(Exception,"ALREADY_STARTED_OR_UNCERTAIN"):
+            execution.reconcile_history(FakeHistory(jobs=[job]),123)
+
     def test_f6_02_started_post_timeout_or_missing_receipt_blocks_second_batch(self):
         for result,begun in (("success",True),("failure",True),
-                             ("in_progress",True),("skipped",True)):
+                             ("cancelled",True),("in_progress",True)):
             with self.subTest(result=result):
                 job=self._previous_live_after_preparation(
                     generation=result,begun=begun)
