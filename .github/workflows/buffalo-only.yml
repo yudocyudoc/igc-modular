@@ -1,8 +1,17 @@
 name: Arena diagnostic - buffalo-only one POST
 
 on:
+  push:
+    branches: [feat/buffalo-adjust-v1-offline]
+    paths: ['arena/buffalo/**', '.github/workflows/buffalo-only.yml']
   workflow_dispatch:
     inputs:
+      mode:
+        description: "original is the closed one-shot; adjust-check is BF00-02 without POST/OMC"
+        type: choice
+        options: [original, adjust-check, adjust-live]
+        default: original
+        required: true
       authorized:
         description: "Run exactly one paid Buffalo POST outside the closed CT03"
         type: choice
@@ -23,7 +32,7 @@ concurrency:
 jobs:
   buffalo-only:
     name: Original Buffalo - archived public CT03 input - 0 OMC
-    if: inputs.authorized == 'yes' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'original' && inputs.authorized == 'yes' && github.ref == 'refs/heads/main'
     environment: arena-provider
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -71,5 +80,57 @@ jobs:
         with:
           name: buffalo-only-diagnostic-${{ github.run_id }}
           path: ${{ runner.temp }}/arena-native/artifacts/buffalo-only/
+          if-no-files-found: warn
+          retention-days: 90
+
+  adjust:
+    name: BF00-02 - archived real evidence, no provider or OMC
+    if: github.event_name == 'push' || inputs.mode == 'adjust-check' || inputs.mode == 'adjust-live'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/native-runtime
+        with: {role: b}
+      - name: Download original CT03 public construction
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 13607441674
+          run-id: 42455527897
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/arena-native/artifacts/ct03-public
+      - name: Download original CT03 failed Buffalo response (READ ONLY)
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 13607158216
+          run-id: 42455527897
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/buffalo-evidence/ct03
+      - name: Download original successful Buffalo-only diagnostic (READ ONLY)
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 13639473968
+          run-id: 42536740649
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/buffalo-evidence/parent
+      - name: BF00 BF01 BF02 static check, pinned source hashes and public-only packet
+        if: github.event_name == 'push' || inputs.mode == 'adjust-check'
+        run: |
+          python -m arena.buffalo.adjust check --workspace "$RUNNER_TEMP/arena-native" --evidence "$RUNNER_TEMP/buffalo-evidence"
+      - name: Paid BF03-BF05 GATE - explicitly blocked until exact pulse contract exists
+        if: inputs.mode == 'adjust-live'
+        run: |
+          python -m arena.buffalo.adjust authorize-live --workspace "$RUNNER_TEMP/arena-native" --evidence "$RUNNER_TEMP/buffalo-evidence"
+      - name: Preserve complete offline BF00-BF02 results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: buffalo-adjust-v1-offline-${{ github.run_id }}
+          path: ${{ runner.temp }}/arena-native/artifacts/buffalo-adjust-v1/
           if-no-files-found: warn
           retention-days: 90
