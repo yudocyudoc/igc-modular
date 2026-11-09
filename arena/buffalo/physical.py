@@ -21,6 +21,68 @@ DT=0.125
 STEPS=64
 MASS=3.4
 CONSERVATION_ABS_TOL=1e-9
+# Native OMC CSV legitimately emits pre/post-event samples and a repeated
+# terminal sample (68 historical rows for 65 Euler grid instants). Reconcile
+# the full raw file into a POST-EVENT, right-continuous regular grid without
+# treating extra event records as separate integration steps.
+GRID_TIME_TOL=1e-9
+CSV_VIEW_POLICY="REGULAR_65_LAST_RAW_ROW_WITHIN_1E9_POST_EVENT"
+
+
+def regular_grid_view(rows, required_columns):
+    """Select all 65 regular times from ordered raw OMC rows, last match wins.
+
+    Keep the original CSV byte-for-byte. Event rows at t~2, including the
+    post-event update at t+4e-10 in frozen CT02 evidence, map to the t=2
+    grid instant. Integration uses ONLY the selected 65 rows at fixed dt.
+    No interpolation or replacement of a truly missing regular sample.
+    """
+    if not isinstance(rows,list) or not rows or len(rows)>100000:
+        raise ArenaError("BF05_CSV_ROWS_INVALID")
+    data=[]
+    previous=-math.inf
+    for idx,row in enumerate(rows):
+        if not isinstance(row,dict):
+            raise ArenaError("BF05_CSV_ROW_INVALID")
+        try:
+            t=float(row["time"])
+            values={key:float(row[key]) for key in required_columns}
+        except (ValueError,TypeError,KeyError) as exc:
+            raise ArenaError("BF05_NONNUMERIC_CSV") from exc
+        if (not math.isfinite(t) or not all(map(math.isfinite,values.values()))
+            or t < -GRID_TIME_TOL or t > STEPS*DT+GRID_TIME_TOL
+            or t + GRID_TIME_TOL < previous):
+            raise ArenaError("BF05_TIME_ORDER_RANGE_OR_FINITE_VALUES_INVALID")
+        previous=t
+        data.append({"time":t,**values})
+    selected=[]
+    selections=[]
+    for k in range(STEPS+1):
+        t=k*DT
+        matches=[i for i,row in enumerate(data)
+                 if abs(row["time"]-t)<=GRID_TIME_TOL]
+        if not matches:
+            raise ArenaError(f"BF05_CSV_GRID_MISSING_REGULAR_TIME:{t:g}")
+        chosen=matches[-1]  # post-event (last emitted state), including final t=8
+        selected.append({"time":t,**{key:data[chosen][key] for key in required_columns}})
+        selections.append({"grid_index":k,"grid_time":t,
+            "selected_raw_row_1_based":chosen+1,
+            "raw_time":data[chosen]["time"],
+            "matching_raw_rows_1_based":[i+1 for i in matches]})
+    indices={step["selected_raw_row_1_based"]-1 for step in selections}
+    audit={"schema":"buffalo-adjust-v1/bf05-csv-grid/1",
+           "policy":CSV_VIEW_POLICY,
+           "raw_data_rows":len(rows),"regular_grid_rows":STEPS+1,
+           "time_tolerance_hours":GRID_TIME_TOL,
+           "event_rows_not_used_as_euler_steps":len(rows)-len(indices),
+           "excluded_raw_rows_1_based":[i+1 for i in range(len(rows)) if i not in indices],
+           "selection":selections,
+           "raw_csv_preserved":True,
+           "interpolated_or_imputed_samples":0,
+           "post_event_last_match_at_t2":True}
+    return selected,audit
+
+
 
 
 def prepare(root):
@@ -79,25 +141,26 @@ def evaluate_csv(root,plan):
         reader=csv.DictReader(stream)
         rows=list(reader)
         columns=reader.fieldnames or []
-    if len(rows)!=STEPS+1 or "time" not in columns:
-        raise ArenaError("BF05_CSV_GRID_MISSING")
+    if "time" not in columns:
+        raise ArenaError("BF05_CSV_TIME_COLUMN_MISSING")
     native=read_json(Path(root)/"artifacts/buffalo-adjust-v1/bf04/native-engine-result.json")
     stocks=[ident(v["name"]) for v in native["model"]["variables"] if v["type"]=="stock"]
     cumulative=plan["observation_operator"]["modelica_csv_column"]
     inflow=ident(plan["external_input_flow"])
-    missing=[name for name in [*stocks,cumulative,inflow] if name not in columns]
+    required=list(dict.fromkeys([*stocks,cumulative,inflow]))
+    missing=[name for name in required if name not in columns]
     if missing:
         raise ArenaError("BF05_CSV_REQUIRED_VARIABLES_MISSING:"+",".join(missing))
-    dataset=[]
-    for i,row in enumerate(rows):
-        try:
-            t=float(row["time"])
-            values={name:float(row[name]) for name in set([*stocks,cumulative,inflow])}
-        except (ValueError,TypeError,KeyError) as exc:
-            raise ArenaError("BF05_NONNUMERIC_CSV") from exc
-        if abs(t-i*DT)>1e-9 or not all(map(math.isfinite,values.values())):
-            raise ArenaError("BF05_TIME_GRID_OR_FINITE_VALUES_INVALID")
-        dataset.append({"time":t,**values})
+    dataset,view=regular_grid_view(rows,required)
+    # Archive a deterministic derived regular view AND provenance. The raw
+    # physical_res.csv remains untouched and is uploaded alongside these.
+    destination=path.parent
+    write_json(destination/"physical-grid-selection.json",view,exclusive=True)
+    grid_csv=destination/"physical-grid.csv"
+    with grid_csv.open("x",newline="",encoding="utf-8") as stream:
+        writer=csv.DictWriter(stream,fieldnames=["time",*required])
+        writer.writeheader()
+        writer.writerows(dataset)
     source_area=0.
     residuals=[]
     material_initial=sum(dataset[0][s] for s in stocks)
@@ -129,6 +192,12 @@ def evaluate_csv(root,plan):
              "status":"G2_PHYSICAL_VALID" if all((nonnegative,monotone,
                  total_mass_ok,conservation_ok)) else "G2_PHYSICAL_CONSTRAINT_FAILED",
              "omc_attempts":1,
+             "csv_grid_policy":CSV_VIEW_POLICY,
+             "raw_csv_rows":view["raw_data_rows"],
+             "selected_grid_rows":view["regular_grid_rows"],
+             "event_rows_not_integrated":view["event_rows_not_used_as_euler_steps"],
+             "selection_manifest":"physical-grid-selection.json",
+             "regular_grid_csv":"physical-grid.csv",
              "source_mass_integral_euler":source_area,
              "expected_continuous_mass":MASS,
              "max_material_conservation_residual":max_res,
