@@ -366,6 +366,13 @@ class BuffaloLiveTests(unittest.TestCase):
             self.assertAlmostEqual(result["source_mass_integral_euler"],3.4)
             self.assertEqual(path.read_bytes(),before)
             manifest=read_json(dest/"physical-grid-selection.json")
+            self.assertEqual(manifest["raw_csv_sha256"],result["raw_csv_sha256"])
+            self.assertEqual(manifest["derived_csv_sha256"],result["regular_grid_sha256"])
+            self.assertEqual(manifest["raw_csv_sha256"],
+                             "sha256:"+__import__("hashlib").sha256(before).hexdigest())
+            self.assertEqual(manifest["derived_csv_sha256"],
+                             "sha256:"+__import__("hashlib").sha256(
+                                 (dest/"physical-grid.csv").read_bytes()).hexdigest())
             self.assertEqual(manifest["selection"][16]["selected_raw_row_1_based"],19)
             self.assertEqual(manifest["selection"][64]["selected_raw_row_1_based"],68)
             with (dest/"physical-grid.csv").open(newline="",encoding="utf-8") as stream:
