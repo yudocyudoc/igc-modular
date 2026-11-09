@@ -119,7 +119,7 @@ jobs:
         if: inputs.mode == 'adjust-check'
         run: |
           python -m arena.buffalo.adjust check --workspace "$RUNNER_TEMP/arena-native" --evidence "$RUNNER_TEMP/buffalo-evidence"
-      - name: Paid BF03-BF05 GATE - explicitly blocked until exact pulse contract exists
+      - name: Paid BF03-BF05 GATE - not implemented or authorized
         if: inputs.mode == 'adjust-live'
         run: |
           python -m arena.buffalo.adjust authorize-live --workspace "$RUNNER_TEMP/arena-native" --evidence "$RUNNER_TEMP/buffalo-evidence"
