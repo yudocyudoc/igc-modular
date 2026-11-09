@@ -12,9 +12,12 @@ PROFILE = """BUFFALO-ADJUST-V1 / public construction task
 
 Retain the original Buffalo quantitative Engine.generate and its SDK schema.
 The mandatory graphicalFunction field DOES NOT mandate a curve. Use
-graphicalFunction: {points: []} for stocks, scalar parameters and flows not
-capable of graphical lookup under the selected backend. Only put points on
-supported auxiliaries when the equation is the real lookup input, with declared
+graphicalFunction: {points: []} for stocks, flows without supported
+lookup, and ordinary scalar parameters with no intended functional mapping.
+A constant-input lookup in a supported auxiliary may be valid (for example,
+a dimensionless gain of 1): do not reject it merely for being constant.
+Only put points on supported auxiliaries when the equation is the real
+lookup input, with declared
 units, interpolation and extrapolation; never use the variable itself as its
 input. Do not put time pulse points on every variable.
 
