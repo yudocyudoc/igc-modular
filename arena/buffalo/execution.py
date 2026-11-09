@@ -30,6 +30,57 @@ PER_BATCH_POST_CAP=2
 PER_BATCH_OMC_CAP=1
 MAX_HISTORY=100
 PHASES=("bf03","bf04")
+PAID_GENERATION_STEP="BF03 then BF04 - original Engine.generate max two POST total no retries"
+PAID_OMC_STEP="BF05 - at most one pinned isolated OpenModelica simulation"
+KNOWN_JOB_NAMES={
+    LIVE_JOB,
+    "Original Buffalo - archived public CT03 input - 0 OMC",
+    "BF00-02 - archived real evidence, no provider or OMC",
+}
+
+
+def _previous_live_job_proven_no_consumption(job):
+    """Only positively skipped paid steps allow a new FIRST manual attempt.
+
+    Pre-provider download, dependencies or environment failure is recoverable
+    if Actions shows both spending-capable steps never started. A timeout,
+    missing step record, cancellation during a paid step, or unknown status
+    is NOT proof of zero usage.
+    """
+    if job.get("name")!=LIVE_JOB or job.get("status")!="completed":
+        return False
+    if job.get("conclusion")=="skipped":
+        # Job-level skip: no checkout/credentials/Node/OMC were started.
+        return True
+    if job.get("conclusion") not in ("failure","cancelled"):
+        return False
+    steps=job.get("steps")
+    if not isinstance(steps,list):
+        return False
+    paid={}
+    for name in (PAID_GENERATION_STEP,PAID_OMC_STEP):
+        found=[step for step in steps if step.get("name")==name]
+        if len(found)!=1:
+            return False
+        paid[name]=found[0]
+    for step in paid.values():
+        # "skipped" is a real Actions conclusion, not an inference from a
+        # failed job. A paid step with an observed start is consumed/unknown.
+        if (step.get("status")!="completed"
+            or step.get("conclusion")!="skipped"
+            or step.get("started_at") not in (None,"")
+            or type(step.get("number")) is not int):
+            return False
+    first_paid_number=min(step["number"] for step in paid.values())
+    # The failure must be demonstrably in a PREPAID preparation step.
+    prior=[step for step in steps if
+           type(step.get("number")) is int and
+           step["number"]<first_paid_number]
+    return any(step.get("status")=="completed"
+               and step.get("conclusion") in ("failure","cancelled")
+               for step in prior)
+
+
 
 
 def identity():
@@ -48,11 +99,11 @@ def identity():
 
 
 def reconcile_history(api, current_id):
-    """Prior manual BF03-05 job *started* = possible paid use => permanent block.
+    """Only affirmative proof of *no paid step ever starting* permits first POST.
 
-    A skipped job costs nothing. An older completed offline check or historical
-    one-POST diagnostic belongs to another fixed batch, not a retry.
-    Missing/incomplete Actions history fails closed; no automatic reruns.
+    Pre-provider preparation failures can be retried by a new manual dispatch
+    only when the original BF03/BF04 and OMC steps are provably unstarted.
+    Any spending-capable step started/uncertain fails closed. No automatic retries.
     """
     listing=api.repo("GET",
       "/actions/workflows/buffalo-only.yml/runs?event=workflow_dispatch&per_page=100")
@@ -79,13 +130,14 @@ def reconcile_history(api, current_id):
             or jobs.get("total_count")!=len(items or [])
             or not isinstance(items,list)):
             raise ArenaError("BF_PRIOR_DISPATCH_JOBS_INCOMPLETE")
+        live_jobs=[job for job in items if job.get("name")==LIVE_JOB]
+        if len(live_jobs)>1:
+            raise ArenaError("BF_PRIOR_DISPATCH_DUPLICATE_LIVE_JOBS")
         for job in items:
-            if job.get("name")==LIVE_JOB and job.get("conclusion")!="skipped":
-                raise ArenaError("BF03_TO_BF05_BATCH_ALREADY_STARTED_OR_UNCERTAIN")
-            if job.get("name") not in (
-                 LIVE_JOB,"Original Buffalo - archived public CT03 input - 0 OMC",
-                 "BF00-02 - archived real evidence, no provider or OMC"):
+            if job.get("name") not in KNOWN_JOB_NAMES:
                 raise ArenaError("BF_PRIOR_DISPATCH_UNKNOWN_JOB_BLOCKED")
+        if live_jobs and not _previous_live_job_proven_no_consumption(live_jobs[0]):
+            raise ArenaError("BF03_TO_BF05_BATCH_ALREADY_STARTED_OR_UNCERTAIN")
         verified.append(rid)
     return verified
 
