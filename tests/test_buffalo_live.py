@@ -53,8 +53,70 @@ class BuffaloLiveTests(unittest.TestCase):
 
     def test_skipped_paid_job_never_counts_as_attempt(self):
         api=FakeHistory(jobs=[{"name":execution.LIVE_JOB,
-                               "conclusion":"skipped"}])
+                               "status":"completed","conclusion":"skipped"}])
         self.assertEqual(execution.reconcile_history(api,123),[987])
+
+    def _previous_live_after_preparation(self, *, prep_conclusion="failure",
+            generation="skipped", omc="skipped", begun=False, missing=None,
+            job_conclusion="failure"):
+        """Detailed GitHub Actions job steps, all metadata synthetic."""
+        paid_step_names=(execution.PAID_GENERATION_STEP,execution.PAID_OMC_STEP)
+        steps=[{"name":"Install original Buffalo SDK dependencies before generation",
+                "number":8,"status":"completed","conclusion":prep_conclusion,
+                "started_at":"2026-11-08T20:00:00Z"}]
+        for number,(label,result) in enumerate(zip(
+                paid_step_names,(generation,omc)),start=9):
+            if label==missing:
+                continue
+            steps.append({"name":label,"number":number,
+                "status":"completed" if result!="in_progress" else "in_progress",
+                "conclusion":None if result=="in_progress" else result,
+                "started_at":("2026-11-08T20:00:01Z" if
+                              begun and label==paid_step_names[0] else None)})
+        return {"name":execution.LIVE_JOB,"status":"completed",
+                "conclusion":job_conclusion,"steps":steps}
+
+    def test_f6_02_failed_download_libraries_or_npm_before_post_is_recoverable(self):
+        # The step name is irrelevant; verified timing and skipped paid steps
+        # are the entire safety property, including pre-provider cancellation.
+        for earlier in ("failure","cancelled"):
+            with self.subTest(earlier=earlier):
+                job=self._previous_live_after_preparation(
+                    prep_conclusion=earlier,job_conclusion=earlier)
+                self.assertEqual(execution.reconcile_history(
+                    FakeHistory(jobs=[job]),123),[987])
+
+    def test_f6_02_started_post_timeout_or_missing_receipt_blocks_second_batch(self):
+        for result,begun in (("success",True),("failure",True),
+                             ("in_progress",True),("skipped",True)):
+            with self.subTest(result=result):
+                job=self._previous_live_after_preparation(
+                    generation=result,begun=begun)
+                with self.assertRaisesRegex(Exception,"ALREADY_STARTED_OR_UNCERTAIN"):
+                    execution.reconcile_history(FakeHistory(jobs=[job]),123)
+
+    def test_f6_02_started_omc_is_not_an_unused_attempt(self):
+        job=self._previous_live_after_preparation(generation="success",
+                                                   omc="failure",begun=True)
+        with self.assertRaisesRegex(Exception,"ALREADY_STARTED_OR_UNCERTAIN"):
+            execution.reconcile_history(FakeHistory(jobs=[job]),123)
+
+    def test_f6_02_incomplete_or_ambiguous_history_fails_closed(self):
+        cases=[
+            self._previous_live_after_preparation(missing=execution.PAID_OMC_STEP),
+            self._previous_live_after_preparation(prep_conclusion="success"),
+            self._previous_live_after_preparation(job_conclusion="success"),
+            {"name":execution.LIVE_JOB,"status":"completed",
+             "conclusion":"failure","steps":None},
+            {"name":execution.LIVE_JOB,"status":"in_progress",
+             "conclusion":None,"steps":[]},
+        ]
+        for case in cases:
+            with self.subTest(job=case):
+                with self.assertRaisesRegex(Exception,"ALREADY_STARTED_OR_UNCERTAIN"):
+                    execution.reconcile_history(FakeHistory(jobs=[case]),123)
+        with self.assertRaisesRegex(Exception,"DUPLICATE_LIVE_JOBS"):
+            execution.reconcile_history(FakeHistory(jobs=[cases[0],cases[0]]),123)
 
     def test_unfinished_previous_and_unknown_jobs_are_blocked(self):
         with self.assertRaisesRegex(Exception,"UNKNOWN_OR_RERUN"):
@@ -227,6 +289,103 @@ class BuffaloLiveTests(unittest.TestCase):
             self.assertEqual(result["rmse_denominator"],4)
             self.assertFalse(result["heldout_truth_accessed"])
             self.assertFalse(result["original_buffalo_simulator_parity_proven"])
+
+    def test_f6_01_historical_ct02_raw_omc_events_prove_policy(self):
+        """Historical D/M CSVs prove only solver event-row shape, not B fit."""
+        repo=Path(__file__).resolve().parents[1]
+        for rel,field in [
+                ("arena/_vendor/ct02/d00_res.csv","inputRate"),
+                ("arena/_vendor/ct02/m00_res.csv","deliveryRate")]:
+            with self.subTest(file=rel):
+                with (repo/rel).open(newline="",encoding="utf-8") as stream:
+                    original=list(csv.DictReader(stream))
+                self.assertEqual(len(original),68)
+                selected,audit=physical.regular_grid_view(original,[field])
+                self.assertEqual(len(selected),65)
+                self.assertEqual(audit["raw_data_rows"],68)
+                self.assertEqual(audit["event_rows_not_used_as_euler_steps"],3)
+                self.assertAlmostEqual(selected[16]["time"],2)
+                self.assertAlmostEqual(selected[64]["time"],8)
+                # The post-event row is emitted AFTER t=2 and has 0 input
+                # in D's historical CSV; the final duplicate is last.
+                self.assertEqual(audit["selection"][16]
+                                 ["selected_raw_row_1_based"],19)
+                self.assertEqual(audit["selection"][64]
+                                 ["selected_raw_row_1_based"],68)
+                if field=="inputRate":
+                    self.assertEqual(selected[16][field],0.)
+
+    def test_f6_01_event_augmented_csv_preserves_mass_and_raw_evidence(self):
+        with TemporaryDirectory() as d:
+            root=Path(d)
+            batch=root/"artifacts/buffalo-adjust-v1"
+            dest=batch/"bf05"
+            dest.mkdir(parents=True)
+            (batch/"bf04").mkdir()
+            write_json(batch/"bf04/native-engine-result.json",pulse_fixture())
+            write_json(batch/"bf04-visible.json",{
+                "construction":{"observations":[
+                    {"time":0,"delivered":0},{"time":1,"delivered":0.5},
+                    {"time":2,"delivered":1},{"time":4,"delivered":2}]}})
+            path=dest/"physical_res.csv"
+            rows=[]
+            work=delivered=0.
+            for i in range(65):
+                t=i/8
+                rate=1.7 if i<16 else 0.
+                base={"time":t,"Work":work,"Delivered":delivered,
+                      "Arrivals":rate}
+                if i==16:
+                    # Exact t=2 pre-event; then epsilon-shift pre/post
+                    # event rows, as emitted in CT02. Last match wins.
+                    rows.append({**base,"Arrivals":1.7})
+                    rows.append({**base,"time":2.000000000400178,
+                                 "Arrivals":1.7})
+                    rows.append({**base,"time":2.000000000400178,
+                                 "Arrivals":0.})
+                else:
+                    rows.append(base)
+                if i==64:
+                    rows.append(base.copy())  # duplicated endpoint
+                finish=0.5*work
+                work+=physical.DT*(rate-finish)
+                delivered+=physical.DT*finish
+            with path.open("w",newline="",encoding="utf-8") as stream:
+                writer=csv.DictWriter(stream,fieldnames=[
+                    "time","Work","Delivered","Arrivals"])
+                writer.writeheader()
+                writer.writerows(rows)
+            before=path.read_bytes()
+            plan={"observation_operator":{"modelica_csv_column":"Delivered"},
+                  "external_input_flow":"Arrivals"}
+            result=physical.evaluate_csv(root,plan)
+            self.assertEqual(result["raw_csv_rows"],68)
+            self.assertEqual(result["selected_grid_rows"],65)
+            self.assertEqual(result["event_rows_not_integrated"],3)
+            self.assertEqual(result["status"],"G2_PHYSICAL_VALID")
+            self.assertAlmostEqual(result["source_mass_integral_euler"],3.4)
+            self.assertEqual(path.read_bytes(),before)
+            manifest=read_json(dest/"physical-grid-selection.json")
+            self.assertEqual(manifest["selection"][16]["selected_raw_row_1_based"],19)
+            self.assertEqual(manifest["selection"][64]["selected_raw_row_1_based"],68)
+            with (dest/"physical-grid.csv").open(newline="",encoding="utf-8") as stream:
+                selected=list(csv.DictReader(stream))
+            self.assertEqual(len(selected),65)
+            self.assertEqual(float(selected[16]["Arrivals"]),0.)
+            self.assertEqual(float(selected[64]["time"]),8.)
+
+    def test_f6_01_rejects_missing_regular_time_and_malformed_event_rows(self):
+        base=[{"time":k/8,"Arrivals":1.7 if k<16 else 0}
+              for k in range(65)]
+        for sample in (
+                [r for r in base if r["time"]!=1.0],
+                [*base[:15],{"time":float("nan"),"Arrivals":1.7},*base[15:]],
+                [*base[:15],{"time":-1.0,"Arrivals":1.7},*base[15:]],
+                [*base[:15],{"time":4.5,"Arrivals":1.7},*base[15:]],
+                [*base[:15],{"time":2.0,"Arrivals":"bad"},*base[15:]]):
+            with self.subTest(candidate=sample[:2]):
+                with self.assertRaisesRegex(Exception,"BF05_"):
+                    physical.regular_grid_view(sample,["Arrivals"])
 
     def test_omc_failed_attempt_is_recorded_no_retry(self):
         with TemporaryDirectory() as d:
