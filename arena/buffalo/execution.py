@@ -64,14 +64,16 @@ def _previous_live_job_proven_no_consumption(job):
             return False
         paid[name]=found[0]
     for step in paid.values():
-        # "skipped" is a real Actions conclusion, not an inference from a
-        # failed job. A paid step with an observed start is consumed/unknown.
+        # GitHub may timestamp skipped steps, even when they never executed.
+        # Only status=completed AND conclusion=skipped proves omission;
+        # started_at/completed_at are NOT evidence of a provider/OMC start.
         if (step.get("status")!="completed"
             or step.get("conclusion")!="skipped"
-            or step.get("started_at") not in (None,"")
             or type(step.get("number")) is not int):
             return False
-    first_paid_number=min(step["number"] for step in paid.values())
+    if paid[PAID_GENERATION_STEP]["number"]>=paid[PAID_OMC_STEP]["number"]:
+        return False
+    first_paid_number=paid[PAID_GENERATION_STEP]["number"]
     # The failure must be demonstrably in a PREPAID preparation step.
     prior=[step for step in steps if
            type(step.get("number")) is int and
