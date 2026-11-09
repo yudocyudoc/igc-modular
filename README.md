@@ -37,6 +37,18 @@ La compuerta de único POST **no rechaza por el mero hecho de que exista otro de
 
 El ZIP original del CT03 mostró `message.content` vacío y `finish_reason=length` con **16,000 tokens de salida** y razonamiento separado: la generación agotó el límite sin producir el contenido de un modelo. Esto **no demuestra** que aumentar el límite resuelva el problema; la prueba aislada mantiene exactamente los 16,000 tokens originales.
 
+## Buffalo-adjust v1 — BF-00/BF-01/BF-02 sin gasto
+
+Se conserva **el mismo workflow** [Buffalo-only](https://github.com/yudocyudoc/igc-modular/actions/workflows/buffalo-only.yml), con un selector `mode`: `original` conserva el diagnóstico histórico de un solo POST ya utilizado; `adjust-check` ejecuta **únicamente** la preparación offline; `adjust-live` **se detiene explícitamente sin invocar proveedor/OMC** mientras persista `INPUT_CAPABILITY_GAP`. No iniciar `adjust-live` para intentar gastar el lote.
+
+El modo `adjust-check` descarga los tres archivos públicos del CT03 cerrado y las dos respuestas originales archivadas, verifica hashes SHA-256 de seis archivos históricos y construye un solo artifact `buffalo-adjust-v1-offline-<run>` con diagnósticos BF-00, vista separada de unidades BF-01, perfil BF-02 y feedback propio. **No modifica archivos del motor, su prompt original, fuentes originales, lock ni puntuaciones CT03.** Tampoco usa secretos de Cloudflare, R2, D/M ni OMC.
+
+El diagnóstico real reproduce el ciclo autorreferente de `input rate profile`, las tablas incompatibles en stocks/flows, el lookup aplicado a `mean flow time = 2.8` que produce 0, y el perfil lineal de masa 3.315 frente a 3.4 reales. La vista `hours → hour` es un alias de escala 1, no una reparación de ecuaciones. El perfil `buffalo-adjust-v1` se conserva con hash de bytes y no presupone un número de etapas ni parámetros del mundo.
+
+**Bloqueo científico pendiente:** las instrucciones system originales de Buffalo prohíben condicionales y el traductor Modelica fijado solo admite MIN/MAX/ABS. Esa capacidad es insuficiente para certificar el pulso discontinuo [0,2) de forma exacta en tiempo continuo; una tabla lineal no sirve. Antes de BF-03 hay que resolver solo esa brecha en un contrato derivado y versionado con pruebas de equivalencia. Hasta entonces BF-02 está **preparado, no habilitado**. No se simula el nativo defectuoso ni se repara desde código para hacerlo pasar.
+
+**Presupuesto propuesto, aún no ejecutable:** BF-03: un POST de revisión; BF-04: un POST nuevo condicionado a BF-03 válido; BF-05: una sola simulación OMC del candidato BF-04 válido. Máximo **2 POST + 1 OMC**, 0 DES, 0 D/M, 0 mundos y ninguna reejecución. La antigua llamada consumida de Buffalo-only no se borra ni se reutiliza como cuota nueva. El lote no arranca desde push/PR.
+
 ## Motores dentro de este repositorio
 
 - **D**: generador original, seis alternativas, validación física y feedback propio.
