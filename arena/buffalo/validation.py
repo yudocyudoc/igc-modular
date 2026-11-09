@@ -11,6 +11,10 @@ import json
 import math
 import re
 
+from arena._vendor.igc.scripts.arena_b_native_to_modelica import (
+    expression as compile_native_expression, TranslationBlocked,
+)
+
 REPORT_VERSION = "buffalo-adjust-v1/bf00"
 ERROR = "ERROR"
 WARNING = "WARNING"
@@ -57,12 +61,36 @@ def linear_lookup(points, x):
 
 
 def _dependencies(equation, names):
-    if not isinstance(equation,str):
-        return set(),set()
-    used = {s for s in SYMBOL.findall(equation) if s in names}
-    unknown = {s for s in SYMBOL.findall(equation)
-               if s not in names and s not in LITERALS and s.upper() not in LITERALS}
-    return used,unknown
+    """Parse actual identifiers, not substrings; malformed syntax is reported separately."""
+    if not isinstance(equation, str):
+        return set(), set()
+    try:
+        tree = ast.parse(equation.replace("^", "**"), mode="eval")
+    except SyntaxError:
+        return set(), set()
+    found = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+    return ({name for name in found if name in names},
+            {name for name in found if name not in names
+             and name.upper() not in LITERALS})
+
+
+def _divisor_references(equation):
+    """Only direct variable denominators: do not claim general symbolic division proof."""
+    direct = set()
+    safe = set()
+    if not isinstance(equation, str):
+        return direct, safe
+    try:
+        tree = ast.parse(equation.replace("^", "**"), mode="eval")
+    except SyntaxError:
+        return direct, safe
+    for node in ast.walk(tree):
+        if isinstance(node, ast.BinOp) and isinstance(node.right, ast.Name):
+            if isinstance(node.op, ast.Div):
+                direct.add(node.right.id)
+            elif isinstance(node.op, ast.FloorDiv):
+                safe.add(node.right.id)
+    return direct, safe
 
 
 def _cycles(graph):
@@ -109,6 +137,7 @@ def diagnose(document, *, raw_response=None):
         ids[ident]=v
         by_name[name]=v
     graph={}
+    constant_lookups = {}
     ports=defaultdict(list)
     specs=(document or {}).get("model",{}).get("specs",{})
     if specs.get("timeUnits") == "hours":
@@ -141,10 +170,12 @@ def diagnose(document, *, raw_response=None):
                 x=None
             if x is not None:
                 y=linear_lookup(xy,x)
-                results.append(item("LOOKUP_APPLIED_TO_CONSTANT",ERROR,name,
+                constant_lookups[name.replace(" ", "_")] = y
+                results.append(item("LOOKUP_APPLIED_TO_CONSTANT",WARNING,name,
                                     "graphicalFunction.points",
                                     {"equation":eq,"input":x,"effective_value":y,
-                                     "not_decorative":True}))
+                                     "not_decorative":True,
+                                     "constant_lookup_can_be_valid":True}))
             if "input" in name.lower() and "profile" in name.lower():
                 area=sum((xb-xa)*(ya+yb)/2 for (xa,ya),(xb,yb) in zip(xy,xy[1:]))
                 if abs(area-PULSE_MASS)>1e-12:
@@ -180,6 +211,13 @@ def diagnose(document, *, raw_response=None):
         else:
             if v.get("inflows") or v.get("outflows"):
                 results.append(item("MATERIAL_PORTS_ON_NONSTOCK",ERROR,name,"ports"))
+            try:
+                # Reuse the pinned translator grammar; it recognizes safe division
+                # as //, rather than Python's mathematical floor division.
+                compile_native_expression(eq, set(ids))
+            except (TranslationBlocked, ValueError) as exc:
+                results.append(item("INVALID_NATIVE_EXPRESSION",ERROR,name,"equation",
+                                    {"equation":eq,"translator_error":str(exc)}))
             refs,unknown=_dependencies(eq,ids)
             graph[name.replace(" ","_")]={
                 ref for ref in refs if ids[ref].get("type")!="stock"}
@@ -188,6 +226,28 @@ def diagnose(document, *, raw_response=None):
         if v.get("units")=="hours":
             results.append(item("REPRESENTATIONAL_TIME_UNIT_ALIAS",WARNING,name,"units",
                                 {"from":"hours","to":"hour","scale":1},backend="Adapter"))
+    # A scalar lookup can validly provide a constant gain. The real harmful
+    # case is an effective zero used as an ordinary, unguarded denominator.
+    # Safe division // is separately documented and intentionally not rejected.
+    for v in variables:
+        if v.get("type") == "stock":
+            continue
+        direct, safe = _divisor_references(v.get("equation",""))
+        for identifier in sorted(direct):
+            if identifier in constant_lookups and abs(constant_lookups[identifier]) <= 1e-12:
+                results.append(item("ZERO_LOOKUP_USED_AS_DIVISOR",ERROR,v.get("name",""),
+                                    "equation",{"denominator":identifier,
+                                                "effective_value":constant_lookups[identifier],
+                                                "division":"/",
+                                                "source":"constant auxiliary lookup"}))
+        for identifier in sorted(safe):
+            if identifier in constant_lookups and abs(constant_lookups[identifier]) <= 1e-12:
+                results.append(item("ZERO_LOOKUP_USED_IN_SAFE_DIVISION",WARNING,
+                                    v.get("name",""),"equation",
+                                    {"denominator":identifier,
+                                     "effective_value":constant_lookups[identifier],
+                                     "division":"//",
+                                     "zero_guard":True}))
     for flow,used in ports.items():
         if len(used)>2 or len({d for d,_ in used})!=len(used):
             results.append(item("MATERIAL_PORT_DUPLICATED",ERROR,flow,"ports",used))
