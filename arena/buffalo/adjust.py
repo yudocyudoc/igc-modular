@@ -1,7 +1,8 @@
 """BF-00/BF-01/BF-02 offline bundle from immutable CT03/Buffalo-only archives.
 
 A single public artifact. Does not call the LLM, solver, private R2 or custodian.
-Any paid phase is blocked while the exact pulse has no shared implementation.
+The exact pulse has a static Modelica representation, but paid BF03-BF05
+remain unimplemented and unauthorized. XMILE/PySD parity is unproven.
 """
 import argparse
 from hashlib import sha256
@@ -12,7 +13,7 @@ from .capabilities import capability_report,normalize_units_only,native_hash,PRO
 from .feedback import freeze_profile,own_feedback
 from .validation import diagnose
 from ..cloud import public_input
-from ..common import ArenaError,write_json
+from ..common import ArenaError,write_json,read_json
 
 SOURCE = {
  "ct03_raw":("ct03/B/initial/provider-raw.json","1c1d7d89f036feb090178a9f9bb8a822c0870fa7f4c234384db0f53ea5e6f348"),
@@ -73,13 +74,29 @@ def offline_bundle(root, evidence):
       "bf00-provider-length.json":{"schema":"buffalo-adjust-v1/length/1",
                                    "diagnostics":failure,
                                    "source_run_id":42455527897},
-      "bf01-unit-view.json":normalization,
+      "bf01-unit-manifest.json":{
+          **normalization,
+          "normalized_native_file":"bf01-normalized-native.json",
+          "normalized_native_sha256":normalization["view_sha256"],
+          "original_file":"parent/initial/native-engine-result.json"},
+      "bf01-normalized-native.json":view,
       "bf01-capability-report.json":caps,
       "bf02-profile.json":profile,
       "bf02-own-feedback.json":feedback,
     }
     for filename,content in files.items():
         write_json(output/filename,content,exclusive=True)
+    # Verify the actually archived native is recoverable, and not just a hash
+    # in the manifest. Re-applying the exact unit-only transform must match.
+    archived=read_json(output/"bf01-normalized-native.json")
+    manifest=read_json(output/"bf01-unit-manifest.json")
+    if (native_hash(archived)!=manifest["view_sha256"]
+        or native_hash(native)!=manifest["original_sha256"]
+        or archived!=view):
+        raise ArenaError("BF01 unit view archive identity mismatch.")
+    second_manifest,second_view=normalize_units_only(native)
+    if second_view!=archived or second_manifest["transformations"]!=manifest["transformations"]:
+        raise ArenaError("BF01 unit view is not a unit-only derived native.")
     result={
        "schema":"buffalo-adjust-v1/offline-report/1",
        "batch_id":BATCH_ID,
@@ -93,14 +110,18 @@ def offline_bundle(root, evidence):
                "original_no_content":"OUTPUT_BUDGET_EXHAUSTED_NO_FINAL_CONTENT"},
        "bf01":{"status":caps["physical_compatibility"],
                "unit_changes":normalization["transformations"],
-               "exact_rectangular_pulse_implemented_in_original_backend":False},
+               "unit_manifest_file":"bf01-unit-manifest.json",
+               "normalized_native_file":"bf01-normalized-native.json",
+               "normalized_native_sha256":normalization["view_sha256"],
+               "exact_rectangular_pulse_static_modelica":True,
+               "xmile_pysd_safe_division_parity":"UNPROVEN"},
        "bf02":{"status":"PROFILE_FROZEN_NOT_AUTHORIZED_FOR_PAID_PHASES",
                "profile_sha256":profile["utf8_sha256"],
                "own_feedback_created":True},
        "future_fixed_budget":{"bf03_posts":1,"bf04_posts":1,"bf05_omc":1,
                              "provider_posts_max":MAX_POSTS,"new_omc_max":MAX_OMC,
                              "des_max":0,"dm_max":0,"new_worlds_max":0},
-       "gate":"BLOCKED_PENDING_EXACT_SHARED_PULSE_AND_UPSTREAM_SYSTEM_CONFLICT_RESOLUTION",
+       "gate":"BLOCKED_PAID_PHASES_NOT_IMPLEMENTED_OR_AUTHORIZED",
        "ct03_lock_or_score_touched":False,
        "actual_consumption":{"provider_posts":0,"new_omc":0,"new_worlds":0},
        "no_automatic_retries":True,
@@ -116,7 +137,7 @@ def main(argv=None):
     parser.add_argument("--evidence",required=True,type=Path)
     args=parser.parse_args(argv)
     if args.phase=="authorize-live":
-        raise ArenaError("INPUT_CAPABILITY_GAP: BF-03, BF-04 and BF-05 must not run yet.")
+        raise ArenaError("BF03_BF04_BF05_NOT_IMPLEMENTED_OR_AUTHORIZED: no provider or OMC call.")
     result=offline_bundle(args.workspace,args.evidence)
     print(json.dumps(result,indent=2))
 
