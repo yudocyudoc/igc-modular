@@ -6,11 +6,18 @@ Mathematically equivalent forms outside the proven subset are BLOCKED and
 reported, not silently re-authored. XMILE/PySD equivalence is not claimed.
 """
 import ast
+import sys
+from pathlib import Path
 from fractions import Fraction
 from .capabilities import exact_pulse_equation, eval_fixture_equation, normalize_units_only
 from .validation import diagnose
 from arena._vendor.igc.scripts.arena_b_native_to_modelica import generate, TranslationBlocked
-from arena._vendor.igc.scripts.arena_cafe.ct03_b_physical_prepare import operator
+# The preserved CT03 observation operator has original "scripts.*" imports.
+# Make its original package root importable; never modify vendored bytes.
+_VENDOR_IGC=str(Path(__file__).resolve().parents[1]/"_vendor"/"igc")
+if _VENDOR_IGC not in sys.path:
+    sys.path.insert(0,_VENDOR_IGC)
+from scripts.arena_cafe.ct03_b_physical_prepare import operator
 
 
 class CandidateBlocked(ValueError):
