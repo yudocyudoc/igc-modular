@@ -91,8 +91,11 @@ def diagnose(document, *, raw_response=None):
     results = []
     variables = (document or {}).get("model",{}).get("variables",[])
     if not isinstance(variables,list) or not variables:
+        issues=[item("MISSING_NATIVE_MODEL",ERROR)]
+        if raw_response is not None:
+            issues+=classify_provider(raw_response)
         return {"schema":REPORT_VERSION, "admissible":False,
-                "diagnostics":[item("MISSING_NATIVE_MODEL",ERROR)]}
+                "diagnostics":issues}
     by_name = {}
     ids = {}
     for v in variables:
