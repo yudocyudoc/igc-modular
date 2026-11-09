@@ -49,7 +49,7 @@ El diagnóstico real reproduce el ciclo autorreferente de `input rate profile`, 
 
 **Correcciones BF-00 (F5-02/F5-03):** las ecuaciones se validan con la gramática del traductor original, incluidos `MAX` y `//`. Una tabla auxiliar con entrada constante puede ser válida: se registra como aviso. Se rechaza específicamente el **lookup cuyo valor efectivo es cero y aparece como divisor ordinario `/`**, indicando la variable y la ecuación. No se modifica ninguna salida nativa. BF-01 archiva **dos archivos independientes**: `bf01-unit-manifest.json` con hashes/rutas y `bf01-normalized-native.json` con el nativo completo y solo los alias de unidad permitidos.
 
-**Compuerta de gasto:** BF-03/BF-04/BF-05 todavía no están implementadas ni autorizadas; `adjust-live` se detiene antes del proveedor y OMC. El perfil BF-02 se vuelve a congelar con las capacidades corregidas, sin alterar `_vendor`. No se simula el nativo defectuoso ni se repara desde código para hacerlo pasar.
+**Compuerta de gasto:** BF-03/BF-04/BF-05 ya tienen una ruta operativa independiente, pero **no se ejecutan sin `mode=adjust-live`, `authorized=yes` y `main`**, tras revisión/fusión. El modo `adjust-check` sigue consumiendo 0 POST y 0 OMC. El perfil BF-02 se vuelve a congelar con las capacidades corregidas, sin alterar `_vendor`. No se simula el nativo defectuoso ni se repara desde código para hacerlo pasar.
 
 **Presupuesto propuesto, aún no ejecutable:** BF-03: un POST de revisión; BF-04: un POST nuevo condicionado a BF-03 válido; BF-05: una sola simulación OMC del candidato BF-04 válido. Máximo **2 POST + 1 OMC**, 0 DES, 0 D/M, 0 mundos y ninguna reejecución. La antigua llamada consumida de Buffalo-only no se borra ni se reutiliza como cuota nueva. El lote no arranca desde push/PR.
 
