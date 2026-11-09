@@ -162,6 +162,8 @@ class BuffaloLiveTests(unittest.TestCase):
                 return SimpleNamespace(returncode=1)
             with (patch.object(physical,"prepare",side_effect=fake_prepare),
                   patch.object(physical.subprocess,"run",side_effect=fail_once) as run,
+                  patch.object(physical.os,"getuid",return_value=1001,create=True),
+                  patch.object(physical.os,"getgid",return_value=1001,create=True),
                   patch.dict(os.environ,{"RUNNER_TEMP":str(root),
                       "GITHUB_RUN_ATTEMPT":"1"})):
                 outcome=physical.simulate(root)
