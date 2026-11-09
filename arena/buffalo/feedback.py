@@ -20,9 +20,15 @@ input. Do not put time pulse points on every variable.
 
 The exogenous input is exactly 1.7 items/hour from t=0 inclusive to t=2
 exclusive, and zero outside: 3.4 items total in continuous time. Do not
-approximate it by a ramp or claim that an Euler-grid match is exact. If the
-original system language/translator cannot express that discontinuity, identify
-the capability gap explicitly rather than inventing a substitute.
+approximate it by a ramp or claim that an Euler-grid match is exact. The
+original language allows safe division //: x // 0 returns 0, otherwise x/y.
+A public exact pulse can use Z(x) = MAX(0,x) // MAX(0,x), expanded inline,
+with Pulse_rate * (1 - Z(Start_time - TIME)) * Z(End_time - TIME).
+Here Z is mathematical shorthand, not a declared new function. Use only
+original operators and named public parameters. Do not infer a structure or
+repair a native parent from this neutral input-expression example.
+The pinned Modelica translator preserves this // guard. XMILE/PySD parity
+is not proven: the original XMILE exporter changes // to ordinary /.
 Initial material stocks and cumulative delivery are zero. Horizon 0-8 hours,
 Euler step 0.125. Only observations at t=0,1,2,4 are available.
 
@@ -66,7 +72,8 @@ def own_feedback(parent, receipt, public_construction, profile):
             "world_public_id":public_construction.get("world_public_id"),
             "public_construction":public_construction,
             "own_semantic_diagnostics":report,
-            "capability_gap":capability_report()["physical_compatibility"],
+            "modelica_pulse_compatibility":capability_report()["physical_compatibility"],
+            "xmile_pysd_safe_division_parity":"UNPROVEN",
             "not_physical_measurement":True,
             "not_a_repaired_native":True,
             "no_hidden_or_rival_inputs":True,
