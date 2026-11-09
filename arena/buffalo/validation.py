@@ -127,6 +127,9 @@ def diagnose(document, *, raw_response=None):
             results.append(item("BAD_LOOKUP_POINTS",ERROR,name,"graphicalFunction.points",
                                 points))
             xy=[]
+        if len(xy)==1:
+            results.append(item("LOOKUP_REQUIRES_TWO_POINTS",ERROR,name,
+                                "graphicalFunction.points",xy))
         if xy and typ in ("stock","flow"):
             results.append(item("LOOKUP_UNSUPPORTED_FOR_MATERIAL_TYPE",ERROR,name,
                                 "graphicalFunction.points",{"type":typ,"count":len(xy)}))
@@ -158,11 +161,22 @@ def diagnose(document, *, raw_response=None):
                 if not isinstance(ports_list,list):
                     results.append(item("BAD_MATERIAL_PORTS",ERROR,name,direction))
                     continue
+                if set(v.get("inflows",[]) or []) & set(v.get("outflows",[]) or []):
+                    results.append(item("SAME_FLOW_BOTH_STOCK_PORTS",ERROR,name,
+                                        "ports",{"inflows":v.get("inflows"),
+                                                 "outflows":v.get("outflows")}))
                 for flow in ports_list:
                     if flow not in by_name or by_name[flow].get("type")!="flow":
                         results.append(item("UNKNOWN_MATERIAL_FLOW",ERROR,name,direction,flow))
                     else:
                         ports[flow].append((direction,name))
+                        stock_unit=str(v.get("units","")).replace(" ","").lower()
+                        flow_unit=str(by_name[flow].get("units","")).replace(" ","").lower()
+                        if stock_unit and flow_unit and flow_unit!=stock_unit+"/hour":
+                            results.append(item("STOCK_FLOW_UNIT_MISMATCH",ERROR,name,
+                                                direction,{"flow":flow,
+                                                           "stock_units":stock_unit,
+                                                           "flow_units":flow_unit}))
         else:
             if v.get("inflows") or v.get("outflows"):
                 results.append(item("MATERIAL_PORTS_ON_NONSTOCK",ERROR,name,"ports"))
@@ -180,6 +194,10 @@ def diagnose(document, *, raw_response=None):
     for name,v in by_name.items():
         if v.get("type")=="flow" and name not in ports:
             results.append(item("MATERIAL_FLOW_WITHOUT_STOCK",ERROR,name,"ports"))
+    for edge in (document or {}).get("model",{}).get("relationships",[]):
+        if (not isinstance(edge,dict) or edge.get("from") not in by_name
+            or edge.get("to") not in by_name):
+            results.append(item("DANGLING_CAUSAL_EDGE",ERROR,"","relationships",edge))
     for circuit in _cycles(graph):
         results.append(item("ALGEBRAIC_CYCLE",ERROR,circuit[0],"equation",
                             {"path":list(circuit),"stocks_break_instantaneous_cycles":True}))
