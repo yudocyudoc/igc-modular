@@ -123,3 +123,7 @@ Se comprueban fuentes originales, historial CT-02, regresiones de feedback/revis
 La corrida física queda detrás de la configuración inicial y de mode=live/authorized=yes. Durante la migración no se consumió OMC/Buffalo ni se seleccionó otro mundo.
 
 Detalles de procedencia y límites en [ENGINE_MIGRATION.md](ENGINE_MIGRATION.md). Relevo del coder en [HANDOFF.md](HANDOFF.md); reglas en [AGENTS.md](AGENTS.md).
+
+## Piloto de cafetería P0–P1 (sin consumo)
+
+El protocolo independiente `coffee_peak_capacity_v1` admite el ZIP autocontenido, fija una condición B0 y prepara únicamente la vista POS/proxy anterior al corte de construcción. No ejecuta D/B/M, OMC, Buffalo, políticas ni una reserva predictiva. Véase [COFFEE_PEAK_P0_P1.md](COFFEE_PEAK_P0_P1.md) para el SHA, comandos y límites.

@@ -61,7 +61,9 @@ class CT03:
                 "budget": config["budget"], "detail": detail, "external_compute_started": False}
 
 
-_registry = {"ct03": CT03()}
+from .coffee_peak import CoffeePeakCapacityV1
+
+_registry = {"ct03": CT03(), "coffee_peak_capacity_v1": CoffeePeakCapacityV1()}
 
 
 def register(name, adapter):

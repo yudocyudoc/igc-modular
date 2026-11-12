@@ -10,4 +10,4 @@ runs/
 *.sqlite*
 /vendor/
 .deps/
-
+/inputs/
