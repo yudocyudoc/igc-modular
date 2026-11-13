@@ -60,6 +60,8 @@ class CoffeeLiveTests(TestCase):
         with patch.object(coffee_live.tomllib,"load",return_value=cfg), \
              patch.object(coffee_live,"verify",return_value={}):
             return coffee_live.admit(self.public,123,77,path,
+                config_path=Path(__file__).resolve().parents[1] / "examples/coffee_peak.toml",
+                assumptions_path=test_coffee_domain.ASSUMPTIONS,
                 api=api or FakeGitHub(),env=env or self.env())
 
     def test_identity_rejects_wrong_branch_or_retry(self):

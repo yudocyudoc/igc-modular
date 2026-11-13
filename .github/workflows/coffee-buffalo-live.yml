@@ -52,11 +52,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           COFFEE_B_LIVE_AUTH: '${{ inputs.authorized }}'
+          COFFEE_PUBLIC_RUN_ID: ${{ inputs.public_run_id }}
+          COFFEE_PUBLIC_ARTIFACT_ID: ${{ inputs.public_artifact_id }}
         run: |
           python -m arena.buffalo.coffee_live admit \
             --public-dir "$RUNNER_TEMP/coffee-b-public" \
-            --source-run-id '${{ inputs.public_run_id }}' \
-            --artifact-id '${{ inputs.public_artifact_id }}' \
+            --source-run-id "$COFFEE_PUBLIC_RUN_ID" \
+            --artifact-id "$COFFEE_PUBLIC_ARTIFACT_ID" \
+            --config "$GITHUB_WORKSPACE/examples/coffee_peak.toml" \
+            --assumptions "$GITHUB_WORKSPACE/examples/coffee_public_assumptions_v1.json" \
             --out "$RUNNER_TEMP/coffee-b-live"
       - name: Verify Cloudflare AI permission and R2 denial (GET only)
         env:

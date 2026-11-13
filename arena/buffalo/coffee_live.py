@@ -24,7 +24,6 @@ LIVE_MODE = "CLOUDFLARE_WORKERS_AI_LIVE_ONE_POST"
 R2 = ("CT03_R2_ACCESS_KEY_ID", "CT03_R2_SECRET_ACCESS_KEY",
       "COFFEE_R2_ACCESS_KEY_ID", "COFFEE_R2_SECRET_ACCESS_KEY",
       "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN")
-ROOT = Path(__file__).resolve().parents[2]
 
 
 def need(ok, code):
@@ -119,7 +118,7 @@ def confirm_source(api, source_id, artifact_id, public_dir, cfg):
     return run
 
 
-def admit(public_dir, source_id, artifact_id, output, *, api=None, env=None):
+def admit(public_dir, source_id, artifact_id, output, *, config_path, assumptions_path, api=None, env=None):
     env = os.environ if env is None else env
     sha, run_id = identity(env)
     need(not any(env.get(k) for k in (*R2, "CLOUDFLARE_API_TOKEN")),
@@ -128,7 +127,8 @@ def admit(public_dir, source_id, artifact_id, output, *, api=None, env=None):
          type(artifact_id) is int and artifact_id > 0, "SOURCE_IDS_INVALID")
     output = Path(output)
     need(not output.exists(), "REFUSE_OVERWRITE")
-    with (ROOT / "examples/coffee_peak.toml").open("rb") as f:
+    # Explicit resources: no assumption that site-packages has a checkout's examples/.
+    with Path(config_path).open("rb") as f:
         cfg = tomllib.load(f)
     if api is None:
         need(bool(env.get("GH_TOKEN")), "GITHUB_READ_TOKEN_REQUIRED")
@@ -138,8 +138,7 @@ def admit(public_dir, source_id, artifact_id, output, *, api=None, env=None):
     verify(include_history=False)
     # Source release identity has already been validated, so the producer
     # boundary must not compare its historical run ID with this new dispatch.
-    case = build_case(public_dir, ROOT / "examples/coffee_public_assumptions_v1.json",
-                      environment={})
+    case = build_case(public_dir, Path(assumptions_path), environment={})
     need(case["selection"] == cfg["selection"]
          and case["source_package_sha256"] == cfg["source"]["sha256"]
          and case["time"]["construction_end_min"] == cfg["construction_end_min"]
@@ -197,7 +196,7 @@ def generate(output, *, env=None, runner=None):
     with (output / "node.log").open("xb") as log:
         process = (runner or subprocess.run)(
             ["node", str(Path(__file__).with_name("coffee_live_runner.mjs"))],
-            env=environment, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT,
+            env=environment, cwd=Path.cwd(), stdout=log, stderr=subprocess.STDOUT,
             check=False, timeout=480)
     write_json(output / "process.json", {"exit_code": process.returncode,
                                          "node_invocations": 1, "retry": False}, exclusive=True)
@@ -245,12 +244,17 @@ def main():
     ap.add_argument("--public-dir", type=Path)
     ap.add_argument("--source-run-id", type=int)
     ap.add_argument("--artifact-id", type=int)
+    ap.add_argument("--config", type=Path)
+    ap.add_argument("--assumptions", type=Path)
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
     try:
         if args.action == "admit":
-            need(args.public_dir and args.source_run_id and args.artifact_id, "SOURCE_REQUIRED")
-            result = admit(args.public_dir, args.source_run_id, args.artifact_id, args.out)
+            need(args.public_dir and args.source_run_id and args.artifact_id
+                 and args.config and args.assumptions, "SOURCE_OR_CONFIG_REQUIRED")
+            result = admit(args.public_dir, args.source_run_id, args.artifact_id,
+                           args.out, config_path=args.config,
+                           assumptions_path=args.assumptions)
         elif args.action == "generate":
             result = generate(args.out)
         else:

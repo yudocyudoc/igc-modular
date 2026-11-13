@@ -18,10 +18,11 @@ github-setup = ["PyNaCl>=1.5,<2"]
 arena = "arena.cli:main"
 
 [tool.setuptools]
-packages = ["arena", "arena.coffee_adapters"]
+packages = ["arena", "arena.coffee_adapters", "arena.buffalo"]
 include-package-data = true
 
 [tool.setuptools.package-data]
 arena = ["resources/*.json", "_vendor/**/*.py", "_vendor/**/*.json", "_vendor/**/*.mo", "_vendor/**/*.mjs", "_vendor/**/*.js", "_vendor/**/*.sh", "_vendor/**/*.sql", "_vendor/**/*.csv", "_vendor/**/*.log", "_vendor/**/*.txt", "_vendor/**/*.mos", "_vendor/**/LICENSE"]
 "arena.coffee_adapters" = ["registry.coffee.v1.json"]
+"arena.buffalo" = ["*.mjs"]
 

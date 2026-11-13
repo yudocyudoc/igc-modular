@@ -31,6 +31,10 @@ workflow. El único camino de pago es un `workflow_dispatch` manual sobre
 3. Seleccionar Actions → **Coffee Buffalo - one authorized live Workers AI POST**
    e introducir `public_run_id` (run del custodio) y `public_artifact_id`
    (ID exacto del artefacto público), más `authorized=yes`.
+   La admisión pasa los IDs por variables de entorno y los trata como datos
+   literales, nunca como código shell, y requiere rutas explícitas a
+   `--config` y `--assumptions`. El wheel distribuye `arena.buffalo`
+   y los runners `.mjs`; no presupone que exista `examples/` al instalar.
 4. El preflight comprueba la identidad de run, workflow y artifact, la versión,
    escenario, réplica, día, hashes y corte público, ausencia de acceso reservado
    y la historia de intentos previos. También comprueba permiso Workers AI y
