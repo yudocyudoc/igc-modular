@@ -131,8 +131,6 @@ class CoffeeLiveTests(TestCase):
         import shutil
         import subprocess
         from tempfile import TemporaryDirectory
-        if not shutil.which("bash"):
-            self.skipTest("Bash unavailable")
         yaml = (Path(__file__).resolve().parents[1] /
                 ".github/workflows/coffee-buffalo-live.yml").read_text()
         block = yaml.split(
@@ -142,6 +140,13 @@ class CoffeeLiveTests(TestCase):
         self.assertIn("COFFEE_PUBLIC_ARTIFACT_ID: ${{ inputs.public_artifact_id }}", block)
         self.assertNotIn("--source-run-id '${{ inputs.public_run_id }}'", block)
         self.assertNotIn("--artifact-id '${{ inputs.public_artifact_id }}'", block)
+        if os.name == "nt":
+            # Git Bash interprets Windows drive paths differently from the Ubuntu
+            # runner used by this workflow. Keep static checks on Windows;
+            # execute the precise payload reproduction on Linux.
+            return
+        if not shutil.which("bash"):
+            self.skipTest("Bash unavailable")
         body = block.split("        run: |\n", 1)[1]
         script = "\n".join(line[10:] if line.startswith("          ") else line
                            for line in body.splitlines())
