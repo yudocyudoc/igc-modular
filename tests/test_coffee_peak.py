@@ -3,12 +3,13 @@ import csv
 import hashlib
 import io
 import json
+import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 import zipfile
 
-from arena.coffee_peak import CoffeePeakCapacityV1, _load_package, _build_public, ROOT
+from arena.coffee_peak import CoffeePeakCapacityV1, _load_package, _build_public, ROOT, REQUIRED_OUTPUTS
 from arena.common import ArenaError
 
 
@@ -20,7 +21,7 @@ def tab(headers, rows):
     return out.getvalue().encode()
 
 
-def make_zip(path, *, tamper=False):
+def make_zip(path, *, tamper=False, mutate=None):
     summary = [{"scenario_id": "case-a", "replication": "1", "synthetic": "True", "seed": "123"}]
     pos = []
     lines = []
@@ -52,11 +53,15 @@ def make_zip(path, *, tamper=False):
                "config_sha256": "video2/sintetico_pico_v1/parametros_escenarios.json"}
     for p in sources.values():
         files[p] = b"source fixture\n"
-    files[ROOT+"ordenes_truth.csv"] = b"SECRET-FUTURE-TRUTH\n"
+    for name in REQUIRED_OUTPUTS:
+        files.setdefault(ROOT + name, b"SECRET-FUTURE-TRUTH\n" if "truth" in name else b"fixture-output\n")
+    if mutate is not None:
+        mutate(files, sources)
     inner = {"schema": "cafeteria.synthetic-output-manifest/2",
              "outputs": {name.removeprefix(ROOT): {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
-                         for name, data in files.items() if name.startswith(ROOT) and name.endswith(".csv")}}
-    inner.update({key: hashlib.sha256(files[p]).hexdigest() for key, p in sources.items()})
+                         for name, data in files.items() if name.removeprefix(ROOT) in REQUIRED_OUTPUTS}}
+    inner.update({key: hashlib.sha256(files[source]).hexdigest()
+                  for key, source in sources.items() if source in files})
     files[ROOT+"manifest.json"] = json.dumps(inner).encode()
     registered = {p: {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
                   for p,data in files.items()}
@@ -88,11 +93,111 @@ class CoffeePeakTests(unittest.TestCase):
         self.assertEqual(len(view["pos_records"]), 1)
         self.assertEqual(len(view["pos_line_items"]), 1)
         self.assertEqual(len(view["video_proxy"]), 2)
-        self.assertEqual(view["pos_records"][0]["pos_record_id"], "P10")
+        self.assertTrue(re.fullmatch(r"pos-[0-9a-f]{32}", view["pos_records"][0]["pos_record_id"]))
+        self.assertTrue(re.fullmatch(r"ord-[0-9a-f]{32}", view["pos_records"][0]["order_id"]))
+        self.assertEqual(view["pos_line_items"][0]["order_id"], view["pos_records"][0]["order_id"])
+        self.assertEqual(view["pos_line_items"][0]["pos_record_id"], view["pos_records"][0]["pos_record_id"])
+        self.assertTrue(re.fullmatch(r"line-[0-9a-f]{32}", view["pos_line_items"][0]["pos_line_id"]))
+        self.assertNotIn("P10", json.dumps(view))
         self.assertNotIn("P80", json.dumps(view))
         self.assertNotIn("SECRET", json.dumps(view))
         self.assertNotIn("seed", json.dumps(view))
         self.assertEqual(view["semantics"]["sale"], "POS payment, not a delivery")
+
+    def test_public_ids_do_not_expose_missing_arrival_ordinals(self):
+        # With paid P0003 and P0005, the hidden arriving P0004 is NOT inferable
+        # from public IDs; source linkage and ordering stay importer-only.
+        def gap(files, sources):
+            for name in ("pos_observed.csv", "pos_line_items.csv"):
+                key = ROOT + name
+                text = files[key].decode()
+                files[key] = text.replace("P10", "P0003").replace("P80", "P0005").encode()
+        self.sha = make_zip(self.path, mutate=gap)
+        zf, _ = _load_package(self.path, self.sha)
+        with zf:
+            view = _build_public(zf, self.config, self.sha)
+        serialized = json.dumps(view)
+        for secret in ("P0003", "P0004", "P0005"):
+            self.assertNotIn(secret, serialized)
+        self.assertEqual(len(view["pos_records"]), 1)
+        self.assertEqual(view["pos_records"][0]["order_id"], view["pos_line_items"][0]["order_id"])
+
+    def test_refund_and_line_items_keep_join_after_pseudonymization(self):
+        def add_refund(files, sources):
+            key = ROOT + "pos_observed.csv"
+            reader = csv.DictReader(io.StringIO(files[key].decode()))
+            original = list(reader)
+            refund = dict(original[0], pos_record_id="RF-P10", pos_record_type="refund",
+                          timestamp_min_from_peak_start="20", sale_status="refunded_synthetic",
+                          amount_mxn="-45", refund_amount_mxn="45")
+            original.append(refund)
+            files[key] = tab(reader.fieldnames, original)
+        self.sha = make_zip(self.path, mutate=add_refund)
+        zf, _ = _load_package(self.path, self.sha)
+        with zf:
+            view = _build_public(zf, self.config, self.sha)
+        self.assertEqual(len(view["pos_records"]), 2)
+        sale, refund = view["pos_records"]
+        self.assertEqual(sale["order_id"], refund["order_id"])
+        self.assertNotEqual(sale["pos_record_id"], refund["pos_record_id"])
+        self.assertEqual(view["pos_line_items"][0]["pos_record_id"], sale["pos_record_id"])
+
+    def test_sources_missing_with_consistent_rehashed_manifest_are_rejected(self):
+        def remove_sources(files, sources):
+            for path in sources.values():
+                files.pop(path)
+        new_sha = make_zip(self.path, mutate=remove_sources)
+        with self.assertRaisesRegex(ArenaError, "REQUIRED_SOURCE_MISSING"):
+            _load_package(self.path, new_sha)
+
+    def test_empty_or_incomplete_inner_outputs_are_rejected(self):
+        def remove_output(files, sources):
+            for name in REQUIRED_OUTPUTS:
+                files.pop(ROOT + name)
+        new_sha = make_zip(self.path, mutate=remove_output)
+        with self.assertRaisesRegex(ArenaError, "REQUIRED_OUTPUT_COVERAGE_INVALID"):
+            _load_package(self.path, new_sha)
+
+    def test_rejects_fractional_cut_instead_of_exposing_part_of_minute_59(self):
+        with self.assertRaisesRegex(ArenaError, "CONSTRUCTION_CUT_MUST_ALIGN_TO_MINUTE"):
+            CoffeePeakCapacityV1().validate({**self.config, "construction_end_min": 59.5}, self.path)
+
+    def test_direct_public_export_also_rejects_fractional_cut(self):
+        zf, _ = _load_package(self.path, self.sha)
+        with zf, self.assertRaisesRegex(ArenaError, "CONSTRUCTION_CUT_MUST_ALIGN_TO_MINUTE"):
+            _build_public(zf, {**self.config, "construction_end_min": 59.5}, self.sha)
+
+    def test_rejects_forged_or_inconsistent_line_items(self):
+        for field, value in (
+            ("order_id", "DIFFERENT_ORDER"),
+            ("timestamp_min_from_peak_start", "-9"),
+            ("timestamp_min_from_peak_start", "12"),
+            ("source_class", "truth_injected_as_pos"),
+            ("synthetic", "False"),
+        ):
+            with self.subTest(field=field, value=value):
+                def bad_line(files, sources):
+                    key = ROOT + "pos_line_items.csv"
+                    reader = csv.DictReader(io.StringIO(files[key].decode()))
+                    rows = list(reader)
+                    rows[0][field] = value
+                    files[key] = tab(reader.fieldnames, rows)
+                new_sha = make_zip(self.path, mutate=bad_line)
+                zf, _ = _load_package(self.path, new_sha)
+                with zf, self.assertRaisesRegex(ArenaError, "LINE_PARENT_TIME_OR_PROVENANCE_INVALID"):
+                    _build_public(zf, self.config, new_sha)
+
+    def test_rejects_duplicate_line_ids_even_with_valid_hashes(self):
+        def repeat_line(files, sources):
+            key = ROOT + "pos_line_items.csv"
+            reader = csv.DictReader(io.StringIO(files[key].decode()))
+            rows = list(reader)
+            rows.insert(0, dict(rows[0]))
+            files[key] = tab(reader.fieldnames, rows)
+        sha = make_zip(self.path, mutate=repeat_line)
+        zf, _ = _load_package(self.path, sha)
+        with zf, self.assertRaisesRegex(ArenaError, "DUPLICATE_OR_EMPTY_LINE_ID"):
+            _build_public(zf, self.config, sha)
 
     def test_fails_closed_on_corrupt_member_even_with_new_package_sha(self):
         broken = make_zip(self.path, tamper=True)
