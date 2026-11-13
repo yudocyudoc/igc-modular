@@ -1,0 +1,20 @@
+id = "coffee-peak-b0-admission"
+protocol = "coffee_peak_capacity_v1"
+backend = "fixture"
+construction_end_min = 60.0
+window_end_min = 103.237
+
+[source]
+# Keep the 17 MB ZIP outside git, for example in ../inputs relative to this file.
+path = "../inputs/piloto_cafeteria_documentacion_y_datos_completosACTUALIZADO.zip"
+sha256 = "4ff97ae4d8fe52a5c1d1701aa713fda09b6730ef63d9cbab23e6af30dfad2a5f"
+
+[selection]
+scenario_id = "demanda_bajo__dias6_7_bajo__paciencia_sensible"
+replication = 1
+day_of_week = 1
+
+[budget]
+omc = 0
+provider_posts = 0
+workflow = 0
