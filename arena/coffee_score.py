@@ -46,6 +46,8 @@ def reserved_measurements(zf, cfg):
     cut = cfg["construction_end_min"]
     end = cfg["window_end_min"]
     _need(float(cut).is_integer() and 0 < cut < end, "BAD_CUT")
+    _need(all(cut < t <= end for t in PREDICTION_CUTS),
+          "PREDICTION_CUTS_OUTSIDE_RESERVED_FUTURE")
     pos = []
     for row in _rows(zf, ROOT + "pos_observed.csv", ("scenario_id", "replication",
         "day_of_week", "pos_record_type", "timestamp_min_from_peak_start",
@@ -159,7 +161,7 @@ def score_prediction(lock, oracle, *, native_attestor=None):
 
 
 def guarded_reserved_score(storage, cfg, lock, archive, *, native_attestor=None,
-                           archive_attestor=None):
+                           archive_attestor=None, public_dir=None):
     """Only a verified SCIENTIFIC archive can trigger any private R2 read.
 
     Not wired to GitHub Actions until a genuine coffee-domain engine validator
@@ -172,10 +174,33 @@ def guarded_reserved_score(storage, cfg, lock, archive, *, native_attestor=None,
     require_real_lock_before_reveal(lock, archive)
     _need(callable(native_attestor) and native_attestor(lock) is True,
           "AUTHENTIC_NATIVE_REQUIRED_BEFORE_R2_READ")
-    _need(lock["source_package_sha256"] == cfg["source"]["sha256"]
-          and lock["construction_end_exclusive"] == cfg["construction_end_min"],
-          "LOCK_SOURCE_OR_CUT_MISMATCH")
+    # Bind the exact population and public commitment BEFORE any storage.get.
+    _need(lock.get("source_package_sha256") == cfg["source"]["sha256"]
+          and lock.get("selection") == cfg["selection"]
+          and lock.get("construction_end_exclusive") == cfg["construction_end_min"]
+          and lock.get("window_end_min") == cfg["window_end_min"],
+          "LOCK_CASE_IDENTITY_MISMATCH")
     from pathlib import Path
+    from .common import digest, read_json
+    _need(public_dir is not None and Path(public_dir).is_dir(),
+          "PUBLIC_COMMITMENT_PROOF_REQUIRED")
+    public_path = Path(public_dir)
+    _need({x.name for x in public_path.iterdir()} ==
+          {"producer-public-b0.json", "release.json"}
+          and all(x.is_file() and not x.is_symlink() for x in public_path.iterdir()),
+          "PUBLIC_COMMITMENT_CONTENTS_INVALID")
+    public = read_json(public_path / "producer-public-b0.json")
+    release = read_json(public_path / "release.json")
+    _need(digest(public) == release.get("public_sha256") == lock.get("public_sha256")
+          and release.get("source_package_sha256") == cfg["source"]["sha256"]
+          and release.get("run_id") == lock.get("run_id")
+          and release.get("frozen_sha") == lock.get("frozen_sha")
+          and release.get("construction_end_exclusive") == cfg["construction_end_min"]
+          and public.get("source_package_sha256") == cfg["source"]["sha256"]
+          and public.get("selection") == cfg["selection"]
+          and public.get("time", {}).get("window_end") == cfg["window_end_min"]
+          and public.get("time", {}).get("construction_end_exclusive") == cfg["construction_end_min"],
+          "LOCK_PUBLIC_COMMITMENT_MISMATCH")
     from tempfile import TemporaryDirectory
     from .coffee_custody import source_key
     with TemporaryDirectory() as temp:

@@ -11,6 +11,8 @@ import hashlib
 import io
 import json
 import os
+import zipfile
+from urllib.parse import urlsplit
 from pathlib import Path
 import re
 import sys
@@ -141,11 +143,22 @@ def freeze(public_dir, submissions_dir, out, *, environment=None):
                      "submission_sha256": digest(submission),
                      "model_sha256": None, "predictions": None,
                      "representability": submission["representability"]}
+    public = read_json(Path(public_dir) / PUBLIC_NAME)
+    _need(public.get("selection") and isinstance(public.get("selection"), dict)
+          and set(public["selection"]) == {"scenario_id", "replication", "day_of_week"}
+          and public.get("time", {}).get("construction_end_exclusive")
+              == release["construction_end_exclusive"]
+          and public.get("time", {}).get("window_end") == 103.237
+          and 0 < release["construction_end_exclusive"] < 80.0
+          and proof["public_sha256"] == release["public_sha256"],
+          "PUBLIC_CASE_NOT_VERIFIED")
     lock = {
         "schema": LOCK_SCHEMA, "mode": "READINESS_ONLY", "protocol": "coffee_peak_capacity_v1",
         "condition": "B0", "run_id": release["run_id"],
         "frozen_sha": release["frozen_sha"],
         "source_package_sha256": release["source_package_sha256"],
+        "selection": dict(public["selection"]),
+        "window_end_min": public["time"]["window_end"],
         "public_sha256": proof["public_sha256"],
         "construction_end_exclusive": release["construction_end_exclusive"],
         "arms": rows,
@@ -177,6 +190,16 @@ def inspect_lock_files(folder):
     _need(lock.get("schema") == LOCK_SCHEMA and lock.get("mode") == "READINESS_ONLY"
           and lock.get("truth_opened") is False
           and lock.get("score") is None and lock.get("scientific_conclusion") is None
+          and isinstance(lock.get("selection"), dict)
+          and set(lock["selection"]) == {"scenario_id", "replication", "day_of_week"}
+          and isinstance(lock["selection"].get("scenario_id"), str)
+          and type(lock["selection"].get("replication")) is int
+          and type(lock["selection"].get("day_of_week")) is int
+          and lock.get("window_end_min") == 103.237
+          and type(lock.get("construction_end_exclusive")) in (int, float)
+          and float(lock["construction_end_exclusive"]).is_integer()
+          and 0 < lock["construction_end_exclusive"] < 80.0
+          and HASH_RE.fullmatch(str(lock.get("public_sha256", ""))) is not None
           and set(lock.get("arms", {})) == set(ARMS)
           and all(lock["arms"][a].get("status") == "NO_NATIVE" for a in ARMS),
           "LOCK_READINESS_ONLY_NOT_WELL_FORMED")
@@ -197,12 +220,71 @@ def _api_json(path, token):
         raise ArenaError("COFFEE_LAB_GITHUB_API_VERIFICATION_FAILED") from None
 
 
-def verify_archived_lock(folder, *, artifact_id, run_id, frozen_sha, repo=REPO,
-                         api_get=None, environment=None):
-    """Validate genuine GitHub v4 artifact metadata (not caller-supplied booleans).
+MAX_ARCHIVE_BYTES = 2 * 1024 * 1024
+MAX_MEMBER_BYTES = 512 * 1024
 
-    This verifies archive provenance before R2 access. Its output is NOT a
-    scientific lock acknowledgement: READINESS_ONLY is still fail-closed.
+
+class _SafeArchiveRedirect(urllib.request.HTTPRedirectHandler):
+    """Follow the official GitHub signed ZIP URL without forwarding our token."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        _need(urlsplit(newurl).scheme == "https", "ARCHIVE_REDIRECT_NOT_HTTPS")
+        target = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if target is not None and urlsplit(newurl).hostname != urlsplit(req.full_url).hostname:
+            # GitHub redirects archive ZIPs to temporary signed object-storage URLs.
+            # Only the initial api.github.com request may carry GH_TOKEN.
+            target = urllib.request.Request(newurl, headers={
+                "User-Agent": "IGC-Coffee-Lab-Archive-Verify",
+                "Accept": "application/octet-stream"})
+        return target
+
+
+def _github_archive_zip(repo, artifact_id, token):
+    """Download ZIP bytes by the exact immutable artifact ID; fail without a token."""
+    _need(bool(token), "GITHUB_TOKEN_REQUIRED")
+    url = f"https://api.github.com/repos/{repo}/actions/artifacts/{artifact_id}/zip"
+    request = urllib.request.Request(url, headers={
+        "Authorization": "Bearer " + token,
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "IGC-Coffee-Lab-Archive-Verify"})
+    try:
+        with urllib.request.build_opener(_SafeArchiveRedirect()).open(request, timeout=25) as response:
+            payload = response.read(MAX_ARCHIVE_BYTES + 1)
+    except (ValueError, OSError, urllib.error.HTTPError):
+        raise ArenaError("COFFEE_LAB_GITHUB_ARCHIVE_DOWNLOAD_FAILED") from None
+    _need(0 < len(payload) <= MAX_ARCHIVE_BYTES, "ARCHIVE_ZIP_SIZE_INVALID")
+    return payload
+
+
+def _match_archive_to_local(folder, archive_data):
+    """Compare exact archive member bytes to local verifier input, not metadata."""
+    _need(isinstance(archive_data, bytes) and 0 < len(archive_data) <= MAX_ARCHIVE_BYTES,
+          "ARCHIVE_ZIP_SIZE_INVALID")
+    expected = {"lock.json", "lock-sha256.txt"}
+    try:
+        with zipfile.ZipFile(io.BytesIO(archive_data)) as archive:
+            entries = archive.infolist()
+            _need(len(entries) == len(expected)
+                  and {info.filename for info in entries} == expected
+                  and all(not info.is_dir() and info.file_size <= MAX_MEMBER_BYTES
+                          and ((info.external_attr >> 16) & 0o170000) != 0o120000
+                          for info in entries), "ARCHIVE_ZIP_MEMBERS_INVALID")
+            for name in expected:
+                _need(archive.read(name) == (Path(folder) / name).read_bytes(),
+                      "ARCHIVED_LOCK_BYTES_DIFFER_FROM_LOCAL")
+    except (zipfile.BadZipFile, RuntimeError, OSError, ValueError, EOFError):
+        raise ArenaError("COFFEE_LAB_ARCHIVE_ZIP_INVALID") from None
+    return hashlib.sha256(archive_data).hexdigest()
+
+
+def verify_archived_lock(folder, *, artifact_id, run_id, frozen_sha, repo=REPO,
+                         api_get=None, archive_fetch=None, environment=None):
+    """Verify metadata AND exact ZIP bytes downloaded by artifact ID.
+
+    `api_get` and `archive_fetch` are injected only in offline tests. The CLI
+    fetches the real GitHub archive by ID. No metadata-only approval is possible.
+    The readiness archive still cannot authorize R2 truth release.
     """
     env = os.environ if environment is None else environment
     _need(repo == REPO and RUN_RE.fullmatch(str(run_id)) is not None
@@ -233,12 +315,19 @@ def verify_archived_lock(folder, *, artifact_id, run_id, frozen_sha, repo=REPO,
           and artifact.get("workflow_run", {}).get("id") == int(run_id)
           and artifact.get("size_in_bytes", 0) > 0,
           "GITHUB_ARTIFACT_NOT_IMMUTABLE_RUN_ARCHIVE")
+    if archive_fetch is None:
+        payload = _github_archive_zip(repo, artifact_id, env.get("GH_TOKEN", ""))
+    else:
+        payload = archive_fetch(repo, artifact_id)
+    archive_zip_sha = _match_archive_to_local(folder, payload)
     archive = {
         "schema": "arena.coffee-peak.github-lock-verified/1",
         "status": "READINESS_ARCHIVE_VERIFIED_NO_REVEAL",
         "github_run_id": int(run_id), "github_artifact_id": artifact_id,
         "frozen_sha": frozen_sha, "lock_sha256": digest(lock),
         "file_sha256": hashlib.sha256((Path(folder)/"lock.json").read_bytes()).hexdigest(),
+        "artifact_zip_sha256": archive_zip_sha,
+        "artifact_content_verified": True,
         "verified_by_github_api": True, "immutable_archive_read_before_reveal": True,
         "producer_write_disabled": True, "scientific_lock": False,
         "holdout_opened": False, "provider_posts": 0, "new_omc": 0,

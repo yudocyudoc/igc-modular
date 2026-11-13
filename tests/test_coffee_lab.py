@@ -1,5 +1,7 @@
 """P3 producer read-boundary, immutable readiness lock and reserved evaluator gates."""
 import hashlib
+import io
+import zipfile
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -50,6 +52,19 @@ class CoffeeLabTests(unittest.TestCase):
         self._probe_all()
         return freeze(self.public, self.submissions, self.root / "lock", environment={})
 
+    def _archive(self, folder=None):
+        """Offline stand-in for GET /actions/artifacts/{id}/zip (exact bytes)."""
+        folder = Path(folder) if folder is not None else self.root / "lock"
+        payload = io.BytesIO()
+        with zipfile.ZipFile(payload, "w", zipfile.ZIP_DEFLATED) as zf:
+            for name in ("lock.json", "lock-sha256.txt"):
+                zf.writestr(name, (folder / name).read_bytes())
+        return payload.getvalue()
+
+    def _fetch(self, repo, artifact_id):
+        self.assertEqual((repo, artifact_id), ("yudocyudoc/igc-modular", 456))
+        return self._archive()
+
     def _api(self, path):
         if path.endswith("/actions/runs/123"):
             return {"id": 123, "head_sha": self.sha, "head_branch": "main",
@@ -94,7 +109,7 @@ class CoffeeLabTests(unittest.TestCase):
             from arena.coffee_custody import require_real_lock_before_reveal
             require_real_lock_before_reveal(lock,{})
         verified=verify_archived_lock(self.root/"lock",artifact_id=456,
-                    run_id="123",frozen_sha=self.sha,api_get=self._api,environment={})
+                    run_id="123",frozen_sha=self.sha,api_get=self._api,archive_fetch=self._fetch,environment={})
         self.assertEqual(verified["status"],"READINESS_ARCHIVE_VERIFIED_NO_REVEAL")
         self.assertFalse(verified["scientific_lock"])
         self.assertEqual(verified["lock_sha256"],digest(lock))
@@ -122,18 +137,102 @@ class CoffeeLabTests(unittest.TestCase):
             return v
         with self.assertRaisesRegex(ArenaError,"GITHUB_ARTIFACT_NOT_IMMUTABLE"):
             verify_archived_lock(self.root/"lock", artifact_id=456, run_id="123",
-                 frozen_sha=self.sha,api_get=wrong_artifact,environment={})
+                 frozen_sha=self.sha,api_get=wrong_artifact,archive_fetch=self._fetch,environment={})
         def rerun(path):
             v=self._api(path)
             if "runs" in path:return {**v,"run_attempt": 2}
             return v
         with self.assertRaisesRegex(ArenaError,"GITHUB_RUN_NOT_ORIGINAL"):
             verify_archived_lock(self.root/"lock", artifact_id=456, run_id="123",
-                 frozen_sha=self.sha,api_get=rerun,environment={})
+                 frozen_sha=self.sha,api_get=rerun,archive_fetch=self._fetch,environment={})
         with self.assertRaisesRegex(ArenaError,"ARCHIVE_VERIFIER_HAS_CUSTODY_SECRETS"):
             verify_archived_lock(self.root/"lock", artifact_id=456, run_id="123",
-                 frozen_sha=self.sha,api_get=self._api,
+                 frozen_sha=self.sha,api_get=self._api,archive_fetch=self._fetch,
                  environment={"CT03_R2_ACCESS_KEY_ID":"test"})
+
+    def test_workflow_download_by_artifact_id_unpacks_into_lock_root(self):
+        # v4 only flattens a download-by-ID when merge-multiple is explicit.
+        wf = (Path(__file__).resolve().parents[1] / ".github" / "workflows"
+              / "coffee-peak-custody.yml").read_text()
+        block = wf.split("  verify-lock:", 1)[1].split("      - name: Verify run SHA", 1)[0]
+        self.assertIn("artifact-ids: ${{ needs.prediction-lock.outputs.artifact_id }}", block)
+        self.assertIn("merge-multiple: true", block)
+        self.assertIn("path: ${{ runner.temp }}/coffee-locked", block)
+        # A nested artifact-name directory is rejected as intended.
+        self._freeze()
+        nested = self.root / "download-nested" / "coffee-lock-123"
+        nested.mkdir(parents=True)
+        for name in ("lock.json", "lock-sha256.txt"):
+            (nested / name).write_bytes((self.root / "lock" / name).read_bytes())
+        with self.assertRaisesRegex(ArenaError, "LOCK_ARTIFACT_CONTENTS_INVALID"):
+            inspect_lock_files(nested.parent)
+        self.assertEqual(inspect_lock_files(nested)["mode"], "READINESS_ONLY")
+
+    def test_archive_bytes_are_tied_to_fetched_github_artifact(self):
+        self._freeze()
+        original_archive = self._archive()
+        path = self.root / "lock" / "lock.json"
+        lock = read_json(path)
+        lock["public_sha256"] = "sha256:" + "b" * 64
+        write_json(path, lock)
+        (self.root / "lock" / "lock-sha256.txt").write_text(
+            "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest() + "\n")
+        # A locally self-consistent JSON+checksum is NOT the GitHub archive.
+        self.assertEqual(inspect_lock_files(self.root / "lock")["public_sha256"],
+                         lock["public_sha256"])
+        with self.assertRaisesRegex(ArenaError, "ARCHIVED_LOCK_BYTES_DIFFER"):
+            verify_archived_lock(self.root / "lock", artifact_id=456, run_id="123",
+                frozen_sha=self.sha,api_get=self._api,
+                archive_fetch=lambda repo, artifact: original_archive,environment={})
+        # A metadata-valid archive with an extra/unexpected file must fail.
+        with zipfile.ZipFile(io.BytesIO(original_archive)) as zf:
+            old = {n: zf.read(n) for n in zf.namelist()}
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            for n, data in old.items(): zf.writestr(n, data)
+            zf.writestr("evil.txt", b"BAD")
+        with self.assertRaisesRegex(ArenaError,"ARCHIVE_ZIP_MEMBERS_INVALID"):
+            verify_archived_lock(self.root / "lock", artifact_id=456, run_id="123",
+                frozen_sha=self.sha,api_get=self._api,
+                archive_fetch=lambda repo, artifact: buf.getvalue(),environment={})
+
+    def test_lock_carries_selected_population_and_window(self):
+        lock = self._freeze()
+        self.assertEqual(lock["selection"], self.cfg["selection"])
+        self.assertEqual(lock["window_end_min"], self.cfg["window_end_min"])
+        self.assertEqual(lock["public_sha256"],
+                         read_json(self.public / "release.json")["public_sha256"])
+
+    def test_guarded_evaluator_refuses_day_swap_and_public_mismatch_pre_r2(self):
+        locked = self._freeze()
+        scientific = {**locked, "mode": "SCIENTIFIC"}
+        archive = {"github_artifact_id":456, "verified_by_github_api":True,
+                   "immutable_archive_read_before_reveal":True,
+                   "producer_write_disabled":True, "lock_sha256":digest(scientific)}
+        class NoReads:
+            def get(self,*args,**kwargs):
+                raise AssertionError("R2 was accessed before case/proof check")
+        wrong_day = {**self.cfg, "selection": {**self.cfg["selection"], "day_of_week":2}}
+        with self.assertRaisesRegex(ArenaError,"LOCK_CASE_IDENTITY_MISMATCH"):
+            guarded_reserved_score(NoReads(), wrong_day, scientific, archive,
+                archive_attestor=lambda *args:True,native_attestor=lambda *args:True,
+                public_dir=self.public)
+        with self.assertRaisesRegex(ArenaError,"PUBLIC_COMMITMENT_PROOF_REQUIRED"):
+            guarded_reserved_score(NoReads(), self.cfg, scientific, archive,
+                archive_attestor=lambda *args:True,native_attestor=lambda *args:True)
+        public = read_json(self.public / "producer-public-b0.json")
+        public["pos_records"][0]["amount_mxn"] = "999"
+        write_json(self.public / "producer-public-b0.json", public)
+        with self.assertRaisesRegex(ArenaError,"LOCK_PUBLIC_COMMITMENT_MISMATCH"):
+            guarded_reserved_score(NoReads(), self.cfg, scientific, archive,
+                archive_attestor=lambda *args:True,native_attestor=lambda *args:True,
+                public_dir=self.public)
+
+    def test_reserved_observations_cannot_start_before_construction_end(self):
+        with zipfile.ZipFile(self.cfg["source"]["path"]) as zf:
+            later = {**self.cfg,"construction_end_min":90.0}
+            with self.assertRaisesRegex(ArenaError,"PREDICTION_CUTS_OUTSIDE_RESERVED_FUTURE"):
+                reserved_measurements(zf,later)
 
     def test_never_reads_r2_before_real_lock_both_attestors(self):
         self._freeze()
