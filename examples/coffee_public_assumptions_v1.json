@@ -1,0 +1,12 @@
+{
+  "schema": "arena.coffee-peak.public-assumptions/1",
+  "version": "B0_ENGINEERING_UNCALIBRATED_v1",
+  "frontier": "PAID_ORDER_TO_PICKUP",
+  "parameters": {
+    "initial_paid_orders": {"value": 0, "unit": "orders", "admissible_range": [0, 0], "origin": "PUBLIC_DESIGN_HYPOTHESIS_NOT_IDENTIFIED", "identification": "ASSUMED_NOT_MEASURED"},
+    "service_capacity": {"value": 12, "unit": "orders/hour", "admissible_range": [1, 120], "origin": "PUBLIC_DESIGN_HYPOTHESIS_NOT_IDENTIFIED", "identification": "ASSUMED_NOT_MEASURED"},
+    "response_time": {"value": 0.1, "unit": "hours", "admissible_range": [0.1, 5.0], "origin": "PUBLIC_DESIGN_HYPOTHESIS_NOT_IDENTIFIED", "identification": "ASSUMED_NOT_MEASURED"},
+    "post_payment_loss_rate": {"value": 0.05, "unit": "1/hour", "admissible_range": [0, 1.0], "origin": "PUBLIC_DESIGN_HYPOTHESIS_NOT_IDENTIFIED", "identification": "ASSUMED_NOT_MEASURED"},
+    "workload_per_paid_order": {"value": 1, "unit": "orders/order", "admissible_range": [1, 1], "origin": "PUBLIC_DESIGN_HYPOTHESIS_NOT_IDENTIFIED", "identification": "ASSUMED_NOT_MEASURED"}
+  }
+}
