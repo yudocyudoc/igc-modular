@@ -67,6 +67,19 @@ queues; it does **not** include abandonment or shared resources.
 **Neither** adapter establishes individual waiting-time p90, profitability,
 S1–S5 policy efficacy or empirical calibration of pickups.
 
+For **v1**, `workload_per_paid_order` is exactly **1 order/order** with the
+fixed admissible interval `[1,1]`. A changed value **or a widened range**
+raises `NONUNIT_WORKLOAD_UNSUPPORTED_V1` during shared case validation,
+before D/M native generation, even if the caller recomputes the public
+hypothesis hash. Supporting non-unit workload requires an explicit, versioned
+relation to capacity and conservation of *orders*; simply multiplying the
+native input or pickup counter would change the material unit.
+
+The distribution wheel includes `arena.coffee_adapters` and its versioned
+`registry.coffee.v1.json` as package data. Platform CI builds a real wheel,
+installs into a separate location and imports the adapter and its registry
+from that installed copy, outside the source checkout.
+
 An assumption outside the pinned coffee M registry fails (no silent
 extension of response-time bounds). A source drift or changed stimulus
 interface fails closed. Modelica equations are emitted only by the pinned

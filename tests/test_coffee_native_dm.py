@@ -44,6 +44,23 @@ class CoffeeNativeContracts(unittest.TestCase):
         with self.assertRaisesRegex(ArenaError, "CASE_HAS_PRIVATE_EVIDENCE"):
             case_guard(forged)
 
+    def test_nonunit_or_unfixed_workload_rejected_before_native_generation(self):
+        base = self._case()
+        for value, bounds in ((2, [1, 2]), (1, [1, 2])):
+            case = copy.deepcopy(base)
+            prior = case["hypotheses"]
+            prior["version"] = "nonunit-workload-reproduction"
+            prior["parameters"]["workload_per_paid_order"].update(
+                {"value": value, "admissible_range": bounds})
+            # Recompute the public assumption hash as an adversarial caller would.
+            case["hypotheses_sha256"] = digest(prior)
+            with self.subTest(value=value, bounds=bounds):
+                with self.assertRaisesRegex(ArenaError, "NONUNIT_WORKLOAD_UNSUPPORTED_V1"):
+                    case_guard(case)
+                for generator in (d.generate, m.generate):
+                    with self.assertRaisesRegex(ArenaError, "NONUNIT_WORKLOAD_UNSUPPORTED_V1"):
+                        generator(case)
+
     def test_never_overwrite_native_dir(self):
         case = self._case()
         with self.assertRaisesRegex(ArenaError, "REFUSE_OVERWRITE"):

@@ -30,3 +30,34 @@ jobs:
           path: |
             runs/ci-smoke/result.json
             runs/ci-smoke/report.md
+
+  package-wheel:
+    name: Wheel installation from outside checkout
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Build a real distribution wheel
+        run: python -m pip wheel --no-deps --wheel-dir "$RUNNER_TEMP/wheels" .
+      - name: Install separately and verify packaged coffee adapter plus JSON registry
+        run: |
+          set -euo pipefail
+          python -m pip install --no-deps --target "$RUNNER_TEMP/wheel-target" "$RUNNER_TEMP"/wheels/*.whl
+          cd "$RUNNER_TEMP"
+          python -I - <<'PY'
+          import os
+          import sys
+          from pathlib import Path
+          target = (Path(os.environ["RUNNER_TEMP"]) / "wheel-target").resolve()
+          sys.path.insert(0, str(target))
+          import arena.coffee_native_dm as cli
+          from arena.coffee_adapters import d, m
+          from arena.coffee_adapters.m import REGISTRY
+          assert Path(cli.__file__).resolve().is_relative_to(target)
+          assert REGISTRY.is_file() and REGISTRY.resolve().is_relative_to(target)
+          assert (d.VENDOR_ROOT / "scripts/arena_d_v01.py").is_file()
+          assert (m.VENDOR_ROOT / "experiments/e1/composer.py").is_file()
+          print("Installed wheel coffee adapters and registry: PASS")
+          PY

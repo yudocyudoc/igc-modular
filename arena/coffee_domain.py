@@ -69,6 +69,11 @@ def validate_assumptions(hypotheses):
               "ASSUMPTION_PROVENANCE_OR_UNIT_INVALID:" + key)
         if key == "initial_paid_orders":
             _need(v == lo == hi == 0, "INITIAL_BACKLOG_MUST_BE_ZERO_IN_V1")
+        if key == "workload_per_paid_order":
+            # D/M v1 material balances count paid orders, not cups or workload units.
+            # A non-unit conversion needs an explicit, versioned physical model;
+            # accepting it here would silently leave native equations unchanged.
+            _need(v == lo == hi == 1, "NONUNIT_WORKLOAD_UNSUPPORTED_V1")
         if key in ("service_capacity", "response_time", "workload_per_paid_order"):
             _need(lo > 0, "ASSUMED_POSITIVE_PARAMETER_REQUIRED:" + key)
     return hypotheses
