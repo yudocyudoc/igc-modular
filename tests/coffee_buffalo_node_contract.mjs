@@ -57,7 +57,7 @@ async function run(end, suffix) {
   const out = join(tmp, "out-" + suffix);
   response.specs.stopTime = end;
   await writeFile(fixture, JSON.stringify({success: true, result: {
-    response, usage: {prompt_tokens: 5, completion_tokens: 5},
+    response, usage: {prompt_tokens: 5, completion_tokens: 5, total_tokens: 10},
     choices: [{message: {content: JSON.stringify(response)}, finish_reason: "stop"}]
   }}));
   const env = {...process.env, SDAI_ROOT: join(workspace, "upstream/sd-ai"),
