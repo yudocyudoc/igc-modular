@@ -118,3 +118,45 @@ def audit_fixture_result(folder, payload):
         "provider_posts": 0, "new_omc": 0, "truth_access": False,
         "scientific_lock_created": False,
     }
+
+
+def translate_offline_fixture(folder, payload, out):
+    """Render the EXACT fixture native with a versioned coffee horizon adapter.
+
+    This is a test of translation compatibility only. It does NOT establish
+    Buffalo authorship from a real provider, conservation, G2, or science.
+    """
+    from arena.coffee_adapters import b_translation
+    from arena.common import canonical
+    from hashlib import sha256
+    audit = audit_fixture_result(folder, payload)
+    receipt = read_json(Path(folder) / "receipt.json")
+    need(receipt.get("status") == "ORIGINAL_ENGINE_OUTPUT_ON_OFFLINE_FIXTURE"
+         and receipt.get("model_returned") is True,
+         "OFFLINE_NATIVE_NOT_ADMITTED_FOR_TRANSLATION")
+    native = read_json(Path(folder) / "native-engine-result.json")
+    try:
+        model_name, modelica, translation = b_translation.generate(native)
+    except b_translation.TranslationBlocked as exc:
+        raise ArenaError("COFFEE_B_TRANSLATION_BLOCKED:" + str(exc)) from None
+    out = Path(out)
+    need(not out.exists(), "REFUSE_TRANSLATION_OVERWRITE")
+    out.mkdir(parents=True)
+    code_path = out / (model_name + ".mo")
+    code_path.write_text(modelica, encoding="utf-8", newline="\n")
+    receipt_payload = {
+        "schema": "arena.coffee-peak.b-offline-translation/1",
+        "status": "TRANSLATED_FIXTURE_NOT_COMPILED_NOT_SCIENTIFIC",
+        "native_file_sha256": receipt["native_file_sha256"],
+        "native_payload_sha256": receipt["native_sha256"],
+        "modelica_sha256": "sha256:" + sha256(code_path.read_bytes()).hexdigest(),
+        "modelica_file": code_path.name,
+        "native_scope": translation,
+        "case_sha256": payload["case_sha256"],
+        "scientific_lock_created": False,
+        "provider_posts": 0, "new_omc": 0,
+        "truth_access": False,
+        "fixture_validation": audit["status"],
+    }
+    write_json(out / "translation-receipt.json", receipt_payload, exclusive=True)
+    return receipt_payload

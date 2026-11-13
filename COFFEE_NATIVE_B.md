@@ -32,8 +32,16 @@ node tests/coffee_buffalo_node_contract.mjs "$RUNNER_TEMP/arena-native"
 **Limitations**: The current vendored Modelica translator requires exactly
 8 hours and cannot legitimately compile a 103.237-minute coffee horizon.
 A changed horizon is *not* rewritten to eight hours; the native model and
-reason for stopping remain in the receipt. A versioned coffee translator with
-independent equivalence tests is still required before any physical inference.
+reason for stopping remain in the receipt. A **versioned, derived** coffee-scope Modelica translator is included
+(`arena/coffee_adapters/b_translation.py`). Its original vendored source remains
+untouched; only the version, pinned simulation-scope guard and solver-scope
+receipt differ. The extension requires horizon `103.237/60` hours, Euler,
+`dt=horizon/64` and accepts only equations/functions supported by the original.
+A fixture can now be explicitly translated with `translate_offline_fixture()`,
+which archives a Modelica file and byte-hash receipt while retaining the label
+`TRANSLATED_FIXTURE_NOT_COMPILED_NOT_SCIENTIFIC`. This is **not** physical
+inference or an attested native from a paid provider; equation parity and model
+compilation still require separate validation.
 A passing local mock does NOT prove the provider will produce a valid native,
 that Buffalo can express a true pickup counter, or that it can handle
 machine/barista staffing, prepayment abandonments or S1–S5.

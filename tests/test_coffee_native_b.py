@@ -65,6 +65,31 @@ class CoffeeBuffaloContracts(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             prepare(case, out)
 
+
+    def test_versioned_coffee_modelica_translator_rejects_eight_hours(self):
+        from arena.coffee_adapters import b_translation
+        from arena.buffalo.capabilities import pulse_fixture
+        original = pulse_fixture()
+        original["model"]["specs"].update({
+            "stopTime": 103.237 / 60.0,
+            "dt": (103.237 / 60.0) / 64.0
+        })
+        name, modelica, info = b_translation.generate(original)
+        self.assertTrue(name.startswith("BuffaloNative_"))
+        self.assertIn("der(", modelica)
+        self.assertEqual(info["native_simulation_specs"]["stopTime"], 103.237 / 60)
+        self.assertEqual(info["solver_scope"],
+                         "COFFEE_EULER_0_TO_103_237_MINUTES_DT_HORIZON_DIV_64")
+        original["model"]["specs"]["stopTime"] = 8
+        with self.assertRaisesRegex(b_translation.TranslationBlocked,
+                                    "NATIVE_SPECS_OUTSIDE_COFFEE_V1_SCOPE"):
+            b_translation.generate(original)
+        original["model"]["specs"]["stopTime"] = 103.237 / 60.0
+        original["model"]["variables"][0]["equation"] = "UNSUPPORTED(TIME)"
+        with self.assertRaisesRegex(b_translation.TranslationBlocked,
+                                    "UNSUPPORTED"):
+            b_translation.generate(original)
+
     def test_readiness_does_not_accept_mock_native_as_scientific(self):
         case = self._case()
         payload = make_payload(case)
