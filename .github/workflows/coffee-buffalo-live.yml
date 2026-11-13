@@ -1,0 +1,96 @@
+name: Coffee Buffalo - one authorized live Workers AI POST
+
+on:
+  workflow_dispatch:
+    inputs:
+      authorized:
+        description: "Permit one Cloudflare Workers AI POST, never auto-retry"
+        type: choice
+        options: ['no', 'yes']
+        default: 'no'
+        required: true
+      public_run_id:
+        description: "Successful coffee-peak-custody admission run ID"
+        type: string
+        required: true
+      public_artifact_id:
+        description: "Exact coffee-public-<run_id> GitHub artifact ID"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: coffee-buffalo-live-one-post
+  cancel-in-progress: false
+
+jobs:
+  live:
+    name: Coffee Buffalo one-post live (no OMC/R2)
+    if: github.event_name == 'workflow_dispatch' && inputs.authorized == 'yes' && github.ref == 'refs/heads/main' && github.run_attempt == 1
+    environment: arena-provider
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/native-runtime
+        with: {role: b}
+      - name: Download only the existing custody-approved B0 public artifact
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ inputs.public_artifact_id }}
+          run-id: ${{ inputs.public_run_id }}
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/coffee-b-public
+      - name: Verify source run, artifact, B0 public identity and prior attempts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COFFEE_B_LIVE_AUTH: '${{ inputs.authorized }}'
+          COFFEE_PUBLIC_RUN_ID: ${{ inputs.public_run_id }}
+          COFFEE_PUBLIC_ARTIFACT_ID: ${{ inputs.public_artifact_id }}
+        run: |
+          python -m arena.buffalo.coffee_live admit \
+            --public-dir "$RUNNER_TEMP/coffee-b-public" \
+            --source-run-id "$COFFEE_PUBLIC_RUN_ID" \
+            --artifact-id "$COFFEE_PUBLIC_ARTIFACT_ID" \
+            --config "$GITHUB_WORKSPACE/examples/coffee_peak.toml" \
+            --assumptions "$GITHUB_WORKSPACE/examples/coffee_public_assumptions_v1.json" \
+            --out "$RUNNER_TEMP/coffee-b-live"
+      - name: Verify Cloudflare AI permission and R2 denial (GET only)
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          python -c 'import json; from arena.cloud import provider_preflight; print(json.dumps(provider_preflight()))'
+      - name: Install pinned Buffalo SDK before the paid request
+        working-directory: ${{ runner.temp }}/arena-native/upstream/sd-ai
+        run: npm ci --ignore-scripts --omit=optional --no-audit --no-fund
+      - name: One original coffee Engine.generate Cloudflare POST
+        env:
+          COFFEE_B_LIVE_AUTH: '${{ inputs.authorized }}'
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python -m arena.buffalo.coffee_live generate --out "$RUNNER_TEMP/coffee-b-live"
+      - name: Finalize actual or uncertain provider usage with no retry
+        if: always()
+        run: |
+          if [ -d "$RUNNER_TEMP/coffee-b-live" ]; then
+            python -m arena.buffalo.coffee_live finalize --out "$RUNNER_TEMP/coffee-b-live"
+          fi
+      - name: Archive request, original native, raw response and usage receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-b-live-${{ github.run_id }}
+          path: ${{ runner.temp }}/coffee-b-live/
+          if-no-files-found: warn
+          retention-days: 90
+
+# No R2 credentials, private ZIP, D/M, OMC, lock or reserved evaluation.
+# Requires merge to main and prior successful public custody admission.

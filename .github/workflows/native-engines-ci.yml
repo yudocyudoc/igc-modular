@@ -23,6 +23,8 @@ jobs:
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
       - name: Verify BF03/BF04 original Engine adapter has valid ESM syntax
         run: node --check arena/buffalo/original_runner.mjs
+      - name: Verify coffee Buffalo live runner syntax without credentials or network
+        run: node --check arena/buffalo/coffee_live_runner.mjs
       - name: Verify the migrated engine bytes and native CT02 evidence
         run: python -m arena.runtime verify
       - name: Original producer, revision, feedback and failure regressions
