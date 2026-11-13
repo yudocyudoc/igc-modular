@@ -2,6 +2,7 @@
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -172,11 +173,16 @@ class CoffeeDomainTests(unittest.TestCase):
 
     def test_cli_new_process(self):
         dest = self.root / 'case.json'
+        # The fixture release declares run 123. CI exposes its own GitHub run ID;
+        # run this subprocess as an isolated producer test, not as that live run.
+        env = os.environ.copy()
+        for key in ('GITHUB_RUN_ID', 'GITHUB_SHA', 'GH_TOKEN', 'GITHUB_TOKEN'):
+            env.pop(key, None)
         process = subprocess.run(
             [sys.executable, '-m', 'arena.coffee_domain',
              '--public-dir', str(self.public),
              '--assumptions', str(ASSUMPTIONS), '--out', str(dest)],
-            cwd=ROOT, capture_output=True, text=True,
+            cwd=ROOT, capture_output=True, text=True, env=env,
         )
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertEqual(json.loads(dest.read_text())['schema'], 'arena.coffee-peak.public-case/1')
@@ -184,7 +190,7 @@ class CoffeeDomainTests(unittest.TestCase):
             [sys.executable, '-m', 'arena.coffee_domain',
              '--public-dir', str(self.public),
              '--assumptions', str(ASSUMPTIONS), '--out', str(dest)],
-            cwd=ROOT, capture_output=True, text=True,
+            cwd=ROOT, capture_output=True, text=True, env=env,
         )
         self.assertEqual(again.returncode, 2)
         self.assertIn('REFUSE_CASE_OVERWRITE', again.stderr)
