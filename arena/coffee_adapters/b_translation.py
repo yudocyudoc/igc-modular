@@ -1,12 +1,12 @@
-"""Versioned coffee scope extension of pinned IGC Buffalo Modelica translator.
-
-Source: arena/_vendor/igc/scripts/arena_b_native_to_modelica.py
-Original Git blob: 7ea2d40c7d451ef93e322f4dafe47167d79045d5
-The original is unchanged; this derived copy differs only in VERSION,
-simulation-scope guard and solver-scope report. This file makes the
-8-hour to 103.237-minute change explicit rather than altering a native.
-No hidden data, calibration, solver execution or scientific conclusions.
-"""
+# Versioned coffee scope extension of pinned IGC Buffalo Modelica translator.
+# 
+# Source: arena/_vendor/igc/scripts/arena_b_native_to_modelica.py
+# Original Git blob: 7ea2d40c7d451ef93e322f4dafe47167d79045d5
+# The original is unchanged; this derived copy differs only in VERSION,
+# simulation-scope guard and solver-scope report. This file makes the
+# 8-hour to 103.237-minute change explicit rather than altering a native.
+# No hidden data, calibration, solver execution or scientific conclusions.
+# 
 
 """Strict Buffalo SD-AI native sd-json -> OpenModelica translator (NO D/M).
 
