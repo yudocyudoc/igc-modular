@@ -147,7 +147,7 @@ def _load_package(path, expected_sha):
         raise
 
 
-def _build_public(zf, settings, source_sha):
+def _build_public(zf, settings, source_sha, *, include_private=False):
     selection = settings["selection"]
     scenario, replication, day = (selection[k] for k in ("scenario_id", "replication", "day_of_week"))
     key = (scenario, str(replication))
@@ -220,7 +220,7 @@ def _build_public(zf, settings, source_sha):
                      and row["synthetic"].lower() == "false", "VIDEO_PROXY_PROVENANCE_INVALID")
             profile.append({k: row[k] for k in ALLOWED_PROFILE})
     _require(bool(records) and bool(profile), "EMPTY_PUBLIC_CONSTRUCTION")
-    return {
+    public = {
         "schema": "arena.coffee-peak.public-b0/1", "evidence_kind": "SYNTHETIC_POS_AND_VIDEO_PROXY",
         "condition": "B0", "source_package_sha256": source_sha,
         "selection": dict(selection),
@@ -234,6 +234,21 @@ def _build_public(zf, settings, source_sha):
                       "queue": "not observed in POS", "net_profit": "not identifiable"},
         "pos_records": records, "pos_line_items": lines, "video_proxy": profile,
     }
+    if not include_private:
+        return public
+    # This reverse linkage is restricted to the custodian; never include it in
+    # public artifacts or producer jobs. A single admission freezes both views.
+    from .common import digest
+    private = {
+        "schema": "arena.coffee-peak.private-linkage/1",
+        "source_package_sha256": source_sha,
+        "public_sha256": digest(public),
+        "selection": dict(selection),
+        "order_ids": {opaque: original for original, opaque in order_map.items()},
+        "pos_record_ids": {opaque: original for original, opaque in pos_map.items()},
+        "pos_line_ids": {opaque: original for original, opaque in line_map.items()},
+    }
+    return public, private
 
 
 class CoffeePeakFixtureBackend:
