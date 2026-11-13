@@ -32,7 +32,8 @@ class CoffeeBuffaloContracts(unittest.TestCase):
         self.assertNotIn('P10', json.dumps(p))
         self.assertNotIn('SECRET-FUTURE-TRUTH', json.dumps(p))
         self.assertNotIn('source.zip', json.dumps(p))
-        self.assertNotIn('eight hours)', p["prompt"])
+        self.assertIn("stopTime=1.72061666666667", p["prompt"])
+        self.assertNotIn("stopTime=8", p["prompt"])
         self.assertEqual(p["provider_posts"], 0)
         self.assertFalse(p["truth_access"])
 
@@ -76,6 +77,8 @@ class CoffeeBuffaloContracts(unittest.TestCase):
             "mode": "OFFLINE_FIXTURE_CONTRACT_ONLY",
             "case_sha256": payload["case_sha256"], "provider_posts": 0,
             "sdk_interceptions": 1, "native_sha256": digest(native),
+            "native_file_sha256": "sha256:" + __import__("hashlib").sha256(
+                (folder / "native-engine-result.json").read_bytes()).hexdigest(),
             "model_returned": True,
         })
         audit = audit_fixture_result(folder, payload)

@@ -77,6 +77,9 @@ async function run(end, suffix) {
   assert.equal(receipt.provider_posts, 0);
   assert.equal(receipt.real_network_calls, 0);
   assert.equal(receipt.engine_source_modified, false);
+  assert.equal(receipt.native_file_sha256,
+      "sha256:" + (await import("node:crypto")).createHash("sha256")
+        .update(await readFile(join(out, "native-engine-result.json"))).digest("hex"));
   assert.equal(receipt.native_sha256,
       "sha256:" + (await import("node:crypto")).createHash("sha256")
         .update(JSON.stringify(native)).digest("hex"));

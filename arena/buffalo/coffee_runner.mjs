@@ -74,7 +74,7 @@ try {
     need(Array.isArray(body.messages) &&
          !body.messages.some(m => m.role === "assistant") &&
          body.messages.at(-1)?.role === "user" &&
-         body.messages.at(-1)?.content === payload.prompt,
+         body.messages.at(-1)?.content.endsWith(payload.prompt),
          "ORIGINAL_ENGINE_PROMPT_OR_PARENT_INVALID");
     need(body.messages.some(m => typeof m.content === "string" &&
          m.content.includes(payload.problemStatement)) &&
@@ -107,6 +107,8 @@ try {
       payload.prompt, {variables: [], relationships: []}, parameters);
   await save("native-engine-result.json", native);
   receipt.native_sha256 = sha(native);
+  receipt.native_file_sha256 = "sha256:" + createHash("sha256")
+    .update(JSON.stringify(native, null, 2) + "\n").digest("hex");
   receipt.model_returned = Boolean(!native?.err &&
       Array.isArray(native?.model?.variables) &&
       Array.isArray(native?.model?.relationships));

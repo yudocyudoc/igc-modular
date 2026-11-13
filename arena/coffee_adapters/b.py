@@ -106,7 +106,9 @@ def audit_fixture_result(folder, payload):
          and receipt.get("case_sha256") == payload["case_sha256"]
          and receipt.get("provider_posts") == 0
          and receipt.get("sdk_interceptions") == 1
-         and receipt.get("native_sha256") == digest(native), "FIXTURE_RECEIPT_INVALID")
+         and receipt.get("native_file_sha256") == "sha256:" + __import__("hashlib").sha256(
+             (folder / "native-engine-result.json").read_bytes()).hexdigest(),
+         "FIXTURE_RECEIPT_INVALID")
     return {
         "schema": "arena.coffee-peak.b-offline-audit/1",
         "status": "ORIGINAL_ENGINE_INVOKED_WITH_MOCKED_PROVIDER_NOT_SCIENTIFIC",
