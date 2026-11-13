@@ -85,7 +85,7 @@ async function run(end, suffix) {
         .update(JSON.stringify(native)).digest("hex"));
   const req = JSON.parse(await readFile(join(out, "sdk-request.json"), "utf8"));
   assert.equal(req.response_format.type, "json_schema");
-  assert.equal(req.messages.at(-1).content, prompt);
+  assert(req.messages.at(-1).content.endsWith(prompt), "Original SDK wraps the user prompt with public background");
   assert(!req.messages.some(m => m.role === "assistant"));
   assert(req.messages.some(m => m.content.includes(problem)));
   const effective = JSON.parse(await readFile(join(out, "cloudflare-effective-request.json"), "utf8"));
