@@ -128,6 +128,12 @@ def admit(config, storage, out, *, run_id, frozen_sha):
     public GitHub artifacts. Any uncertain write is terminal, not retried.
     """
     _require_pinned_config(config)
+    # Reject an invalid prospective holdout cut BEFORE creating the irreversible
+    # R2 selection reservation. P3 predicts only after minute 80 through 103.237.
+    _require(type(config["construction_end_min"]) in (int, float)
+             and 0 < config["construction_end_min"] < 80.0
+             and config["window_end_min"] == 103.237,
+             "CONSTRUCTION_CUT_NOT_BEFORE_P3_FORECASTS")
     prefix = run_prefix(run_id, frozen_sha)
     output = Path(out)
     _require(not output.exists(), "REFUSE_REUSE_CUSTODY_DIRECTORY")

@@ -93,3 +93,113 @@ jobs:
           name: coffee-boundary-${{ github.run_id }}
           path: ${{ runner.temp }}/coffee-boundary.json
           if-no-files-found: error
+
+  producer-probes:
+    name: Independent original producer ${{ matrix.arm }} - readiness only
+    needs: producer-boundary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    strategy:
+      fail-fast: false
+      matrix:
+        arm: [D, B, M]
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: coffee-public-${{ github.run_id }}
+          path: ${{ runner.temp }}/coffee-public
+      - name: Verify upstream bytes and declare coffee-domain capability (NO provider/OMC)
+        env:
+          COFFEE_ARM: ${{ matrix.arm }}
+        run: |
+          python -m arena.coffee_lab probe \
+            --public-dir "$RUNNER_TEMP/coffee-public" \
+            --arm "$COFFEE_ARM" \
+            --out "$RUNNER_TEMP/submission-$COFFEE_ARM.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coffee-arm-${{ matrix.arm }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/submission-${{ matrix.arm }}.json
+          if-no-files-found: error
+          retention-days: 30
+
+  prediction-lock:
+    name: Immutable three-arm readiness lock (NO truth or scoring)
+    needs: producer-probes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    outputs:
+      artifact_id: ${{ steps.archive.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: coffee-public-${{ github.run_id }}
+          path: ${{ runner.temp }}/coffee-public
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: coffee-arm-*-${{ github.run_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/coffee-submissions
+      - name: Seal all three outcomes before accessing private data
+        run: |
+          python -m arena.coffee_lab freeze \
+            --public-dir "$RUNNER_TEMP/coffee-public" \
+            --submissions-dir "$RUNNER_TEMP/coffee-submissions" \
+            --out "$RUNNER_TEMP/coffee-readiness-lock"
+      - id: archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-lock-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/coffee-readiness-lock/lock.json
+            ${{ runner.temp }}/coffee-readiness-lock/lock-sha256.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  verify-lock:
+    name: Verify archived lock via GitHub API - no private credentials
+    needs: prediction-lock
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.prediction-lock.outputs.artifact_id }}
+          # download-artifact with artifact-ids nests under artifact name unless merged.
+          merge-multiple: true
+          path: ${{ runner.temp }}/coffee-locked
+      - name: Verify run SHA, first attempt, artifact identity and content hash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LOCK_ARTIFACT_ID: ${{ needs.prediction-lock.outputs.artifact_id }}
+        run: |
+          python -m arena.coffee_lab verify-archive \
+            --lock-dir "$RUNNER_TEMP/coffee-locked" \
+            --artifact-id "$LOCK_ARTIFACT_ID" \
+            --run-id "$GITHUB_RUN_ID" --sha "$GITHUB_SHA" \
+            --out "$RUNNER_TEMP/coffee-lock-verification.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coffee-lock-verification-${{ github.run_id }}
+          path: ${{ runner.temp }}/coffee-lock-verification.json
+          if-no-files-found: error
+
+# Deliberately NO evaluator job: all three arms currently return NO_NATIVE,
+# therefore the sealed lock is READINESS_ONLY. Future real native producer
+# adapters must be independently reviewed and validated before a post-lock
+# evaluator may receive R2 secrets. CT03 and its workflow remain unchanged.
