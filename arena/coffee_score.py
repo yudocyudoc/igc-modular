@@ -108,7 +108,7 @@ def reserved_measurements(zf, cfg):
             "refund_amount_mxn_cumulative": round(sum(_number(x["refund_amount_mxn"], "refund") for x in refunds),6),
             "orders_ready_cumulative": len(completed),
             "orders_picked_up_cumulative": len(pickups),
-            "abandonment_count_truth_by_arrival_cohort": len(abandon),
+            "abandonments_by_event_time_truth_cumulative": len(abandon),
             "prep_wait_p90_min_truth_completed": _pct90(waits),
         }
     # Counts and revenue are not independently observed; all are synthetic.
@@ -142,10 +142,15 @@ def score_prediction(lock, oracle, *, native_attestor=None):
         actual=oracle["metrics"]
         _need(isinstance(forecast,dict) and set(forecast)==set(actual), "FORECAST_CUTS_INVALID")
         err=[]
-        for t in forecast:
+        prior=-1.0
+        for t in sorted(forecast, key=float):
             v=forecast[t].get("paid_sales_cumulative")
             _need(type(v) in (int,float) and math.isfinite(v) and v>=0,
                   "PREDICTION_INVALID")
+            # Cumulative paid sales cannot decrease even if later refunds occur.
+            # A refund is a separate financial flow, never negative purchases.
+            _need(v >= prior, "PREDICTION_NON_MONOTONE")
+            prior=v
             err.append(abs(v-actual[t]["paid_sales_cumulative"]))
         scores[arm]={"status":"PREDICTED", "mae_paid_sales":sum(err)/len(err)}
     return {"schema":"arena.coffee-peak.paired-score/1",
