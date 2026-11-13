@@ -1,0 +1,95 @@
+name: Coffee peak - R2 custody boundary (no D/B/M)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Preflight runs tests only; admit commits one private B0 selection to R2
+        type: choice
+        options: [preflight, admit]
+        required: true
+        default: preflight
+      authorized:
+        description: Allow private R2 admission once (no provider or solver calls)
+        type: choice
+        options: ['no', 'yes']
+        required: true
+        default: 'no'
+
+permissions:
+  contents: read
+concurrency:
+  group: coffee-peak-v1-custody
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Offline validation of custody contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m unittest discover -s tests -p 'test_coffee*.py' -v
+  custody:
+    name: Admit one staged B0 source under private R2 prefix
+    needs: preflight
+    if: inputs.mode == 'admit' && inputs.authorized == 'yes' && github.ref == 'refs/heads/main' && github.run_attempt == 1
+    environment: arena-custodian
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Install existing AWS CLI transport
+        run: |
+          aws --version
+      - name: Prepare private custody and release exact public files
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CT03_R2_BUCKET: ${{ vars.CT03_R2_BUCKET || 'igc-ct03-private-custody' }}
+          CT03_R2_ACCESS_KEY_ID: ${{ secrets.CT03_R2_ACCESS_KEY_ID }}
+          CT03_R2_SECRET_ACCESS_KEY: ${{ secrets.CT03_R2_SECRET_ACCESS_KEY }}
+        run: |
+          python -m arena.coffee_custody admit \
+            --config examples/coffee_peak.toml \
+            --out "$RUNNER_TEMP/coffee-peak-custody" \
+            --run-id "$GITHUB_RUN_ID" --sha "$GITHUB_SHA"
+      - name: Publish ONLY the public construction and release receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-public-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/coffee-peak-custody/producer-public/producer-public-b0.json
+            ${{ runner.temp }}/coffee-peak-custody/producer-public/release.json
+          if-no-files-found: error
+          retention-days: 30
+  producer-boundary:
+    name: Verify independent producer job has no access to private R2
+    needs: custody
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: coffee-public-${{ github.run_id }}
+          path: ${{ runner.temp }}/coffee-producer-input
+      - name: Validate public-only boundary - NO R2, NO provider and NO OMC
+        run: |
+          python -m arena.coffee_custody producer-boundary \
+            --public-dir "$RUNNER_TEMP/coffee-producer-input" \
+            --config examples/coffee_peak.toml \
+            --out "$RUNNER_TEMP/coffee-boundary.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coffee-boundary-${{ github.run_id }}
+          path: ${{ runner.temp }}/coffee-boundary.json
+          if-no-files-found: error
