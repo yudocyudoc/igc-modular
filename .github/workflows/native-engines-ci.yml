@@ -49,6 +49,10 @@ jobs:
           set -euo pipefail
           node tests/buffalo_adjust_node_contract.mjs bf03 "$RUNNER_TEMP/arena-native"
           node tests/buffalo_adjust_node_contract.mjs bf04 "$RUNNER_TEMP/arena-native"
+      - name: Original Buffalo coffee Engine.generate — offline fixture, no provider
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: node tests/coffee_buffalo_node_contract.mjs "$RUNNER_TEMP/arena-native"
       - uses: actions/upload-artifact@v4
         with:
           name: native-engine-migration-contracts-zero-consumption
