@@ -162,6 +162,18 @@ class CoffeeLabTests(unittest.TestCase):
         self.assertGreaterEqual(oracle["metrics"]["100.0"]["paid_sales_cumulative"],10)
         self.assertEqual(oracle["profit_mxn"],"NOT_IDENTIFIABLE_NO_FIXED_COSTS")
 
+    def test_future_cumulative_paid_sales_must_be_monotone(self):
+        lock={"schema":"arena.coffee-peak.prediction-lock/1","mode":"SCIENTIFIC",
+              "arms": {a:{"status":"NO_NATIVE"} for a in ARMS}}
+        lock["arms"]["D"]={"status":"PREDICTED","predictions": {
+            "80.0":{"paid_sales_cumulative":12},
+            "100.0":{"paid_sales_cumulative":10},
+            "103.237":{"paid_sales_cumulative":14}}}
+        oracle={"metrics": {t:{"paid_sales_cumulative":10} for t in
+                ("80.0","100.0","103.237")}}
+        with self.assertRaisesRegex(ArenaError,"PREDICTION_NON_MONOTONE"):
+            score_prediction(lock,oracle,native_attestor=lambda _:True)
+
     def test_no_archive_secret_or_truth_in_public_future(self):
         self._freeze()
         lock_json=(self.root/"lock"/"lock.json").read_text()
