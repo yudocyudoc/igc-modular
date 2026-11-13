@@ -228,6 +228,16 @@ class CoffeeLabTests(unittest.TestCase):
                 archive_attestor=lambda *args:True,native_attestor=lambda *args:True,
                 public_dir=self.public)
 
+    def test_admission_rejects_late_cut_before_any_irreversible_r2_reservation(self):
+        wrong = {**self.cfg, "construction_end_min": 90.0}
+        storage = FakeR2()
+        stage_source(wrong, storage)
+        from arena.coffee_custody import selection_key
+        with self.assertRaisesRegex(ArenaError, "CONSTRUCTION_CUT_NOT_BEFORE_P3_FORECASTS"):
+            admit(wrong, storage, self.root / "late-custody",
+                  run_id="125", frozen_sha=self.sha)
+        self.assertNotIn(selection_key(wrong), storage.objects)
+
     def test_reserved_observations_cannot_start_before_construction_end(self):
         with zipfile.ZipFile(self.cfg["source"]["path"]) as zf:
             later = {**self.cfg,"construction_end_min":90.0}
