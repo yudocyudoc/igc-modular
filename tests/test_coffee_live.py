@@ -125,6 +125,43 @@ class CoffeeLiveTests(TestCase):
         self.assertIsNone(final["provider_posts_observed"])
         self.assertEqual(final["retries"],0)
 
+    def test_dispatch_ids_remain_literal_shell_data(self):
+        """Execute the exact workflow block with an inert Python argument recorder."""
+        import os
+        import shutil
+        import subprocess
+        from tempfile import TemporaryDirectory
+        if not shutil.which("bash"):
+            self.skipTest("Bash unavailable")
+        yaml = (Path(__file__).resolve().parents[1] /
+                ".github/workflows/coffee-buffalo-live.yml").read_text()
+        block = yaml.split(
+            "      - name: Verify source run, artifact, B0 public identity and prior attempts\n", 1
+        )[1].split("      - name: Verify Cloudflare AI permission", 1)[0]
+        self.assertIn("COFFEE_PUBLIC_RUN_ID: ${{ inputs.public_run_id }}", block)
+        self.assertIn("COFFEE_PUBLIC_ARTIFACT_ID: ${{ inputs.public_artifact_id }}", block)
+        self.assertNotIn("--source-run-id '${{ inputs.public_run_id }}'", block)
+        self.assertNotIn("--artifact-id '${{ inputs.public_artifact_id }}'", block)
+        body = block.split("        run: |\n", 1)[1]
+        script = "\n".join(line[10:] if line.startswith("          ") else line
+                           for line in body.splitlines())
+        with TemporaryDirectory() as temp:
+            marker = Path(temp) / "marker-must-not-exist"
+            captured = Path(temp) / "shell-argv.txt"
+            run_id = "123'$(touch " + str(marker) + ")'"
+            artifact_id = "77'$(touch " + str(marker) + ")'"
+            env = {**os.environ, "RUNNER_TEMP": temp, "GITHUB_WORKSPACE": temp,
+                   "COFFEE_PUBLIC_RUN_ID": run_id,
+                   "COFFEE_PUBLIC_ARTIFACT_ID": artifact_id, "CAPTURE": str(captured)}
+            inert = 'python() { printf "%s\\n" "$@" > "$CAPTURE"; }\n'
+            result = subprocess.run(["bash", "-e", "-c", inert + script],
+                                    env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            args = captured.read_text().splitlines()
+            self.assertIn(run_id, args)
+            self.assertIn(artifact_id, args)
+            self.assertFalse(marker.exists(), "unexpected command execution")
+
     def test_workflow_has_single_paid_step_and_no_r2_secrets(self):
         y=(Path(__file__).resolve().parents[1] /
            ".github/workflows/coffee-buffalo-live.yml").read_text()
