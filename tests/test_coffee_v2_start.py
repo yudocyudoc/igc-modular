@@ -155,6 +155,7 @@ class CoffeeV21P00P01Tests(unittest.TestCase):
             p=Path(tmp)/"work"
             with patch.object(v2.dm,"validate_public_zip",return_value=fixture_bundles), \
                  patch.object(v2,"build_case",side_effect=fake_build), \
+                 patch.object(v2,"digest",return_value=dm.CASE_SHA256), \
                  patch.object(v2,"_safe_r1",side_effect=r1):
                 receipt=v2.compile_package(b"fake public",b"r0",b"r1",
                                 [],Path("unused"),p)
