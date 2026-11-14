@@ -105,7 +105,7 @@ globalThis.fetch=async (url,init)=>{
       choices:[{message:{content:JSON.stringify(response)},finish_reason:"stop"}]}
   }),{status:200,headers:{"content-type":"application/json"}});
 };
-await import(pathToFileURL(resolve("arena/buffalo/coffee_review_runner.mjs")).href);
+await import(pathToFileURL(resolve("arena/coffee_review_runner.mjs")).href);
 const receipt=JSON.parse(await readFile(join(out,"receipt.json"),"utf8"));
 assert.equal(receipt.sdk_interceptions,1);
 assert.equal(receipt.provider_posts,1);
