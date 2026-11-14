@@ -223,7 +223,7 @@ class CoffeeDMModelicaTests(TestCase):
                     return self.raw
                 return {"id":prior["artifact_id"],
                         "name":f'coffee-dm-g2-{prior["run_id"]}',
-                        "expired":False,"digest":prior["artifact_digest"],
+                        "expired":False,"digest":g2.NO_SIMULATION_RECOVERY["artifact_digest"],
                         "workflow_run":{"id":prior["run_id"]}}
         def review(raw):
             active={**prior,
