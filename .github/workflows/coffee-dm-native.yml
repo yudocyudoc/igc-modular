@@ -58,11 +58,13 @@ jobs:
         env:
           ARTIFACT_ID: ${{ steps.archive.outputs.artifact-id }}
         run: |
-          echo "Original D/M native generation on exact B0" >> "$GITHUB_STEP_SUMMARY"
-          echo "GitHub run: $GITHUB_RUN_ID" >> "$GITHUB_STEP_SUMMARY"
-          echo "Archive ID: $ARTIFACT_ID" >> "$GITHUB_STEP_SUMMARY"
-          echo "Source archive ID: 14088545399; case SHA: 756d16d2824a9052f5494dd41c3eef1f0e8826537deffbfc7cd39b0ca2d2457f" >> "$GITHUB_STEP_SUMMARY"
-          echo "12 original candidates; no OMC, no provider, no R2, no truth, no scientific lock." >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "Original D/M native generation on exact B0"
+          echo "GitHub run: $GITHUB_RUN_ID"
+            echo "Archive ID: $ARTIFACT_ID"
+            echo "Source archive ID: 14088545399; case SHA: 756d16d2824a9052f5494dd41c3eef1f0e8826537deffbfc7cd39b0ca2d2457f"
+            echo "12 original candidates; no OMC, no provider, no R2, no truth, no scientific lock."
+          } >> "$GITHUB_STEP_SUMMARY"
 
 # A source artifact mismatch fails before D/M generation; never substitute the
 # original 17MB synthetic ZIP or a new public export. This is a STATIC campaign.
