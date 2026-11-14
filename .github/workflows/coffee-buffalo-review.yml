@@ -1,0 +1,76 @@
+name: Coffee Buffalo R1 - original currentModel own feedback live review
+
+on:
+  workflow_dispatch:
+    inputs:
+      authorized:
+        description: "Approve ONE real Cloudflare Workers AI POST to review ORIGINAL Buffalo currentModel"
+        type: choice
+        options: ['no', 'yes']
+        default: 'no'
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: coffee-buffalo-original-one-review-r1
+  cancel-in-progress: false
+
+jobs:
+  review:
+    name: Coffee Buffalo original Engine.generate currentModel R1 (one POST max)
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.run_attempt == 1 && inputs.authorized == 'yes'
+    environment: arena-provider
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/native-runtime
+        with: {role: b}
+      - name: Verify immutable original Buffalo parent, final B Ledger ATMS, exact as-of and no prior review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COFFEE_B_REVIEW_AUTH: '${{ inputs.authorized }}'
+        run: |
+          python -m arena.coffee_review admit \
+            --out "$RUNNER_TEMP/coffee-b-review"
+      - name: Verify Cloudflare AI scoped permission (GET only, no R2)
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          python -c 'import json; from arena.cloud import provider_preflight; print(json.dumps(provider_preflight()))'
+      - name: Install original pinned Buffalo SDK
+        working-directory: ${{ runner.temp }}/arena-native/upstream/sd-ai
+        run: npm ci --ignore-scripts --omit=optional --no-audit --no-fund
+      - name: One paid original Buffalo Engine.generate(currentModel) review POST
+        env:
+          COFFEE_B_REVIEW_AUTH: '${{ inputs.authorized }}'
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          python -m arena.coffee_review invoke \
+            --out "$RUNNER_TEMP/coffee-b-review"
+      - name: Finalize attempt reservation, actual or uncertain usage, no retry
+        if: always()
+        run: |
+          if [ -d "$RUNNER_TEMP/coffee-b-review" ]; then
+            python -m arena.coffee_review finalize \
+              --out "$RUNNER_TEMP/coffee-b-review"
+          fi
+      - name: Archive exact input, original SDK currentModel request, raw provider, G1 diagnosis and receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-b-review-${{ github.run_id }}
+          path: ${{ runner.temp }}/coffee-b-review/
+          if-no-files-found: warn
+          retention-days: 90
+
+# NEVER triggered by push/PR. No hidden world or R2. B revision is not G2/G3.
+# No future automatic retry or regeneration from an empty currentModel.
