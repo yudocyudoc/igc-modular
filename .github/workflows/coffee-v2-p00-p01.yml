@@ -48,7 +48,7 @@ jobs:
           path: ${{ runner.temp }}/coffee-v2-p00-p01/
           if-no-files-found: warn
           retention-days: 90
-      - name: Summary: P00/P01 is initial public slice, NOT full private data inventory
+      - name: "Summary - P00/P01 public slice, NOT full private inventory"
         if: success()
         run: |
           {
