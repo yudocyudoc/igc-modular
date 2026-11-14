@@ -1,0 +1,64 @@
+name: Coffee V2.1 - P02 P05 public time profile operators
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'arena/coffee_v2_pos_profile.py'
+      - 'tests/test_coffee_v2_pos_profile.py'
+      - 'COFFEE_V2_1_P02_P05_PUBLIC_TIMES.md'
+      - '.github/workflows/coffee-v2-p02-p05.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: coffee-v2-p02-p05-public-readonly
+  cancel-in-progress: false
+
+jobs:
+  public-profile:
+    name: Attest public B0 and construct 5/15-min paid-POS and proxy bins, no G3
+    if: github.ref == 'refs/heads/main' && github.run_attempt == 1 && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Verify original engine contracts
+        run: python -m arena.runtime verify
+      - name: Offline profile and boundary tests
+        run: python -m unittest discover -s tests -p 'test_coffee_v2_pos_profile.py' -v
+      - name: Reuse attested public B0 custody artifact and build construction profiles
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -m arena.coffee_v2_pos_profile --out "$RUNNER_TEMP/coffee-v2-p02-p05"
+      - name: Archive aggregate-only output; never archive source/public raw IDs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-v2-p02-p05-${{ github.run_id }}
+          path: ${{ runner.temp }}/coffee-v2-p02-p05/output/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Record evidence stage and consumption
+        if: success()
+        run: |
+          {
+            echo "Coffee V2.1 P02/P05 minimum — public construction only"
+            echo "Ten synthetic payments preserve their temporal concentration."
+            echo "Five- and fifteen-minute bins; 60 complete visual-proxy minutes."
+            echo "Future [60,103.237] minutes withheld, never treated as zero."
+            echo "No source private ZIP, R2, OMC, provider or reserved truth."
+            echo "V1 models remain unchanged, no G2 or G3."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+# This workflow can only read the pinned public custody release; no access
+# to private source, evaluator outputs, provider tokens or a scientific lock.
