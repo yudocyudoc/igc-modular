@@ -6,6 +6,7 @@ separately authenticates the real Modelica/Buffalo artifact bytes and CSVs.
 from __future__ import annotations
 
 import hashlib
+from contextlib import closing
 from datetime import datetime, timezone
 import io
 import json
@@ -155,8 +156,8 @@ class CoffeeFeedbackTests(unittest.TestCase):
                 # All source and decision revisions have been flushed; this
                 # readonly connection sees the final on-disk DB, not a
                 # temporary in-memory ATMS snapshot.
-                with sqlite3.connect(db.resolve().as_uri()+"?mode=ro&immutable=1",
-                                     uri=True) as closed_db:
+                with closing(sqlite3.connect(db.resolve().as_uri()+"?mode=ro&immutable=1",
+                                     uri=True)) as closed_db:
                     self.assertEqual(closed_db.execute(
                         "PRAGMA integrity_check").fetchone()[0],"ok")
                 self.assertEqual(len(receipts),6)
@@ -184,8 +185,8 @@ class CoffeeFeedbackTests(unittest.TestCase):
                                recorded_at=cuts["feedback_recorded_at"])
         before=bridge.recover_feedback(db,ctx,parent_hash=parent,
                                        as_known_at=cuts["retrieval_as_known_at"])
-        with sqlite3.connect(db.resolve().as_uri()+"?mode=ro&immutable=1",
-                             uri=True) as closed_db:
+        with closing(sqlite3.connect(db.resolve().as_uri()+"?mode=ro&immutable=1",
+                             uri=True)) as closed_db:
             self.assertEqual(closed_db.execute(
                 "PRAGMA integrity_check").fetchone()[0],"ok")
         replay=cf.replay_final_ledger_at_cut(
