@@ -38,10 +38,8 @@ jobs:
             --root "$RUNNER_TEMP/coffee-dm-b0"
       - name: Generate six D and six M originals without solver or providers
         run: |
-          python -m arena.coffee_native_dm \
-            --public-dir "$RUNNER_TEMP/coffee-dm-b0/public" \
-            --assumptions "$GITHUB_WORKSPACE/examples/coffee_public_assumptions_v1.json" \
-            --out "$RUNNER_TEMP/coffee-dm-b0/native"
+          python -m arena.coffee_dm_campaign generate \
+            --root "$RUNNER_TEMP/coffee-dm-b0"
       - name: Audit exactly emitted Modelica and native AST files
         run: |
           python -m arena.coffee_dm_campaign audit \
