@@ -1,0 +1,65 @@
+name: Coffee V2.1 - P00 P01 public evidence and decision inventory
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'arena/coffee_v2_start.py'
+      - 'tests/test_coffee_v2_start.py'
+      - 'COFFEE_V2_1_P00_P01_START.md'
+      - '.github/workflows/coffee-v2-p00-p01.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: coffee-v2-p00-p01-readonly
+  cancel-in-progress: false
+
+jobs:
+  public-evidence:
+    name: P00 historical SHA and R1 audit / P01 public consumption and decision gaps
+    if: github.ref == 'refs/heads/main' && github.run_attempt == 1 && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Verify upstream methods are unchanged
+        run: python -m arena.runtime verify
+      - name: Offline P00/P01 guards, zero external consumption
+        run: python -m unittest discover -s tests -p 'test_coffee_v2_start.py' -v
+      - name: Fetch eight immutable metadata receipts; audit ONLY B0 public and original/revised Buffalo G1 ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -m arena.coffee_v2_start --out "$RUNNER_TEMP/coffee-v2-p00-p01"
+      - name: Archive redacted source coverage, usage, history and measurement decision
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-v2-p00-p01-${{ github.run_id }}
+          path: ${{ runner.temp }}/coffee-v2-p00-p01/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Summary: P00/P01 is initial public slice, NOT full private data inventory
+        if: success()
+        run: |
+          {
+            echo "Coffee V2.1 P00/P01 — public evidence-first"
+            echo "Eight historic GitHub artifacts SHA identities checked."
+            echo "Ten synthetic paid POS, thirteen line items, sixty visual bins."
+            echo "Buffalo R0 -> R1 native bytes and exact SDK currentModel checked."
+            echo "Full video2 and synthetic weeks remain uninspected in this producer-safe job."
+            echo "Decision: MEASURE_FIRST; no selected Sx, no business validation."
+            echo "Zero new OMC, provider POST, R2, private truth or scientific lock."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+# Explicitly no arena-custodian/provider environment. No access to R2 or heldout.
+# Merge triggers once on main; rerun only for offline inspection, never paid work.
