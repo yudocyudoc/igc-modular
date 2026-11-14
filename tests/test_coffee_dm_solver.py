@@ -56,6 +56,12 @@ class CoffeeDMModelicaTests(TestCase):
         self.assertTrue(g2.history(API([999]),999)["first_g2_batch"])
         with self.assertRaisesRegex(ArenaError,"PRIOR_RUN_REQUIRES"):
             g2.history(API([999,888]),999)
+        with patch.object(g2, "reconcile_no_simulation",return_value={}):
+            reconciled = g2.history(API([999,g2.NO_SIMULATION_RECOVERY["run_id"]]),999)
+        self.assertTrue(reconciled["one_verified_execution_bug_recovery"])
+        self.assertEqual(reconciled["previous_omc_invocations_spent"],12)
+        with self.assertRaisesRegex(ArenaError,"PRIOR_RUN_REQUIRES"):
+            g2.history(API([999,g2.NO_SIMULATION_RECOVERY["run_id"],777]),999)
 
     def fixture_plan(self):
         source=build_case(self.public,test_coffee_domain.ASSUMPTIONS,environment={})
@@ -98,7 +104,8 @@ class CoffeeDMModelicaTests(TestCase):
                 text=(root/item["script"]).read_text()
                 self.assertEqual(text.count("simulate("),1)
                 self.assertEqual(text.count("checkModel("),1)
-                self.assertIn(f'fileNamePrefix="/work/results/{item["arm"]}/{item["prefix"]}"',text)
+                self.assertIn(f'fileNamePrefix="results/{item["arm"]}/{item["prefix"]}"',text)
+                self.assertNotIn('fileNamePrefix="/work/',text)
                 self.assertNotIn("ct03",text.lower())
                 self.assertNotIn("R2",text)
             self.assertFalse((root/"attempts.jsonl").exists())
@@ -142,6 +149,8 @@ class CoffeeDMModelicaTests(TestCase):
                 "execution_run_id":999,
                 "status":"TWELVE_ORIGINALS_ADMITTED_FOR_ONE_G2_BATCH_NOT_YET_RUN"},
                 exclusive=True)
+            write_json(root/"history-receipt.json",{
+                "one_verified_execution_bug_recovery":False},exclusive=True)
             for path in ("e1-home","e1-libs/msl","e1-libs/systemdynamics"):
                 (self.root/path).mkdir(parents=True,exist_ok=True)
             calls=[]
