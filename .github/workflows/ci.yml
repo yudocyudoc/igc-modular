@@ -55,11 +55,14 @@ jobs:
           import arena.coffee_native_dm as cli
           from arena.coffee_adapters import d, m
           from arena.buffalo import coffee_live
+          from arena import coffee_review
 
           from arena.coffee_adapters.m import REGISTRY
           assert Path(cli.__file__).resolve().is_relative_to(target)
           assert REGISTRY.is_file() and REGISTRY.resolve().is_relative_to(target)
           assert Path(coffee_live.__file__).resolve().is_relative_to(target)
+          assert Path(coffee_review.__file__).resolve().is_relative_to(target)
+          assert (Path(coffee_review.__file__).with_name('coffee_review_runner.mjs')).is_file()
           for runner in ("coffee_live_runner.mjs", "coffee_runner.mjs", "original_runner.mjs"):
               assert (Path(coffee_live.__file__).parent / runner).is_file()
           assert (target / "arena/buffalo/coffee_live_runner.mjs").is_file()
