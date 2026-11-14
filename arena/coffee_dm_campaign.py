@@ -332,7 +332,7 @@ def audit(root, *, out=None):
         "source_artifact_zip_sha256": "sha256:" + ARCHIVE_SHA256,
         "case_sha256": CASE_SHA256,
         "public_sha256": PUBLIC_SHA256,
-        "assumed_paid_order_rate_per_hour": 10.0,
+        "assumed_paid_order_rate_per_hour": case["input"]["rate_orders_per_hour"],
         "prediction_cuts_minutes": [80.0, 100.0, 103.237],
         "arms": reports,
         "solver": {"checkModel": "NOT_RUN", "simulate": "NOT_RUN",
