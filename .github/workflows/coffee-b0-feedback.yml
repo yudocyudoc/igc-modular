@@ -1,0 +1,65 @@
+name: Coffee B0 - original own Ledger ATMS feedback from real G2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'arena/coffee_feedback.py'
+      - 'tests/test_coffee_feedback.py'
+      - '.github/workflows/coffee-b0-feedback.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: coffee-b0-ledger-atms-feedback
+  cancel-in-progress: false
+
+jobs:
+  own-feedback:
+    name: Actual D/M original decisions + B G1 packet, no provider/OMC/R2
+    if: github.ref == 'refs/heads/main' && github.run_attempt == 1 && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Verify original D M Buffalo Ledger ATMS memory source bytes
+        run: python -m arena.runtime verify
+      - name: Download pinned authentic artifacts and connect own feedback (read only)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -m arena.coffee_feedback \
+            --out "$RUNNER_TEMP/coffee-b0-own-feedback"
+      - name: Archive one SQLite Ledger per lane, ATMS retrieval evidence and own dispositions
+        if: always()
+        id: archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-b0-own-feedback-${{ github.run_id }}
+          path: ${{ runner.temp }}/coffee-b0-own-feedback/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Report actual archive identity, no inference or scientific lock
+        if: success()
+        env:
+          ARTIFACT_ID: ${{ steps.archive.outputs.artifact-id }}
+        run: |
+          {
+            echo "Coffee B0 real G2 / own-ledger ATMS feedback"
+            echo "Run ID: $GITHUB_RUN_ID"
+            echo "Artifact ID: $ARTIFACT_ID"
+            echo "G2 source run: 43550618982; original Buffalo: 43537333254."
+            echo "D 6 own fixed-set decisions; M 6 own policy decisions; B packet NOT sent."
+            echo "Zero provider posts, zero OMC, zero R2, zero held-out truth."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+# Producer-specific SQLite files are separate. No scientific G3, score, or
+# review of Buffalo is authorized by this archival feedback workflow.
