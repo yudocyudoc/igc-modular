@@ -34,6 +34,15 @@ SOURCE_SHA = "ad939be28597139eb7868dfc37f3f39fa5475205"
 ARTIFACT_ID = 14095080561
 ARCHIVE_SHA = "d7d91f825c4d63fe334592f282fea5acf33844ac8487f94feb8e69d86b55414c"
 SOURCE_WORKFLOW = ".github/workflows/coffee-dm-native.yml"
+# A prior G2 batch ran 12 checkModel/compile calls but NO model executable.
+# Permit one replacement dispatch only after exact cryptographic reconciliation.
+NO_SIMULATION_RECOVERY = {
+    "run_id": 43548909533,
+    "sha": "54566cc6197a2508e0b5695bddc3b2836492ee4a",
+    "artifact_id": 14095701577,
+    "artifact_digest": "sha256:3e6611e9981566101d8f1941f0f588e5812921a3ee162d53258dfc5b33b12ebd",
+    "job_id": 132306564773,
+}
 WORKFLOW = ".github/workflows/coffee-dm-modelica.yml"
 IMAGE = runtime.IMAGE
 MAX_ATTEMPTS = 12
@@ -88,9 +97,134 @@ def history(api, current):
          "G2_RUN_HISTORY_INCOMPLETE")
     previous = [r.get("id") for r in runs["workflow_runs"]
                 if r.get("id") != current]
-    need(not previous, "G2_PRIOR_RUN_REQUIRES_INDEPENDENT_RECONCILIATION")
-    return {"previous_dispatches": 0, "first_g2_batch": True}
+    # No general bypass for prior failure, no reset of the 12 consumed OMC
+    # invocations. Exactly one known historical path can be reconciled.
+    need(previous == [] or previous == [NO_SIMULATION_RECOVERY["run_id"]],
+         "G2_PRIOR_RUN_REQUIRES_INDEPENDENT_RECONCILIATION")
+    if previous:
+        reconcile_no_simulation(api)
+    return {"previous_dispatches": len(previous),
+            "first_g2_batch": not previous,
+            "one_verified_execution_bug_recovery": bool(previous),
+            "previous_omc_invocations_spent": 12 if previous else 0}
 
+
+
+def reconcile_no_simulation(api):
+    """Prove the *exact* prior archive had twelve checks but zero simulations.
+
+    The original 12 OMC invocations stay spent. Only the incorrect executable
+    location (not the original models or their equations) may be repaired.
+    If metadata, bytes, physical logs or attempt ledger disagree, fail closed.
+    """
+    prior = NO_SIMULATION_RECOVERY
+    run = api.run(prior["run_id"])
+    need(run.get("id") == prior["run_id"]
+         and run.get("head_sha") == prior["sha"]
+         and run.get("path") == WORKFLOW
+         and run.get("event") == "workflow_dispatch"
+         and run.get("head_branch") == "main"
+         and run.get("run_attempt") == 1
+         and run.get("status") == "completed"
+         and run.get("conclusion") == "success",
+         "RECOVERY_PRIOR_RUN_UNVERIFIED")
+    jobs = api.repo("GET", f'/actions/runs/{prior["run_id"]}/jobs?per_page=100')
+    items = jobs.get("jobs")
+    need(isinstance(items, list) and len(items) == jobs.get("total_count")
+         and len(items) == 1
+         and items[0].get("id") == prior["job_id"]
+         and items[0].get("status") == "completed"
+         and items[0].get("conclusion") == "success",
+         "RECOVERY_PRIOR_JOB_UNVERIFIED")
+    meta = api.repo("GET", f'/actions/artifacts/{prior["artifact_id"]}')
+    need(meta.get("id") == prior["artifact_id"]
+         and meta.get("name") == f'coffee-dm-g2-{prior["run_id"]}'
+         and meta.get("expired") is False
+         and meta.get("digest") == prior["artifact_digest"]
+         and meta.get("workflow_run", {}).get("id") == prior["run_id"],
+         "RECOVERY_ARTIFACT_NOT_AUTHENTIC")
+    raw = api.repo("GET", f'/actions/artifacts/{prior["artifact_id"]}/zip',
+                   binary=True)
+    need(type(raw) is bytes and 0 < len(raw) <= 6_000_000
+         and sha_bytes(raw) == prior["artifact_digest"],
+         "RECOVERY_ARCHIVE_BYTES_DIFFER")
+    try:
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            entries = archive.infolist()
+            names = set(x.filename for x in entries)
+            need(len(entries) == len(names) and len(entries) < 1200
+                 and sum(x.file_size for x in entries) < 15_000_000
+                 and all(not x.is_dir() and
+                         not (x.external_attr >> 16 & 0o170000 == 0o120000)
+                         for x in entries),
+                 "RECOVERY_ARCHIVE_MEMBERS_UNSAFE")
+            mandatory = {"result.json", "plan.json", "attempts.jsonl"}
+            need(mandatory.issubset(names) and
+                 not any(x.lower().endswith(".csv") for x in names),
+                 "RECOVERY_REAL_CSV_PRESENT_OR_RECEIPTS_MISSING")
+            receipt = json.loads(archive.read("result.json"))
+            plan = json.loads(archive.read("plan.json"))
+            ledger = [json.loads(x) for x in
+                      archive.read("attempts.jsonl").decode("utf-8").splitlines()]
+            need(receipt.get("status") == "ONE_INITIAL_BATCH_EXECUTED_NO_SCIENTIFIC_LOCK"
+                 and receipt.get("run_id") == prior["run_id"]
+                 and receipt.get("head_sha") == prior["sha"]
+                 and receipt.get("case_sha256") == dm.CASE_SHA256
+                 and receipt.get("attempts_reserved") == 12
+                 and receipt.get("simulations_authenticated") == 0
+                 and receipt.get("maximum_allowed_attempts") == 12
+                 and receipt.get("truth_access") is False
+                 and receipt.get("provider_posts") == 0
+                 and receipt.get("scientific_lock_created") is False
+                 and receipt.get("no_retries") is True,
+                 "RECOVERY_PRIOR_RESULT_NOT_ZERO_SIMULATIONS")
+            items = plan.get("candidates")
+            results = receipt.get("results")
+            need(plan.get("source_native_artifact_id") == ARTIFACT_ID
+                 and plan.get("case_sha256") == dm.CASE_SHA256
+                 and isinstance(items, list) and len(items) == 12
+                 and isinstance(results, list) and len(results) == 12
+                 and len(ledger) == 12,
+                 "RECOVERY_TWELVE_ORIGINALS_NOT_PROVED")
+            for i, (item, result, event) in enumerate(zip(items, results, ledger)):
+                need(item["id"] == result.get("candidate_id")
+                     and result.get("candidate_id") == event.get("candidate_id")
+                     and event.get("attempt_number") == i + 1
+                     and result.get("attempt_number") == i + 1
+                     and event.get("run_id") == prior["run_id"]
+                     and event.get("reserved_before_omc") is True
+                     and result.get("attempt_reserved") is True
+                     and result.get("omc_exit_code") == 0
+                     and result.get("check_model_completed") is True
+                     and result.get("status") == "G2_CSV_NOT_PRODUCED"
+                     and result.get("solver_simulation_authenticated") is False
+                     and item["log"] in names
+                     and item["script"] in names
+                     and item["arm"] == result.get("arm")
+                     and event.get("model_sha256") == item["model_sha256"]
+                     and event.get("script_sha256") == item["script_sha256"],
+                     "RECOVERY_PRIOR_ATTEMPT_NOT_PROVEN_FAILED_BEFORE_SIMULATION")
+                rawlog = archive.read(item["log"])
+                need(sha_bytes(rawlog) == result.get("solver_log_sha256"),
+                     "RECOVERY_LOG_HASH_MISMATCH")
+                log = rawlog.decode("utf-8")
+                need(f"Check of {item['modelica_class']} completed successfully" in log
+                     and "Simulation execution failed for model:" in log
+                     and 'resultFile = ""' in log
+                     and f'/work//work/results/{item["arm"]}/{item["prefix"]}: not found' in log
+                     and "LOG_SUCCESS" not in log,
+                     "RECOVERY_PRIOR_SIMULATION_POSSIBLY_RAN")
+                mos = archive.read(item["script"]).decode("utf-8")
+                need(f'fileNamePrefix="/work/results/{item["arm"]}/{item["prefix"]}"' in mos
+                     and mos.count("simulate(") == 1,
+                     "RECOVERY_ORIGINAL_PATH_ERROR_NOT_PROVEN")
+    except (KeyError, ValueError, TypeError, UnicodeError, zipfile.BadZipFile):
+        raise ArenaError("COFFEE_DM_G2_RECOVERY_ARTIFACT_NOT_VERIFIABLE") from None
+    return {"historical_omc_invocations": 12,
+            "historical_check_model_passes": 12,
+            "historical_simulations_completed": 0,
+            "prior_artifact_sha256": prior["artifact_digest"],
+            "recovery_reason": "OMC_ABSOLUTE_FILENAMEPREFIX_DOUBLE_WORK_DIRECTORY"}
 
 def zip_bytes(raw):
     need(type(raw) is bytes and 0 < len(raw) <= 200_000,
@@ -121,7 +255,7 @@ def stage(root, *, env=None, api=None):
     if api is None:
         need(bool(env.get("GH_TOKEN")), "GITHUB_READ_TOKEN_REQUIRED")
         api = GitHub(REPO, Secret(env["GH_TOKEN"], "GITHUB_TOKEN"))
-    history(api, run_id)
+    prior = history(api, run_id)
     run = api.run(SOURCE_RUN)
     need(run.get("id") == SOURCE_RUN and
          run.get("path") == SOURCE_WORKFLOW and
@@ -159,6 +293,7 @@ def stage(root, *, env=None, api=None):
              and checked["source_artifact_id"] == dm.ARTIFACT_ID,
              "REAL_NATIVE_AUDIT_UNVERIFIED")
     planned = plan(root)
+    write_json(root / "history-receipt.json", prior, exclusive=True)
     write_json(root / "stage-receipt.json", {
         "schema": "arena.coffee-peak.dm-g2-stage/1",
         "status": "TWELVE_ORIGINALS_ADMITTED_FOR_ONE_G2_BATCH_NOT_YET_RUN",
@@ -200,7 +335,10 @@ def plan(root):
             name = candidate["modelica_file"] if arm == "D" else "native.mo"
             need(sha_bytes(model_bytes) == m["files"][name]["sha256"],
                  "NATIVE_MODEL_BYTES_CHANGED")
-            prefix = f"/work/results/{arm}/{short}"
+            # OpenModelica's generated simulation launcher prefixes cwd (/work).
+            # Absolute fileNamePrefix would yield /work//work/results/... and
+            # makes the executable unlaunchable despite a green checkModel.
+            prefix = f"results/{arm}/{short}"
             src = [f'loadFile("/work/{model_file}");'] if arm=="D" else [
                 'loadFile("/models/IGCMolecules.mo");',
                 'loadFile("/models/IGCInformationMolecules.mo");',
@@ -409,6 +547,11 @@ def run_batch(root, *, env=None, cli=subprocess.run):
                     status="OMC_EXIT_NONZERO"
                 elif not outcome["check_model_completed"]:
                     status="G1_MODEL_CHECK_FAILED"
+                elif ("Simulation execution failed" in evidence or
+                      'resultFile = ""' in evidence):
+                    # omc sometimes exits 0 even when the generated executable
+                    # never launches. Do not equate a green checkModel with G2.
+                    status="G2_SIMULATION_LAUNCH_FAILED"
                 elif not csv_path.is_file():
                     status="G2_CSV_NOT_PRODUCED"
                 elif "LOG_SUCCESS" not in evidence:
@@ -451,6 +594,9 @@ def run_batch(root, *, env=None, cli=subprocess.run):
         "scientific_lock_created":False,
         "ledger_atms_feedback_consumed":False,
         "no_retries":True,
+        "historical_omc_invocations_before_this_run":
+            12 if read_json(root / "history-receipt.json").get(
+                "one_verified_execution_bug_recovery") else 0,
         "warning":"All outputs are conditional on public assumptions; no hidden scoring or intervention proof."
     }
     write_json(root/"result.json",report,exclusive=True)
