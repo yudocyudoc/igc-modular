@@ -117,7 +117,7 @@ class CoffeeLiveTests(TestCase):
         path=self.root/"live"
         self.admit(path)
         env={**self.env(),"CLOUDFLARE_API_TOKEN":"FAKE",
-             "CLOUDFLARE_ACCOUNT_ID":"a"*32}
+             "CLOUDFLARE_ACCOUNT_ID":""}  # exercise public-config fallback
         with self.assertRaisesRegex(ArenaError,"PROVIDER_FAILED_OR_UNKNOWN"):
             coffee_live.generate(path,env=env,runner=lambda *a,**k:Mock(returncode=1))
         self.assertTrue((path/"attempt.json").is_file())
