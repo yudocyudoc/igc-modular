@@ -133,7 +133,9 @@ def acquire(out, *, api=None, env=None, assumptions=ASSUMPTIONS):
             stream.write(raw)
     # The only normal pathway to the common case validates the custody
     # public-only boundary and guards construction vs future information.
-    case = case_guard(build_case(public, assumptions, environment=env))
+    # This is a subsequent producer run; the historical release has its own
+    # verified run ID and SHA. Never compare them to this new execution run.
+    case = case_guard(build_case(public, assumptions, environment={}))
     need(digest(case) == CASE_SHA256 and
          case["input"]["rate_orders_per_hour"] == 10.0 and
          case["public_sha256"] == PUBLIC_SHA256 and
@@ -155,6 +157,26 @@ def acquire(out, *, api=None, env=None, assumptions=ASSUMPTIONS):
     }
     write_json(out / "attestation.json", receipt, exclusive=True)
     return receipt
+
+
+def generate(root, *, env=None):
+    """Invoke existing native D/M prepare only after independently attested B0."""
+    identity(env)
+    root = Path(root)
+    proof = read_json(root / "attestation.json")
+    need(proof.get("status") == "EXACT_GITHUB_PUBLIC_SOURCE_VERIFIED"
+         and proof.get("source_artifact_id") == ARTIFACT_ID
+         and proof.get("public_sha256") == PUBLIC_SHA256
+         and proof.get("case_sha256") == CASE_SHA256, "NATIVE_SOURCE_NOT_ATTESTED")
+    case = case_guard(build_case(root / "public", ASSUMPTIONS, environment={}))
+    need(digest(case) == CASE_SHA256, "NATIVE_CASE_NOT_BUFFALO_B01")
+    from .coffee_native_dm import prepare
+    result = prepare(root / "public", ASSUMPTIONS, root / "native",
+                     verify_original=True, environment={})
+    need(result.get("arms") == {"D": 6, "M": 6}
+         and result.get("status") == "ORIGINAL_NATIVE_GENERATED_NOT_SIMULATED",
+         "NATIVE_GENERATION_CONTRACT_FAILED")
+    return result
 
 
 def audit(root, *, out=None):
@@ -328,12 +350,14 @@ def audit(root, *, out=None):
 
 def main(argv=None):
     p = argparse.ArgumentParser(description="Generate and audit native D/M on pinned B0")
-    p.add_argument("action", choices=("source", "audit"))
+    p.add_argument("action", choices=("source", "generate", "audit"))
     p.add_argument("--root", required=True, type=Path)
     args = p.parse_args(argv)
     try:
         if args.action == "source":
             result = acquire(args.root)
+        elif args.action == "generate":
+            result = generate(args.root)
         else:
             result = audit(args.root)
         print(json.dumps({"status": result["status"],
