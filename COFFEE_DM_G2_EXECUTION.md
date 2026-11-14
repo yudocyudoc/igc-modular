@@ -1,3 +1,42 @@
+# Diagnóstico de la primera corrida física (14/11/2026)
+
+**Run** [43548909533](https://github.com/yudocyudoc/igc-modular/actions/runs/43548909533),
+**artifact** 14095701577,
+**SHA-256 del ZIP exacto**
+\`3e6611e9981566101d8f1941f0f588e5812921a3ee162d53258dfc5b33b12ebd\`.
+
+Los 12 registros del ledger indican intento OMC consumido y los 12 logs
+prueban \`checkModel\` exitoso. **Cero simulaciones completadas, cero CSV**.
+Un error del adaptador en el \`fileNamePrefix\` usó
+\`"/work/results/D/d00"\`, pero OMC construyó una ruta ejecutable
+\`/work//work/results/D/d00\`; los doce logs muestran
+\`resultFile = ""\` y
+\`Simulation execution failed ... /work//work/results/...: not found\`.
+El proceso \`omc\` devolvió 0, así que el runner guardó
+\`G2_CSV_NOT_PRODUCED\` en vez de explicar explícitamente el error de arranque.
+La compilación no demuestra una simulación.
+
+**Corrección operativa, no científica:** pasar
+\`fileNamePrefix="results/D/d00"\`, relativo al directorio de trabajo
+\`/work\` en Docker; no tocar las ecuaciones nativas, los parámetros,
+los registros fuente ni las librerías. El runner distingue
+\`G2_SIMULATION_LAUNCH_FAILED\` de \`G2_CSV_NOT_PRODUCED\`, incluso con
+código de salida OMC 0.
+
+**Contabilidad y parada:** los 12 intentos anteriores siguen siendo 12
+invocaciones OMC reales, no cero. Un segundo dispatch solo puede admitirse
+si verifica (lectura exclusiva) el run, SHA, trabajo, artifact ID y digest,
+los 12 eventos de reserva, cada modelo/archivo .mos, los 12 logs de fallo
+de arranque y la ausencia de CSV. Cualquier otra corrida previa, fallo
+incierto, archivo mutado o evidencia de simulación válida provoca bloqueo.
+
+El nuevo lote también está limitado a **máximo 12 invocaciones** y necesita
+otra selección manual \`authorized=yes\` en main. No se ejecuta automáticamente
+con la integración de la corrección. No se puede utilizar "Re-run jobs".
+La verdad reservada permanece cerrada y G3 no está acreditado.
+
+---
+
 # Cafetería — ejecución física G2 inicial D/M
 
 ## Antecedente auténtico
