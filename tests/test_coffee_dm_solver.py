@@ -1,5 +1,6 @@
 """Strict zero-network contracts for coffee G2; synthetic CSVs are TEST fixtures."""
 from contextlib import ExitStack
+import os
 import csv
 from pathlib import Path
 from types import SimpleNamespace
@@ -132,6 +133,8 @@ class CoffeeDMModelicaTests(TestCase):
             g2.verify_csv(p,item)
 
     def test_zero_provider_failed_omc_is_counted_once_for_every_candidate(self):
+        if os.name == "nt":
+            self.skipTest("Docker execution is Linux-only; static plan tests run on Windows")
         stack,root=self.fixture_plan()
         with stack:
             g2.plan(root)
