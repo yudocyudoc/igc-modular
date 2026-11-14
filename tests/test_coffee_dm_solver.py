@@ -191,13 +191,17 @@ class CoffeeDMModelicaTests(TestCase):
               "candidates":rows}
         def archive(*, simulated=False, extra_csv=False):
             buffer=io.BytesIO()
+            adjusted = json.loads(json.dumps(report))
+            if simulated:
+                adjusted["results"][0]["solver_log_sha256"] = g2.sha_bytes(
+                    members[rows[0]["log"]] + b"LOG_SUCCESS\n")
             with zipfile.ZipFile(buffer,"w",zipfile.ZIP_DEFLATED) as z:
                 for name, content in members.items():
                     if simulated and name==rows[0]["log"]:
                         content += b"LOG_SUCCESS\n"
                     z.writestr(name,content)
                 z.writestr("plan.json",json.dumps(plan))
-                z.writestr("result.json",json.dumps(report))
+                z.writestr("result.json",json.dumps(adjusted))
                 z.writestr("attempts.jsonl",
                            "\n".join(json.dumps(a) for a in attempts)+"\n")
                 if extra_csv:
