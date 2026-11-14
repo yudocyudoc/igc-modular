@@ -1,15 +1,18 @@
 """One authorized Buffalo coffee POST; only verified public custody evidence."""
 import argparse
+import hashlib
+import io
 import json
 import os
 import re
 import subprocess
 import sys
 import tomllib
+import zipfile
 from pathlib import Path
 
 from arena.common import ArenaError, digest, read_json, write_json
-from arena.connections import Secret
+from arena.connections import Secret, public_config
 from arena.github import GitHub
 from arena.runtime import verify
 from arena.coffee_domain import build_case
@@ -44,6 +47,101 @@ def identity(env=None):
     return sha, int(run)
 
 
+
+# Exactly one independently inspected pre-HTTP failure, not a general retry
+# exemption. SHA-256 is the *GitHub ZIP artifact bytes* downloaded and audited
+# following the 2026-11-14 run. No provider/attempt files were present.
+NO_POST_RECOVERY = {
+    "run_id": 43533784491,
+    "head_sha": "4dd62c8b323096abfa3aca8675a311738cdce34e",
+    "job_id": 132257699365,
+    "artifact_id": 14088099211,
+    "artifact_digest": "sha256:c15251e8a129a93dced1997f9aa29a29e5c6554450e1d24042de34655f643789",
+    "source_run_id": 43532737911,
+    "source_artifact_id": 14088545399,
+    "case_sha256": "sha256:756d16d2824a9052f5494dd41c3eef1f0e8826537deffbfc7cd39b0ca2d2457f",
+}
+
+
+def verify_one_historical_no_post(api, previous, job):
+    """Allow only the independently verified pre-attempt credential failure.
+
+    Verify both GitHub job states and the exact archived receipt *bytes* before
+    accepting any further authorized workflow dispatch. Never infer zero
+    consumption merely from a failed paid step or an absent provider response.
+    """
+    r = NO_POST_RECOVERY
+    need(previous.get("id") == r["run_id"] and
+         previous.get("head_sha") == r["head_sha"] and
+         previous.get("path") == WORKFLOW and
+         previous.get("run_attempt") == 1 and
+         previous.get("status") == "completed" and
+         previous.get("conclusion") == "failure", "PREVIOUS_NO_POST_RUN_IDENTITY_MISMATCH")
+    need(job.get("id") == r["job_id"] and
+         job.get("status") == "completed" and
+         job.get("conclusion") == "failure", "PREVIOUS_NO_POST_JOB_IDENTITY_MISMATCH")
+    steps = job.get("steps")
+    need(isinstance(steps, list), "PREVIOUS_NO_POST_STEPS_MISSING")
+    expected = {
+        "Verify source run, artifact, B0 public identity and prior attempts": "success",
+        "Verify Cloudflare AI permission and R2 denial (GET only)": "success",
+        "Install pinned Buffalo SDK before the paid request": "success",
+        PAID_STEP: "failure",
+        "Finalize actual or uncertain provider usage with no retry": "success",
+        "Archive request, original native, raw response and usage receipts": "success",
+    }
+    for name, result in expected.items():
+        matches = [step for step in steps if step.get("name") == name]
+        need(len(matches) == 1 and matches[0].get("status") == "completed" and
+             matches[0].get("conclusion") == result,
+             "PREVIOUS_NO_POST_STEP_ATTESTATION_FAILED")
+    meta = api.repo("GET", f'/actions/artifacts/{r["artifact_id"]}')
+    need(meta.get("id") == r["artifact_id"]
+         and meta.get("name") == f'coffee-b-live-{r["run_id"]}'
+         and meta.get("expired") is False
+         and meta.get("digest") == r["artifact_digest"]
+         and meta.get("workflow_run", {}).get("id") == r["run_id"],
+         "PREVIOUS_NO_POST_ARTIFACT_ATTESTATION_FAILED")
+    archive = api.repo("GET", f'/actions/artifacts/{r["artifact_id"]}/zip',
+                       binary=True)
+    need(type(archive) is bytes and len(archive) <= 20_000 and
+         "sha256:" + hashlib.sha256(archive).hexdigest() == r["artifact_digest"],
+         "PREVIOUS_NO_POST_ARCHIVE_HASH_MISMATCH")
+    try:
+        with zipfile.ZipFile(io.BytesIO(archive)) as bundle:
+            need(sorted(bundle.namelist()) == ["admission.json", "final.json", "input.json"],
+                 "PREVIOUS_NO_POST_ARCHIVE_FILES_INVALID")
+            need(all(not item.is_dir() and item.file_size <= 12_000
+                     for item in bundle.infolist()),
+                 "PREVIOUS_NO_POST_ARCHIVE_MEMBERS_INVALID")
+            admission = json.loads(bundle.read("admission.json"))
+            inputs = json.loads(bundle.read("input.json"))
+            final = json.loads(bundle.read("final.json"))
+    except (ValueError, KeyError, zipfile.BadZipFile, UnicodeError):
+        raise ArenaError("COFFEE_B_LIVE_PREVIOUS_NO_POST_ARCHIVE_UNREADABLE") from None
+    need(final == {
+        "schema": "arena.coffee-b-live-final/1",
+        "status": "NO_PROVIDER_ATTEMPT", "attempt_reserved": False,
+        "provider_posts_observed": 0, "provider_may_have_consumed": False,
+        "provider_usage": None, "raw_provider_saved": False,
+        "new_omc": 0, "r2_access": False, "scientific_lock_created": False,
+        "retries": 0,
+    }, "PREVIOUS_NO_POST_RECEIPT_NOT_ZERO_ATTEMPT")
+    need(admission.get("run_id") == r["run_id"] and
+         admission.get("sha") == r["head_sha"] and
+         admission.get("source_run_id") == r["source_run_id"] and
+         admission.get("artifact_id") == r["source_artifact_id"] and
+         admission.get("case_sha256") == r["case_sha256"] and
+         admission.get("max_provider_posts") == 1 and
+         admission.get("scientific_lock_created") is False and
+         inputs.get("execution_run_id") == r["run_id"] and
+         inputs.get("execution_sha") == r["head_sha"] and
+         inputs.get("case_sha256") == admission["case_sha256"] and
+         inputs.get("provider_posts") == 0 and
+         inputs.get("scientific_lock_created") is False,
+         "PREVIOUS_NO_POST_PUBLIC_IDENTITY_MISMATCH")
+    return True
+
 def check_history(api, current):
     data = api.repo("GET", "/actions/workflows/coffee-buffalo-live.yml/runs?event=workflow_dispatch&per_page=100")
     count, rows = data.get("total_count"), data.get("workflow_runs")
@@ -68,6 +166,10 @@ def check_history(api, current):
         need(len(matches) == 1, "PREVIOUS_PAID_JOB_UNKNOWN")
         job = matches[0]
         if job.get("status") == "completed" and job.get("conclusion") == "skipped":
+            cleared.append(rid)
+            continue
+        if rid == NO_POST_RECOVERY["run_id"]:
+            verify_one_historical_no_post(api, prev, job)
             cleared.append(rid)
             continue
         steps = job.get("steps")
@@ -166,9 +268,15 @@ def generate(output, *, env=None, runner=None):
     env = dict(os.environ if env is None else env)
     sha, run_id = identity(env)
     need(not any(env.get(k) for k in R2), "CUSTODY_CREDENTIALS_FORBIDDEN")
+    # Match the already-proven preflight fallback. The GitHub environment
+    # supplies the scoped token but its account variable can be absent.
+    # Only the repository-pinned *public* account ID is accepted.
+    pinned = public_config()["cloudflare"]["account_id"]
+    account = env.get("CLOUDFLARE_ACCOUNT_ID") or pinned
     need(bool(env.get("CLOUDFLARE_API_TOKEN"))
-         and re.fullmatch(r"[0-9a-fA-F]{32}", env.get("CLOUDFLARE_ACCOUNT_ID", "")),
-         "PROVIDER_CREDENTIALS_REQUIRED")
+         and re.fullmatch(r"[0-9a-fA-F]{32}", account)
+         and account == pinned, "PROVIDER_CREDENTIALS_REQUIRED")
+    env["CLOUDFLARE_ACCOUNT_ID"] = account
     output = Path(output).resolve()
     admission, payload = (read_json(output / name)
                           for name in ("admission.json", "input.json"))
