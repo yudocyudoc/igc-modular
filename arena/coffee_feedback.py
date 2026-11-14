@@ -8,7 +8,7 @@ prepared, never called without separate provider authorization.
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import io
 import json
@@ -388,6 +388,78 @@ def _diagnostic(arm, candidate):
     }
 
 
+
+def logical_feedback_cuts(anchor):
+    """Three explicitly ordered logical cuts, not measured wall-clock latency.
+
+    Source observations have no timing information here. The microsecond
+    offsets encode append -> retrieval -> disposition as an *audit* order,
+    rather than falsely asserting physical time elapsed between operations.
+    """
+    need(isinstance(anchor, datetime) and anchor.tzinfo is not None
+         and anchor.utcoffset() is not None, "AWARE_LOGICAL_TIME_REQUIRED")
+    anchor = anchor.astimezone(timezone.utc)
+    cuts = {
+        "feedback_recorded_at": anchor.isoformat(timespec="microseconds"),
+        "retrieval_as_known_at":
+            (anchor + timedelta(microseconds=1)).isoformat(timespec="microseconds"),
+        "disposition_recorded_at":
+            (anchor + timedelta(microseconds=2)).isoformat(timespec="microseconds"),
+    }
+    need(cuts["feedback_recorded_at"] < cuts["retrieval_as_known_at"]
+         < cuts["disposition_recorded_at"], "NONMONOTONIC_LOGICAL_CUTS")
+    return cuts
+
+
+def replay_final_ledger_at_cut(bridge, db, context, parent_hash, receipt,
+                               *, decision_recorded_at=None):
+    """Reopen FINAL SQLite and reproduce the actual pre-decision ATMS receipt.
+
+    This is deliberately performed after all dispositions are written. The
+    original Ledger snapshot and original memory retrieval remain unchanged.
+    """
+    need(isinstance(receipt, dict)
+         and isinstance(receipt.get("as_known_at"), str)
+         and isinstance(receipt.get("projection_hash"), str)
+         and isinstance(receipt.get("item_id"), str),
+         "MISSING_ARCHIVED_RETRIEVAL_RECEIPT")
+    cut = receipt["as_known_at"]
+    scoped = bridge._parent_scope(context, parent_hash)
+    ledger = bridge._ledger(db)  # New SQLite connection after all writes.
+    before = ledger.snapshot(case_id=scoped["case_id"], as_known_at=cut)
+    need(len(before) == 4
+         and all(rev.access_policy == "lane:" + context["arm"]
+                 and ledger.verify_integrity(entity_id=rev.entity_id,
+                                             revision=rev.revision)
+                 for rev in before),
+         "ASOF_PREDECISION_SNAPSHOT_NOT_FOUR_VERIFIED_REVISIONS")
+    if decision_recorded_at is not None:
+        need(cut < decision_recorded_at, "DISPOSITION_NOT_AFTER_ASOF_CUT")
+        after = ledger.snapshot(case_id=scoped["case_id"],
+                                as_known_at=decision_recorded_at)
+        need(len(after) == 6, "FINAL_LEDGER_DOES_NOT_CONTAIN_DISPOSITION")
+        need(all(rev.recorded_at > before[0].recorded_at
+                 for rev in after if rev.entity_id not in
+                 {item.entity_id for item in before}),
+             "FINAL_DECISION_NOT_TEMPORALLY_SEPARATE")
+    elif context["arm"] == "B":
+        after = before
+    else:
+        raise ArenaError("COFFEE_FEEDBACK_DM_DISPOSITION_CUT_REQUIRED")
+    reproduced = bridge.recover_feedback(
+        db, context, parent_hash=parent_hash, as_known_at=cut)
+    need(reproduced["retrieval"] == receipt,
+         "FINAL_SQLITE_ASOF_PROJECTION_HASH_NOT_REPRODUCIBLE")
+    return {
+        "status": "ASOF_REPLAYED_FROM_CLOSED_FINAL_SQLITE",
+        "as_known_at": cut,
+        "projection_hash": reproduced["retrieval"]["projection_hash"],
+        "predecision_revision_count": len(before),
+        "final_revision_count": len(after),
+        "separate_disposition_time": decision_recorded_at is not None,
+    }
+
+
 def connect(g2_entries, b_entries, out):
     """Actually call original CT02 bridge and producer-native own decisions."""
     out = Path(out)
@@ -400,9 +472,10 @@ def connect(g2_entries, b_entries, out):
     # Separate physical DBs by arm: no producer is passed a rival's ledger or
     # model. Bridge then additionally enforces a typed parent-only subcase.
     out.mkdir(parents=True,mode=0o700)
-    event_time = datetime.now(timezone.utc).isoformat()
+    cuts = logical_feedback_cuts(datetime.now(timezone.utc))
+    event_time = cuts["feedback_recorded_at"]
     result = {
-        "schema": "arena.coffee-peak.own-ledger-atms-consumption/1",
+        "schema": "arena.coffee-peak.own-ledger-atms-consumption/2",
         "status": "OWN_FEEDBACK_RETRIEVED_DM_POLICIES_INVOKED_B_PACKET_NOT_SENT",
         "case_sha256": dm.CASE_SHA256,
         "source_public_run_id": dm.SOURCE_RUN_ID,
@@ -413,6 +486,8 @@ def connect(g2_entries, b_entries, out):
               "original_native_file_sha256": b_parent,
               "translation": translation, "native_g1_diagnostics": b_g1},
         "logical_record_time_utc": event_time,
+        "logical_temporal_cuts": cuts,
+        "as_of_replay_from_final_sqlite": False,
         "arms": {},
         "revisions_proposed_by_adapter": 0,
         "new_omc": 0, "provider_posts": 0,
@@ -439,7 +514,7 @@ def connect(g2_entries, b_entries, out):
             # alone and fabricating a decision would not count as consumption.
             if arm == "D":
                 own = bridge.d_fixed_decision(
-                    db,ctx,parent_hash=parent_hash,as_known_at=event_time)
+                    db,ctx,parent_hash=parent_hash,as_known_at=cuts["retrieval_as_known_at"])
                 action = "FIXED_STRUCTURE_SET_NO_ORIGINAL_D_REVISION_SUPPORTED"
                 need(own["status"] == "RATIFIED" and
                      own["model_revision"] is False,
@@ -449,7 +524,7 @@ def connect(g2_entries, b_entries, out):
                 need(digest(graph) == parent_hash,
                      "M_ORIGINAL_AST_HASH_MISMATCH")
                 own = bridge.own_m_decision(
-                    db,ctx,parent_graph=graph,as_known_at=event_time,
+                    db,ctx,parent_graph=graph,as_known_at=cuts["retrieval_as_known_at"],
                     classes=classes)
                 action = "NO_REVISION_WITHOUT_OBSERVED_PICKUP_RESIDUALS"
                 need(own["status"] == "ABSTAINED"
@@ -462,7 +537,7 @@ def connect(g2_entries, b_entries, out):
                  own.get("provider_calls") == 0 and own.get("new_omc") == 0,
                  "OWN_POLICY_DID_NOT_RETRIEVE_SAME_PARENT_FEEDBACK")
             disposition = bridge.persist_disposition(
-                db,ctx,decision=own,recorded_at=event_time)
+                db,ctx,decision=own,recorded_at=cuts["disposition_recorded_at"])
             rows.append({
                 "candidate_id": candidate["candidate_id"],
                 "parent_hash": parent_hash,
@@ -471,6 +546,7 @@ def connect(g2_entries, b_entries, out):
                 "diagnostic_sha256": stored["diagnostic_hash"],
                 "recorded_to_ledger": stored["stored_feedback"],
                 "retrieved_before_policy": own["retrieved_before_policy"],
+                "disposition_recorded_at": cuts["disposition_recorded_at"],
                 "original_policy": own["policy"],
                 "original_policy_status": own["status"],
                 "original_policy_reason": own.get("reason"),
@@ -479,8 +555,16 @@ def connect(g2_entries, b_entries, out):
                 "new_model": False,
                 "new_omc": 0, "provider_posts": 0,
             })
+        # Reopen the final SQLite only after every original policy decision
+        # has been persisted. A same-timestamp decision must fail this replay.
+        for row in rows:
+            row["final_sqlite_as_of_replay"] = replay_final_ledger_at_cut(
+                bridge, db, ctx, row["parent_hash"],
+                row["retrieved_before_policy"],
+                decision_recorded_at=row["disposition_recorded_at"])
         result["arms"][arm] = {
             "candidate_count": len(rows),
+            "as_of_replay_verified_after_all_dispositions": True,
             "own_feedback_retrieved_before_policy": all(
                 x["retrieved_before_policy"].get("projection_hash")
                 for x in rows),
@@ -515,7 +599,7 @@ def connect(g2_entries, b_entries, out):
         b_db,b_context,parent_hash=b_parent,
         diagnostic=b_diagnostic,recorded_at=event_time)
     recovered=bridge.recover_feedback(
-        b_db,b_context,parent_hash=b_parent,as_known_at=event_time)
+        b_db,b_context,parent_hash=b_parent,as_known_at=cuts["retrieval_as_known_at"])
     need(recovered["diagnostic_hash"] == saved["diagnostic_hash"] and
          recovered["diagnostic"] == b_diagnostic and
          recovered["retrieval"].get("projection_hash"),
@@ -539,7 +623,11 @@ def connect(g2_entries, b_entries, out):
         "truth_access":False,
     }
     write_json(out/"B-own-review-packet.json",packet,exclusive=True)
+    b_replay = replay_final_ledger_at_cut(
+        bridge, b_db, b_context, b_parent, recovered["retrieval"])
     result["arms"]["B"]={
+        "as_of_replay_verified_after_packet": True,
+        "final_sqlite_as_of_replay": b_replay,
         "candidate_count":1,
         "own_feedback_retrieved":True,
         "own_original_policy_invoked":False,
@@ -552,6 +640,11 @@ def connect(g2_entries, b_entries, out):
             (out/"B-own-review-packet.json").read_bytes()),
         "new_omc":0,"provider_posts":0,
     }
+    need(all(result["arms"][arm]["as_of_replay_verified_after_all_dispositions"]
+             for arm in ("D", "M")) and
+         result["arms"]["B"]["as_of_replay_verified_after_packet"],
+         "ASOF_REPLAY_INCOMPLETE")
+    result["as_of_replay_from_final_sqlite"] = True
     write_json(out/"summary.json",result,exclusive=True)
     return result
 

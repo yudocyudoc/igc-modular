@@ -50,3 +50,46 @@ No se puede afirmar que Buffalo consumió ese feedback en una llamada real. **Es
 ## Condición de avance
 
 Antes del cierre científico final será necesario decidir qué modelos/políticas quedan como predicciones selladas; definir tratamiento explícito del abstencionismo M y el bloqueo B; construir un **nuevo lock** G2/revisión no retroactivo; y solo entonces usar el evaluador de verdad reservada. El lock READINESS_ONLY anterior no representa este resultado.
+
+
+## Corrección P2 de cortes temporales y reproducción final (Astra)
+
+**Evidencia histórica preservada:** el feedback run \`43558078534\` y ZIP
+\`14099445220\` con SHA-256
+\`1944596c63ffb3b75bee64f3e8e87d3c966a9c8faece8e84aafa20dea6219f8c\`
+contiene 12 recibos D/M con igual timestamp para el diagnóstico y la
+disposición. Astra encontró 12 \`projection_hash\` que no se reproducen con
+la consulta \`as_known_at\` sobre la base **final**; B sí se reproduce.
+La auditoría física G2 y la integridad de 76 eventos/revisiones no cambian.
+Se mantiene el ZIP histórico; no se corrigen recibos retroactivamente.
+
+**Reparación solo en \`arena/coffee_feedback.py\`, no en el motor vendorizado:**
+un reloj lógico explícito fija tres cortes distintos de la misma iteración:
+\`feedback_recorded_at=T\`,
+\`retrieval_as_known_at=T+1µs\`,
+\`disposition_recorded_at=T+2µs\`.
+Los microsegundos son **orden lógico auditable**, no latencias medidas.
+Las políticas D y M consumen exclusivamente la recuperación en el segundo
+corte, anterior a las disposiciones finales.
+
+Una vez terminadas las seis decisiones de cada brazo, el adaptador abre la
+SQLite final con el Ledger original, verifica que el corte anterior tiene
+cuatro revisiones verificadas (fuente, diagnóstico, regla, feedback) y que el
+corte posterior contiene seis (también regla y decisión). Después vuelve a
+recuperar mediante \`arena_memory/ATMS\` original y exige **igualdad exacta**
+de \`item_id\`, \`as_known_at\` y \`projection_hash\` frente al recibo original
+de esa ejecución. B se reabre, exige cuatro revisiones y reproduce su
+proyección sin disposición. Si cualquiera falla, no se publica un
+\`summary.json\` con éxito.
+
+La nueva salida usa
+\`arena.coffee-peak.own-ledger-atms-consumption/2\` y conserva los cortes,
+reproducciones por candidato, conteos antes/después y hashes en el artefacto.
+Las pruebas incluyen 6 D + 6 M + 1 B, casos y lanes aislados, reapertura
+SQLite \`mode=ro&immutable=1\`, y una regresión negativa del mismo timestamp
+que antes producía un falso recibo reproducible.
+
+La fase no reejecuta OMC, no llama a Buffalo, no accede a R2 ni a la verdad
+reservada. La nueva ejecución de solo lectura utilizará **los mismos
+artefactos G2/B** y publicará un **nuevo ZIP de feedback**, sin alterar el
+run histórico ni crear un lock científico.
