@@ -1,0 +1,70 @@
+name: Coffee D/M - native candidates from original custodied B0
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/coffee-dm-native.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: coffee-dm-b0-native-generation
+  cancel-in-progress: false
+
+jobs:
+  native-dm:
+    name: Generate and audit twelve original D/M natives (NO OMC/AI/R2)
+    if: github.ref == 'refs/heads/main' && github.run_attempt == 1 && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Verify pinned D/M engine original bytes
+        run: python -m arena.runtime verify
+      - name: Download and attest EXACT GitHub B0 artifact used by Buffalo
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -m arena.coffee_dm_campaign source \
+            --root "$RUNNER_TEMP/coffee-dm-b0"
+      - name: Generate six D and six M originals without solver or providers
+        run: |
+          python -m arena.coffee_dm_campaign generate \
+            --root "$RUNNER_TEMP/coffee-dm-b0"
+      - name: Audit exactly emitted Modelica and native AST files
+        run: |
+          python -m arena.coffee_dm_campaign audit \
+            --root "$RUNNER_TEMP/coffee-dm-b0"
+      - name: Archive input attestation, common case, 12 natives and audit
+        id: archive
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-dm-native-${{ github.run_id }}
+          path: ${{ runner.temp }}/coffee-dm-b0/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Write auditable artifact ID to job summary
+        if: success()
+        env:
+          ARTIFACT_ID: ${{ steps.archive.outputs.artifact-id }}
+        run: |
+          {
+            echo "Original D/M native generation on exact B0"
+            echo "GitHub run: $GITHUB_RUN_ID"
+            echo "Archive ID: $ARTIFACT_ID"
+            echo "Source archive ID: 14088545399; case SHA: 756d16d2824a9052f5494dd41c3eef1f0e8826537deffbfc7cd39b0ca2d2457f"
+            echo "12 original candidates; no OMC, no provider, no R2, no truth, no scientific lock."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+# A source artifact mismatch fails before D/M generation; never substitute the
+# original 17MB synthetic ZIP or a new public export. This is a STATIC campaign.
