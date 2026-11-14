@@ -1,0 +1,82 @@
+name: Coffee D/M - one bounded native Modelica G2 batch
+
+on:
+  workflow_dispatch:
+    inputs:
+      authorized:
+        description: "Approve one new physical batch of at most 12 OMC attempts, with no retry"
+        type: choice
+        required: true
+        options: ['no', 'yes']
+        default: 'no'
+      max_new_omc:
+        description: "Fixed ceiling including failed/uncertain OMC attempts (exactly 12)"
+        type: choice
+        required: true
+        options: ['12']
+        default: '12'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: coffee-dm-one-g2-initial-batch
+  cancel-in-progress: false
+
+jobs:
+  modelica-g2:
+    name: Twelve original D/M one-shot G2 simulations (zero provider/R2)
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.run_attempt == 1 && inputs.authorized == 'yes' && inputs.max_new_omc == '12'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Verify original D/M library files against pinned git blobs
+        run: python -m arena.runtime verify
+      - name: Admit exact twelve-native artifact and reconcile prior solver attempts (read only)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COFFEE_DM_OMC_AUTH: '${{ inputs.authorized }}'
+          COFFEE_DM_OMC_MAX: '${{ inputs.max_new_omc }}'
+        run: |
+          python -m arena.coffee_dm_solver stage \
+            --root "$RUNNER_TEMP/coffee-dm-g2"
+      - name: Stage fixed Modelica and SystemDynamics library commits and pinned Docker image
+        run: python -m arena.runtime libraries
+      - name: Execute twelve separate original-model OMC attempts with logs and no retries
+        env:
+          COFFEE_DM_OMC_AUTH: '${{ inputs.authorized }}'
+          COFFEE_DM_OMC_MAX: '${{ inputs.max_new_omc }}'
+        run: |
+          python -m arena.coffee_dm_solver run \
+            --root "$RUNNER_TEMP/coffee-dm-g2"
+      - name: Preserve model files, exact OMC scripts, attempt ledger, raw logs, CSV, and G2 diagnostics
+        if: always()
+        id: archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-dm-g2-${{ github.run_id }}
+          path: ${{ runner.temp }}/coffee-dm-g2/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Report actual run and archive ID without scientific claims
+        if: success()
+        env:
+          ARTIFACT_ID: ${{ steps.archive.outputs.artifact-id }}
+        run: |
+          {
+            echo "Coffee B0 D/M fixed G2 batch (no locked predictions)"
+            echo "Run: $GITHUB_RUN_ID"
+            echo "Artifact: $ARTIFACT_ID"
+            echo "Native source: 43547506584 / 14095080561"
+            echo "Ceiling: exactly 12 OMC attempts; no retries; 0 Cloudflare POST; 0 R2; 0 truth."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+# No CT-03 workflow, world, solver budget or previous original simulation is
+# reused. This never runs from CI, PR, or merge/push; must be manually authorized.
