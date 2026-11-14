@@ -25,6 +25,8 @@ jobs:
         run: node --check arena/buffalo/original_runner.mjs
       - name: Verify coffee Buffalo live runner syntax without credentials or network
         run: node --check arena/buffalo/coffee_live_runner.mjs
+      - name: Verify original coffee Buffalo currentModel review syntax
+        run: node --check arena/coffee_review_runner.mjs
       - name: Verify the migrated engine bytes and native CT02 evidence
         run: python -m arena.runtime verify
       - name: Original producer, revision, feedback and failure regressions
@@ -55,6 +57,10 @@ jobs:
         env:
           RUNNER_TEMP: ${{ runner.temp }}
         run: node tests/coffee_buffalo_node_contract.mjs "$RUNNER_TEMP/arena-native"
+      - name: Buffalo coffee R1 Engine.generate(currentModel) — offline mocked Cloudflare
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: node tests/coffee_buffalo_review_node_contract.mjs "$RUNNER_TEMP/arena-native"
       - uses: actions/upload-artifact@v4
         with:
           name: native-engine-migration-contracts-zero-consumption
