@@ -5,13 +5,18 @@ on:
     paths:
       - 'arena/coffee_v2_reference.py'
       - 'arena/coffee_s5_availability.py'
+      - 'arena/coffee_decision_disposition.py'
+      - 'arena/coffee_next_action.py'
       - 'tests/test_coffee_s5_availability.py'
+      - 'tests/test_coffee_disposition.py'
       - '.github/workflows/coffee-s5-availability.yml'
   push:
     branches: [main]
     paths:
       - 'arena/coffee_v2_reference.py'
       - 'arena/coffee_s5_availability.py'
+      - 'arena/coffee_decision_disposition.py'
+      - 'arena/coffee_next_action.py'
       - '.github/workflows/coffee-s5-availability.yml'
   workflow_dispatch:
 
@@ -39,10 +44,11 @@ jobs:
           python -m unittest discover -s tests -p 'test_coffee_v2_reference.py' -v
           python -m unittest discover -s tests -p 'test_coffee_v2_p11.py' -v
           python -m unittest discover -s tests -p 'test_coffee_s5_availability.py' -v
+          python -m unittest discover -s tests -p 'test_coffee_disposition.py' -v
           python -m unittest discover -s tests -p 'test_decision_atms_gate.py' -v
 
   real-synthetic-decision:
-    name: Six S5 counterfactual pairs on EXISTING construction views (no new worlds)
+    name: S5 disposition plus manual/machine interventions (existing construction views)
     needs: test-physical-mechanism
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.run_attempt == 1
     runs-on: ubuntu-24.04
@@ -60,7 +66,7 @@ jobs:
           CT03_R2_ACCESS_KEY_ID: ${{ secrets.CT03_R2_ACCESS_KEY_ID }}
           CT03_R2_SECRET_ACCESS_KEY: ${{ secrets.CT03_R2_SECRET_ACCESS_KEY }}
         run: python -m arena.coffee_s5_availability fetch-views --out "$RUNNER_TEMP/producer-views"
-      - name: Run actual S5 support-availability pilot without secrets or provider
+      - name: Evaluate S5, ATMS disposition, and two next physical mechanisms
         run: |
           python -m arena.coffee_s5_availability compare \
             --views "$RUNNER_TEMP/producer-views" \
