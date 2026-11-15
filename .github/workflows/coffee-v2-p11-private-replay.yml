@@ -27,7 +27,7 @@ jobs:
       CODE_COMMIT: 50b146e2aa1eabd4fab260ab8914b989aae4bb4f
       PINNED_ZIP_SHA256: dd18a787a1ac3dcd065fe54bff9a2f567d945c60d16e7a646444dacaa6ffbef9
       RELEASE_TAG: ${{ inputs.source_release_tag }}
-      PRIVATE_ROOT: ${{ runner.temp }}/coffee-p11-private
+      PRIVATE_ROOT: ${{ github.workspace }}/coffee-p11-private
     steps:
       - name: Require private caller and valid tag BEFORE any download
         env:
@@ -175,12 +175,12 @@ jobs:
         with:
           name: coffee-p11-github-private-evidence
           path: |
-            ${{ runner.temp }}/coffee-p11-private/results/paired-sensitivity.csv
-            ${{ runner.temp }}/coffee-p11-private/results/economics-conditional.csv
-            ${{ runner.temp }}/coffee-p11-private/results/p11-conditional-summary.json
-            ${{ runner.temp }}/coffee-p11-private/results/REVIEW.md
-            ${{ runner.temp }}/coffee-p11-private/results/receipt.json
-            ${{ runner.temp }}/coffee-p11-private/results/github-run-attestation.json
+            ${{ github.workspace }}/coffee-p11-private/results/paired-sensitivity.csv
+            ${{ github.workspace }}/coffee-p11-private/results/economics-conditional.csv
+            ${{ github.workspace }}/coffee-p11-private/results/p11-conditional-summary.json
+            ${{ github.workspace }}/coffee-p11-private/results/REVIEW.md
+            ${{ github.workspace }}/coffee-p11-private/results/receipt.json
+            ${{ github.workspace }}/coffee-p11-private/results/github-run-attestation.json
           if-no-files-found: error
           retention-days: 30
 
