@@ -110,7 +110,11 @@ class P07Intervals(unittest.TestCase):
                 review.analyze(broken, [interval()], media_file=media)
             empty = review.analyze(manifest, [], media_file=media)
             self.assertEqual(empty["status"], "MEASURE_FIRST")
-            self.assertEqual(empty["aggregate"], {})
+            self.assertEqual(empty["aggregate"], {
+                "overlap_pairs_manual_machine": 0,
+                "overlap_pair_seconds_not_union": 0,
+                "same_task_overlap_pairs": 0,
+            })
             self.assertTrue(empty["no_POS_or_reserved_truth_access"])
             self.assertEqual(empty["external_consumption"],
                              {"R2": 0, "OMC": 0, "provider_POST": 0})
