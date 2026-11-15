@@ -268,8 +268,17 @@ def analyze(manifest, rows, *, media_file):
     counts["overlap_pairs_manual_machine"] = len(overlaps)
     counts["overlap_pair_seconds_not_union"] = sum(x for x, _ in overlaps)
     counts["same_task_overlap_pairs"] = sum(1 for _, same in overlaps if same)
-    status = ("MEASURE_FIRST" if not qualified else
-              "INTERVAL_CANDIDATES_NEED_IDENTIFIABILITY_REVIEW")
+    # A qualified interval of one phase alone cannot discriminate S2/S5.
+    # Pairing is by a task and sampling window, not by fabricated POS order ID.
+    manual_keys = {(w, task) for w, _, task, phase, _, _ in qualified
+                   if phase == "MANUAL_ACTIVE"}
+    machine_keys = {(w, task) for w, _, task, phase, _, _ in qualified
+                    if phase == "MACHINE_BUSY"}
+    counts["paired_complete_task_candidates"] = len(manual_keys & machine_keys)
+    counts["unpaired_manual_task_candidates"] = len(manual_keys - machine_keys)
+    counts["unpaired_machine_task_candidates"] = len(machine_keys - manual_keys)
+    status = ("PAIRED_INTERVAL_CANDIDATES_NEED_IDENTIFIABILITY_REVIEW"
+              if manual_keys & machine_keys else "MEASURE_FIRST")
     return {
         "schema": SCHEMA,
         "status": status,
@@ -312,8 +321,9 @@ def export(result, out):
         f"- Intervalos registrados: {result['aggregate'].get('interval_rows', 0)}; "
         f"elegibles manuales: {result['aggregate'].get('qualified_MANUAL_ACTIVE', 0)}; "
         f"elegibles máquina: {result['aggregate'].get('qualified_MACHINE_BUSY', 0)}.\n"
-        f"- Pares de solapamiento: "
-        f"{result['aggregate'].get('overlap_pairs_manual_machine', 0)} "
+        f"- Tareas vinculadas con ambos tipos de intervalos: "
+        f"{result['aggregate'].get('paired_complete_task_candidates', 0)}.\n"
+        f"- Pares de solapamiento: "\n        f"{result['aggregate'].get('overlap_pairs_manual_machine', 0)} "
         "(un par no equivale a ocupación total ni productividad).\n"
         "- La concordancia de dos intervalos se verifica con la tolerancia " 
         f"predeclarada ({result['predeclared_max_dual_endpoint_delta_s']} s), "
