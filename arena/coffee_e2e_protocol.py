@@ -7,6 +7,7 @@ from .common import ArenaError, write_json
 from . import runtime
 
 WORKFLOW = "coffee-end-to-end.yml"
+RECONCILE_WORKFLOW = "coffee-end-to-end-reconcile.yml"
 REPO = "yudocyudoc/igc-modular"
 
 
@@ -61,13 +62,23 @@ class CoffeeGitHubBackend:
             if expected != "HEAD" and expected != sha:
                 raise ArenaError("Frozen coffee code changed before dispatch.")
             # Reuse the one bootstrap on the exact code commit. Never pick 'latest'.
+            workflow = WORKFLOW
             data = self.api.repo("GET", f"/actions/workflows/{WORKFLOW}/runs?head_sha={sha}&per_page=100")
             matches = [r for r in data.get("workflow_runs", []) if r.get("head_sha") == sha
                        and r.get("head_branch") == "main" and r.get("run_attempt") == 1
                        and r.get("event") in ("push", "workflow_dispatch")]
             if data.get("total_count", 101) > 100 or len(matches) > 1:
                 raise ArenaError("Coffee run identity is ambiguous; do not dispatch again.")
-            detail = {"frozen_code_sha":sha, "reused_bootstrap":bool(matches)}
+            if not matches:
+                correction = self.api.repo("GET", f"/actions/workflows/{RECONCILE_WORKFLOW}/runs?head_sha={sha}&per_page=100")
+                recovered_runs = [r for r in correction.get("workflow_runs", [])
+                                  if r.get("head_sha") == sha and r.get("head_branch") == "main"
+                                  and r.get("run_attempt") == 1 and r.get("event") in ("push","workflow_dispatch")]
+                if correction.get("total_count",101) > 100 or len(recovered_runs) > 1:
+                    raise ArenaError("Coffee reconciliation run identity is ambiguous.")
+                if recovered_runs:
+                    matches, workflow = recovered_runs, RECONCILE_WORKFLOW
+            detail = {"frozen_code_sha":sha, "reused_bootstrap":bool(matches), "workflow":workflow}
             if matches:
                 run_id = matches[0]["id"]
             else:
@@ -92,7 +103,7 @@ class CoffeeGitHubBackend:
         while True:
             run = self.api.run(stage["run_id"])
             if (run.get("head_sha") != detail["frozen_code_sha"] or run.get("head_branch") != "main"
-                    or run.get("path") != ".github/workflows/"+WORKFLOW or run.get("run_attempt") != 1):
+                    or run.get("path") != ".github/workflows/"+detail.get("workflow", WORKFLOW) or run.get("run_attempt") != 1):
                 raise ArenaError("Remote coffee run identity changed.")
             if run["status"] == "completed":
                 break
@@ -105,9 +116,10 @@ class CoffeeGitHubBackend:
             raise ArenaError("Coffee run did not complete; preserve its attempts and diagnostics.")
         files = self.api.artifact(stage["run_id"], f"coffee-e2e-result-{stage['run_id']}")
         result = json.loads(files["result.json"])
+        execution = result.get("execution", result["native_evaluation"])
         if (result.get("status") != "END_TO_END_COMPLETED_WITH_DECLARED_LIMITS"
-                or result["native_evaluation"]["run_id"] != stage["run_id"]
-                or result["native_evaluation"]["code_sha"] != detail["frozen_code_sha"]):
+                or execution["run_id"] != stage["run_id"]
+                or execution["code_sha"] != detail["frozen_code_sha"]):
             raise ArenaError("Coffee result does not match this run.")
         for name, raw in files.items():
             if "/" in name or "\\" in name or name not in {

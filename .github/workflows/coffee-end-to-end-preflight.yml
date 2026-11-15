@@ -24,3 +24,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python -m arena.coffee_e2e native-preflight --out "$RUNNER_TEMP/coffee-native-preflight"
+      - name: Reclassify the already sealed B CSV without another simulation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -m arena.coffee_e2e reconcile-preflight --out "$RUNNER_TEMP/coffee-reconciliation-preview"

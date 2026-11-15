@@ -33,3 +33,10 @@ python -m arena resume runs/coffee
 El backend sigue un bootstrap del mismo commit cuando ya existe; no exige
 copiar IDs ni vuelve a despachar un intento incierto. El objeto R2 de intento
 OMC es de creación única: otro commit no restablece la cuota consumida.
+
+La primera ejecución `43684660729` completó la simulación B, pero el runtime
+sobrescribió `B.log` y el lector la clasificó como fallo. La consola ahora usa
+`B-omc.log`. El workflow de recuperación verifica el CSV que ya estaba dentro
+del artifact de lock antes de revelar la verdad y emite un informe corregido:
+no modifica aquel lock, el modelo, el CSV ni el operador de proyección; cero
+simulaciones adicionales. El backend también sigue ese informe del mismo commit.

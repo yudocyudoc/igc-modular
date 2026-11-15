@@ -80,7 +80,8 @@ class CoffeeEndToEndTests(unittest.TestCase):
 
     def test_uncertain_dispatch_is_recorded_and_never_automatically_repeated(self):
         api = Mock()
-        api.repo.side_effect = [{"sha":"a"*40},{"total_count":0,"workflow_runs":[]}]
+        api.repo.side_effect = [{"sha":"a"*40},{"total_count":0,"workflow_runs":[]},
+                               {"total_count":0,"workflow_runs":[]}]
         api.dispatch.side_effect = ArenaError("uncertain network reply")
         with TemporaryDirectory() as tmp:
             store = RunStore(Path(tmp)/"run", config=self.config())
@@ -102,6 +103,74 @@ class CoffeeEndToEndTests(unittest.TestCase):
                                  ({"B0_IF_ASSUMPTIONS":1,"S5_IF_ASSUMPTIONS":1},True),
                                  ({"TIE_IF_ASSUMPTIONS":1},False)):
             self.assertEqual(strict_preference_reversal(counts), expected)
+
+    def test_runtime_log_cannot_overwrite_omc_console_evidence(self):
+        native = {"model":{"variables":[
+            {"name":"Waiting Paid Orders","type":"stock","equation":"0",
+             "inflows":["Paid"],"outflows":["Pickup","Loss"]},
+            {"name":"Picked Up Cumulative","type":"stock","equation":"0",
+             "inflows":["Pickup"],"outflows":[]}]}}
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root/"B.mo").write_text("fictional model",encoding="utf-8")
+            (root/"B.mos").write_text("fictional commands",encoding="utf-8")
+            e2e.write_json(root/"B-native.json",native)
+            stage = {"run_id":12345,"code_sha":"a"*40,"B_class":"FixtureNative"}
+            for name,key in (("B.mo","B_model_sha256"),("B.mos","B_script_sha256"),
+                             ("B-native.json","B_native_file_sha256")):
+                stage[key] = "sha256:"+corpus.sha_file(root/name)
+            e2e.write_json(root/"stage.json",stage)
+            e2e.write_json(root/"B-attempt.json",{"run_id":12345,"code_sha":"a"*40,"max_new_omc":1})
+            def fake_cli(args, **kwargs):
+                kwargs["stdout"].write(b"Check of FixtureNative completed successfully\nLOG_SUCCESS\n")
+                # Reproduce exactly OMC's independent <prefix>.log creation.
+                (root/"B.log").write_text("LOG_SUCCESS runtime only\n",encoding="utf-8")
+                with (root/"B_res.csv").open("w",encoding="utf-8",newline="") as stream:
+                    writer=csv.writer(stream)
+                    writer.writerow(["time","Waiting_Paid_Orders","Picked_Up_Cumulative","Loss"])
+                    for i in range(65):
+                        t=i*e2e.solver.HORIZON/64
+                        writer.writerow([t,0,10*t,0])
+                return Mock(returncode=0)
+            with patch.dict(os.environ,ENV,clear=True), patch.object(
+                    os,"getuid",return_value=1001,create=True), patch.object(
+                    os,"getgid",return_value=1001,create=True):
+                result=e2e.run_b(root,cli=fake_cli)
+            self.assertEqual(result["status"],"PREDICTED")
+            self.assertIn("Check of FixtureNative",(root/"B-omc.log").read_text())
+            self.assertNotIn("Check of",(root/"B.log").read_text())
+
+    def test_correction_keeps_original_failed_lock_and_uses_sealed_forecast_only(self):
+        lock=lock_fixture()
+        lock.update(run_id=e2e.SEALED_B_RECOVERY["run_id"],code_sha=e2e.SEALED_B_RECOVERY["code_sha"])
+        lock["candidates"][-1].update(status="FAILED_G2",predictions=None)
+        oracle={"metrics":{str(t):{"orders_picked_up_cumulative":1} for t in e2e.CUTS}}
+        original={"lock_sha256":e2e.digest(lock),
+                  "archive_verification":{"artifact_id":e2e.SEALED_B_RECOVERY["lock"][0]},
+                  "truth_read_after_archived_lock":True,"scores":e2e.score_pickups(lock,oracle),
+                  "actual_synthetic_pickups":{str(t):1 for t in e2e.CUTS}}
+        model=b"unchanged original equation bytes"
+        commands=b"one original simulate command"
+        stage={"run_id":lock["run_id"],"code_sha":lock["code_sha"],
+               "B_model_sha256":"sha256:"+hashlib.sha256(model).hexdigest(),
+               "B_script_sha256":"sha256:"+hashlib.sha256(commands).hexdigest()}
+        entries={"lock.json":json.dumps(lock).encode(),"B-native.json":b"{}",
+                 "B-result.json":json.dumps({"status":"FAILED_G2", "failure":"COFFEE_E2E_B_OMC_NOT_SUCCESSFUL"}).encode(),
+                 "B-attempt.json":json.dumps({"run_id":lock["run_id"],"code_sha":lock["code_sha"],
+                                               "max_new_omc":1,"attempt_reserved":True}).encode(),
+                 "stage.json":json.dumps(stage).encode(),"B.mo":model,"B.mos":commands,
+                 "B.log":b"LOG_SUCCESS The simulation finished successfully",
+                 "B_res.csv":b"fictional already sealed trace"}
+        original_lock=entries["lock.json"]
+        checked={"predictions":{str(t):{"orders_picked_up_cumulative":2.0} for t in e2e.CUTS}}
+        with patch.object(e2e,"translate_b",return_value=("Fixture",model.decode(),{})), patch.object(
+                e2e,"verify_b_csv",return_value=checked):
+            corrected=e2e.reclassify_sealed_b(entries,original)
+        self.assertEqual(entries["lock.json"],original_lock)
+        self.assertEqual(json.loads(entries["lock.json"])["candidates"][-1]["status"],"FAILED_G2")
+        self.assertEqual(corrected["scores"][-1]["mae_pickups_orders"],1.0)
+        self.assertEqual(corrected["new_omc_attempts"],0)
+        self.assertTrue(corrected["technical_reclassification"]["original_lock_and_failure_preserved"])
 
     def test_existing_container_keeps_hash_and_reads_only_canonical_corpus(self):
         raw = synthetic_archive()

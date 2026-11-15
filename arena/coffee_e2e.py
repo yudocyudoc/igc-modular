@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import argparse
 import csv
+import copy
+import hashlib
 import io
 import json
 import math
@@ -309,11 +311,13 @@ def run_b(out, cli=subprocess.run):
             f"{os.getuid()}:{os.getgid()}", "-e", "HOME=/tmp", "-v", f"{out}:/work", "-w", "/work",
             runtime.IMAGE, "omc", "B.mos"]
     try:
-        with (out/"B.log").open("xb") as log:
+        # OMC's simulation runtime itself writes <fileNamePrefix>.log.
+        # Capturing omc stdout to B.log lets that runtime truncate compiler proof.
+        with (out/"B-omc.log").open("xb") as log:
             outcome = cli(args, stdout=log, stderr=subprocess.STDOUT, timeout=180,
                           check=False, env={k:v for k,v in os.environ.items()
                                            if k not in ("GH_TOKEN", "GITHUB_TOKEN")})
-        text = (out/"B.log").read_text(encoding="utf-8", errors="replace")
+        text = (out/"B-omc.log").read_text(encoding="utf-8", errors="replace")
         need(outcome.returncode == 0 and "LOG_SUCCESS" in text and
              f"Check of {stage['B_class']} completed successfully" in text and
              "Simulation execution failed" not in text, "B_OMC_NOT_SUCCESSFUL")
@@ -349,7 +353,7 @@ def make_lock(native_dir, out):
     validate_lock(lock)
     write_json(out/"lock.json", lock, exclusive=True)
     for name in ("stage.json", "B-native.json", "B.mo", "B.mos", "B-attempt.json",
-                 "B-result.json", "B.log", "B_res.csv"):
+                 "B-result.json", "B.log", "B-omc.log", "B_res.csv"):
         if (root/name).is_file():
             (out/name).write_bytes((root/name).read_bytes())
     # feedback summary gives own-policy outcomes without leaking another arm's DB.
@@ -492,23 +496,35 @@ def final_report(evaluation_dir, decision_dir, admission_dir, out):
     native = read_json(Path(evaluation_dir)/"evaluation.json")
     policy = read_json(Path(decision_dir)/"p11-conditional-summary.json")
     admitted = read_json(Path(admission_dir)/"admission-summary.json")
+    reconciled = "technical_reclassification" in native
+    new_omc = native["new_omc_attempts"]
+    original_reference = policy["summary"]["physical_reference_simulations"]
     summary = {"schema": SCHEMA, "status":"END_TO_END_COMPLETED_WITH_DECLARED_LIMITS",
                "corpus": admitted, "native_evaluation": native,
                "reference_policy_comparison": policy,
                "business_conclusion":"CONDITIONAL_REFERENCE_ONLY_ORIGINAL_ARMS_CANNOT_PREDICT_S5",
-               "provider_posts":0,"new_omc_attempts":1,"cached_dm_simulations":12,
-               "reference_simulations":policy["summary"]["physical_reference_simulations"]}
+               "provider_posts":0,"new_omc_attempts":new_omc,"cached_dm_simulations":12,
+               "cached_b_simulations":1 if reconciled else 0,
+               "reference_simulations":0 if reconciled else original_reference,
+               "reused_reference_simulations":original_reference if reconciled else 0,
+               "execution":{"run_id":int(os.environ.get("GITHUB_RUN_ID", "0")),
+                            "code_sha":os.environ.get("GITHUB_SHA"),
+                            "mode":"SEALED_TRACE_RECLASSIFICATION" if reconciled else "FULL_PIPELINE"}}
     write_json(out/"result.json", summary, exclusive=True)
     lines = ["# Arena: resultado del recorrido completo", "",
              f"Fuente R2: {admitted['weekly_cases']} semanas sintéticas, {admitted['pos_rows']} registros POS.",
              "", "## D/M/B: contraste con verdad sintética", "",
              "D/M se regeneraron con sus motores originales y reutilizaron 12 CSV Modelica autenticados.",
-             "Buffalo conserva su revisión original R1 y tuvo un intento nuevo de Modelica, sin otro POST.",
+             "Buffalo conserva su revisión original R1 y su único intento Modelica, sin otro POST.",
              "Las predicciones se archivaron y verificaron antes de abrir la verdad.", "",
              "| Brazo | Candidato | Estado | MAE de recogidas (pedidos) |", "|---|---|---|---:|"]
     for row in native["scores"]:
         error = f"{row['mae_pickups_orders']:.4f}" if row['mae_pickups_orders'] is not None else "no disponible"
         lines.append(f"| {row['arm']} | {row['candidate_id']} | {row['status']} | {error} |")
+    if reconciled:
+        lines += ["", "Corrección técnica: el runtime sobrescribió el log de consola y B se marcó como fallo.",
+                  "Se recupera su CSV del artifact sellado antes de abrir la verdad, con el mismo modelo y operador.",
+                  "No se repitió Modelica ni se reemplazaron las predicciones originales."]
     s = policy["summary"]
     lines += ["", "## B0 frente a reasignar la entrega", "",
               f"Referencia especializada: {s['physical_reference_simulations']} corridas, "
@@ -522,8 +538,9 @@ def final_report(evaluation_dir, decision_dir, admission_dir, out):
               "Los D/M/B originales todavía no representan la reasignación S5. Su efecto procede de la referencia separada.",
               "La disponibilidad del apoyo y los tiempos/costes siguen supuestos: no es una recomendación de inversión real.",
               "El contraste V1 es retrospectivo y sintético; no se presenta como un experimento nuevo independiente.",
-              "", "Consumo nuevo: 0 POST, 1 intento OMC; 12 simulaciones D/M reutilizadas; "
-              f"{s['physical_reference_simulations']} simulaciones deterministas de referencia."]
+              "", f"Consumo de esta ejecución: 0 POST, {new_omc} intentos OMC nuevos; "
+              f"12 simulaciones D/M reutilizadas; referencia: {summary['reference_simulations']} nuevas / "
+              f"{summary['reused_reference_simulations']} reutilizadas."]
     (out/"REPORT.md").write_text("\n".join(lines)+"\n", encoding="utf-8")
     for root in (Path(evaluation_dir), Path(decision_dir)):
         for file in root.iterdir():
@@ -532,10 +549,135 @@ def final_report(evaluation_dir, decision_dir, admission_dir, out):
     return {"status":summary["status"], "report":str(out/"REPORT.md")}
 
 
+# Exact first run, including its pre-reveal raw trace and original false failure.
+# This is a status/receipt correction, not permission for another solver attempt.
+SEALED_B_RECOVERY = {
+    "run_id":43684660729, "code_sha":"699f22e3a85fb5ed40e73a4fa0282781f3c3dea8",
+    "lock":(14148774886,"c51d1eb7e565176d1e0f7f3937f4c1f53cc83ad86d2999175b8a3437725560e7"),
+    "evaluation":(14149329994,"b782275474266c2a052fbfd3b79979883358d70dc89318361c6db003bcc250dd"),
+    "decision":(14150075434,"b118b2836812a3429d4914c5ee9bc73cf150168bea2e6e6bd65eb41d9d764a8b"),
+    "admission":(14149278306,"8d1a880bddce15072fe800c8edfe3ef60b63fefe539786f70a157ec098724025"),
+}
+
+
+def reclassify_sealed_b(entries, original_evaluation):
+    """Recompute the predeclared projection from CSV already sealed before truth.
+
+    Keep the original lock/failure unchanged. The corrected report explicitly
+    cites them; it never claims to have created a new pre-reveal prediction.
+    """
+    lock = json.loads(entries["lock.json"])
+    validate_lock(lock)
+    previous = json.loads(entries["B-result.json"])
+    attempt = json.loads(entries["B-attempt.json"])
+    stage = json.loads(entries["stage.json"])
+    native = json.loads(entries["B-native.json"])
+    need(lock["run_id"] == attempt["run_id"] == stage["run_id"] == SEALED_B_RECOVERY["run_id"]
+         and lock["code_sha"] == attempt["code_sha"] == stage["code_sha"] == SEALED_B_RECOVERY["code_sha"]
+         and original_evaluation["lock_sha256"] == digest(lock)
+         and original_evaluation["archive_verification"]["artifact_id"] == SEALED_B_RECOVERY["lock"][0]
+         and original_evaluation["truth_read_after_archived_lock"] is True
+         and previous["status"] == "FAILED_G2"
+         and previous["failure"] == "COFFEE_E2E_B_OMC_NOT_SUCCESSFUL"
+         and attempt["max_new_omc"] == 1 and attempt["attempt_reserved"] is True,
+         "RECOVERY_NOT_THE_EXACT_FIRST_SEALED_TRACE")
+    _, mo, _ = translate_b(native)
+    need(entries["B.mo"] == mo.encode() and
+         stage["B_model_sha256"] == "sha256:"+hashlib.sha256(entries["B.mo"]).hexdigest() and
+         stage["B_script_sha256"] == "sha256:"+hashlib.sha256(entries["B.mos"]).hexdigest() and
+         "The simulation finished successfully" in entries["B.log"].decode("utf-8")
+         and "Simulation execution failed" not in entries["B.log"].decode("utf-8"),
+         "RECOVERY_NATIVE_OR_RUNTIME_PROOF_INVALID")
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp)/"B.csv"
+        path.write_bytes(entries["B_res.csv"])
+        checked = verify_b_csv(path, native)
+    row = next(c for c in lock["candidates"] if c["arm"] == "B")
+    need(row["status"] == "FAILED_G2" and row["predictions"] is None,
+         "RECOVERY_MUST_PRESERVE_ORIGINAL_FAILED_CLASSIFICATION")
+    # Only scoring receives a derived view. Never rewrite/export the original lock.
+    scoring_view = copy.deepcopy(lock)
+    recovered = next(c for c in scoring_view["candidates"] if c["arm"] == "B")
+    recovered.update(status="PREDICTED", predictions=checked["predictions"],
+                     csv_sha256="sha256:"+hashlib.sha256(entries["B_res.csv"]).hexdigest())
+    oracle = {"metrics":{t:{"orders_picked_up_cumulative":v}
+                         for t,v in original_evaluation["actual_synthetic_pickups"].items()}}
+    scores = score_pickups(scoring_view, oracle)
+    # D/M cannot change as part of this correction.
+    need(scores[:-1] == original_evaluation["scores"][:-1], "RECOVERY_CHANGED_ANOTHER_ARM")
+    corrected = copy.deepcopy(original_evaluation)
+    corrected.update(scores=scores, new_omc_attempts=0, cached_b_simulations=1,
+                     historical_omc_attempts_in_source_run=1)
+    corrected["technical_reclassification"] = {
+        "reason":"OMC_STDOUT_COLLIDED_WITH_SIMULATION_RUNTIME_B_LOG",
+        "original_run_id":lock["run_id"], "original_code_sha":lock["code_sha"],
+        "original_lock_sha256":digest(lock),
+        "pre_reveal_lock_artifact_id":SEALED_B_RECOVERY["lock"][0],
+        "source_csv_sha256":recovered["csv_sha256"],
+        "native_model_unchanged":True, "projection_and_cuts_unchanged":True,
+        "original_lock_and_failure_preserved":True,
+        "forecast_source":"RAW_TRACE_ARCHIVED_BEFORE_ORIGINAL_TRUTH_REVEAL",
+        "new_provider_posts":0, "new_omc_attempts":0,
+        "physical_verification":checked}
+    return corrected
+
+
+def reconcile(out, api=None, *, preflight=False):
+    if preflight:
+        need(os.environ.get("GITHUB_REPOSITORY") == REPO and
+             os.environ.get("GITHUB_EVENT_NAME") in ("push", "pull_request") and
+             re.fullmatch(r"[1-9][0-9]*", os.environ.get("GITHUB_RUN_ID", "")),
+             "PUBLIC_TRACE_RECONCILIATION_REQUIRES_GITHUB")
+    else:
+        execution_identity()
+    need(not any(os.environ.get(k) for k in dm.NO_R2), "RECONCILIATION_MUST_NOT_HAVE_PRIVATE_CREDENTIALS")
+    api = api or api_client()
+    source = api.run(SEALED_B_RECOVERY["run_id"])
+    need(source.get("head_sha") == SEALED_B_RECOVERY["code_sha"] and
+         source.get("path") == WORKFLOW and source.get("status") == "completed" and
+         source.get("conclusion") == "success" and source.get("run_attempt") == 1,
+         "RECOVERY_SOURCE_RUN_NOT_AUTHENTIC")
+    archives = {}
+    for name in ("lock", "evaluation", "decision", "admission"):
+        artifact, checksum = SEALED_B_RECOVERY[name]
+        meta = api.repo("GET", f"/actions/artifacts/{artifact}")
+        need(meta.get("digest") == "sha256:"+checksum and meta.get("expired") is False and
+             meta.get("workflow_run", {}).get("id") == source["id"],
+             "RECOVERY_ARCHIVE_IDENTITY_CHANGED")
+        archives[name] = feedback._safe_archive(
+            api.repo("GET", f"/actions/artifacts/{artifact}/zip", binary=True),
+            expected_digest="sha256:"+checksum)
+    # The native and translated equation bytes must be the authentic original R1.
+    r1 = fetch_historical(api, 7)
+    need(json.loads(archives["lock"]["B-native.json"]) ==
+         json.loads(r1["provider/native-engine-result.json"]) and
+         archives["lock"]["B.mo"] == r1["provider/translated.mo"],
+         "RECOVERY_B_IS_NOT_THE_ORIGINAL_R1")
+    evaluation = reclassify_sealed_b(
+        archives["lock"], json.loads(archives["evaluation"]["evaluation.json"]))
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        for name in ("admission", "decision", "evaluation"):
+            directory = base/name
+            directory.mkdir()
+            for file, raw in archives[name].items():
+                need("/" not in file and "\\" not in file, "RECOVERY_NONFLAT_OUTPUT")
+                (directory/file).write_bytes(raw)
+        write_json(base/"evaluation/evaluation.json", evaluation)
+        with (base/"evaluation/native-scores.csv").open("w",encoding="utf-8",newline="") as f:
+            writer = csv.DictWriter(f,fieldnames=list(evaluation["scores"][0]))
+            writer.writeheader(); writer.writerows(evaluation["scores"])
+        result = final_report(base/"evaluation", base/"decision", base/"admission", out)
+    result.update(B_status="PREDICTED_FROM_ORIGINAL_PRE_REVEAL_TRACE",
+                  B_mae_pickups_orders=evaluation["scores"][-1]["mae_pickups_orders"],
+                  new_omc_attempts=0, provider_posts=0)
+    return result
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("prepare-corpus", "download-views", "stage-native", "native-preflight", "reserve-physical", "run-b", "evaluate"):
+    for name in ("prepare-corpus", "download-views", "stage-native", "native-preflight", "reserve-physical", "run-b", "evaluate", "reconcile", "reconcile-preflight"):
         p = sub.add_parser(name)
         p.add_argument("--out", required=True)
     p = sub.add_parser("decision"); p.add_argument("--views", required=True); p.add_argument("--out", required=True)
@@ -546,9 +688,11 @@ def main(argv=None):
     args = parser.parse_args(argv)
     functions = {"prepare-corpus":prepare_corpus,"download-views":download_views,
                  "stage-native":stage_native,"reserve-physical":reserve_physical,
-                 "run-b":run_b,"evaluate":evaluate}
+                 "run-b":run_b,"evaluate":evaluate,"reconcile":reconcile}
     try:
-        if args.command == "native-preflight":
+        if args.command == "reconcile-preflight":
+            result = reconcile(args.out, preflight=True)
+        elif args.command == "native-preflight":
             result = stage_native(args.out, preflight=True)
         elif args.command in functions:
             result = functions[args.command](args.out)
