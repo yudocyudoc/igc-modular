@@ -103,11 +103,12 @@ class P07Intervals(unittest.TestCase):
             self.assertEqual(a["overlap_pairs_manual_machine"], 1)
             self.assertEqual(a["overlap_pair_seconds_not_union"], 7.0)
             self.assertEqual(a["same_task_overlap_pairs"], 1)
+            self.assertEqual(a["paired_complete_task_candidates"], 1)
             self.assertEqual(a["dual_endpoint_checked"], 2)
             self.assertEqual(a["max_dual_endpoint_delta_s"], 0.5)
             self.assertTrue(result["candidate_intervals_not_yet_model_calibration"])
             self.assertEqual(result["status"],
-                             "INTERVAL_CANDIDATES_NEED_IDENTIFIABILITY_REVIEW")
+                             "PAIRED_INTERVAL_CANDIDATES_NEED_IDENTIFIABILITY_REVIEW")
             self.assertTrue(result["service_capacity_not_identified"])
             self.assertTrue(result["no_S2_S5_recommendation"])
             out = Path(tmp) / "result"
@@ -135,10 +136,22 @@ class P07Intervals(unittest.TestCase):
                 "overlap_pairs_manual_machine": 0,
                 "overlap_pair_seconds_not_union": 0,
                 "same_task_overlap_pairs": 0,
+                "paired_complete_task_candidates": 0,
+                "unpaired_manual_task_candidates": 0,
+                "unpaired_machine_task_candidates": 0,
             })
             self.assertTrue(empty["no_POS_or_reserved_truth_access"])
             self.assertEqual(empty["external_consumption"],
                              {"R2": 0, "OMC": 0, "provider_POST": 0})
+
+    def test_single_phase_cannot_count_as_paired_mechanism_evidence(self):
+        with TemporaryDirectory() as tmp:
+            media, manifest = fixture(tmp)
+            result = review.analyze(manifest, [interval()], media_file=media)
+            self.assertEqual(result["status"], "MEASURE_FIRST")
+            self.assertEqual(result["aggregate"]["paired_complete_task_candidates"], 0)
+            self.assertEqual(result["aggregate"]["unpaired_manual_task_candidates"], 1)
+            self.assertTrue(result["no_S2_S5_recommendation"])
 
     def test_censored_legacy_and_disputed_are_not_qualified(self):
         with TemporaryDirectory() as tmp:
