@@ -21,15 +21,23 @@ def fixture(tmp):
         "media_duration_s": 90,
         "max_dual_endpoint_delta_s": 1.0,
         "agreement_tolerance_reason": "one frame of nominal observation resolution",
+        "sampling_design": review.DIRECTED_PLAN,
+        "custom_selection_rationale": "fictional narrow targeted windows for unit tests only",
         "review_scope": "EXPLORATORY_DESCRIPTIVE_NO_G3",
         "study_question": "S2_MACHINE_BUSY_LIMIT_VS_S5_MANUAL_WORK_LIMIT",
         "windows": [
             {"id": "w1", "start_s": 0, "end_s": 30,
              "stratum": "ACTIVITY",
-             "selection_reason": "predeclared active contrast window"},
+             "selection_reason": "predeclared active contrast window",
+             "coverage_state": "REVIEWED",
+             "reviewer_ids": ["W_REVIEWER_1", "W_REVIEWER_2"],
+             "coverage_evidence_ref": "LOCAL_PRIVATE_COVERAGE_ATTESTATION"},
             {"id": "w2", "start_s": 40, "end_s": 70,
              "stratum": "QUIET",
-             "selection_reason": "predeclared quiet comparison window"},
+             "selection_reason": "predeclared quiet comparison window",
+             "coverage_state": "REVIEWED",
+             "reviewer_ids": ["W_REVIEWER_1", "W_REVIEWER_2"],
+             "coverage_evidence_ref": "LOCAL_PRIVATE_COVERAGE_ATTESTATION"},
         ],
     }
     return video, manifest
@@ -81,7 +89,13 @@ class P07Intervals(unittest.TestCase):
             output = Path(tmp) / "blank"
             review.create_template(output)
             manifest = json.loads((output / "manifest.template.json").read_text())
-            self.assertEqual(manifest["windows"], [])
+            self.assertEqual(manifest["sampling_design"], review.SYSTEMATIC_PLAN)
+            self.assertEqual(len(manifest["windows"]), 6)
+            self.assertEqual([(w["start_s"], w["end_s"]) for w in manifest["windows"]],
+                             [(60, 240), (660, 840), (1260, 1440),
+                              (1860, 2040), (2460, 2640), (3060, 3240)])
+            self.assertTrue(all(w["coverage_state"] == "PENDING"
+                                for w in manifest["windows"]))
             self.assertEqual(manifest["media_sha256"],
                              "REPLACE_WITH_SHA256_OF_ORIGINAL_MEDIA")
             with (output / "intervals.template.csv").open() as f:
@@ -109,6 +123,8 @@ class P07Intervals(unittest.TestCase):
             self.assertTrue(result["candidate_intervals_not_yet_model_calibration"])
             self.assertEqual(result["status"],
                              "PAIRED_INTERVAL_CANDIDATES_NEED_IDENTIFIABILITY_REVIEW")
+            self.assertEqual(result["reviewed_window_seconds"], 60)
+
             self.assertTrue(result["service_capacity_not_identified"])
             self.assertTrue(result["no_S2_S5_recommendation"])
             out = Path(tmp) / "result"
@@ -226,11 +242,42 @@ class P07Intervals(unittest.TestCase):
                      "selection_reason": "must not review historical reserve here"}]}),
                 ("no_tolerance", {"max_dual_endpoint_delta_s": None}),
                 ("no_tolerance_justification", {"agreement_tolerance_reason": ""}),
+                ("missing_sampling", {"sampling_design": None}),
+                ("bad_sampling", {"sampling_design": "BLINDED_RANDOM"}),
+                ("bad_coverage", {"windows": [
+                    {**manifest["windows"][0], "coverage_state": "PENDING"}]}),
+                ("reviewed_without_dual_custody", {"windows": [
+                    {**manifest["windows"][0], "reviewer_ids": []}]}),
                 ("invalid_review_scope", {"review_scope": "G3_VALIDATED"}),
             ]
             for key, change in cases:
                 with self.subTest(key=key), self.assertRaises(ArenaError):
                     review.analyze({**manifest, **change}, [], media_file=media)
+
+    def test_systematic_plan_is_fixed_and_no_rows_in_pending_windows(self):
+        with TemporaryDirectory() as tmp:
+            media, manifest = fixture(tmp)
+            m = copy.deepcopy(manifest)
+            m["sampling_design"] = review.SYSTEMATIC_PLAN
+            m["custom_selection_rationale"] = ""
+            m["media_duration_s"] = 3600
+            m["windows"] = review.planned_windows()
+            self.assertEqual(review.validate_manifest(m)["S01"][3], "PENDING")
+            first = copy.deepcopy(m)
+            first["windows"][0]["start_s"] = 61
+            with self.assertRaisesRegex(ArenaError, "SYSTEMATIC_SAMPLING_FRAME_CHANGED"):
+                review.validate_manifest(first)
+            row = interval(window_id="S01", start_s="70", end_s="100")
+            with self.assertRaisesRegex(ArenaError, "INTERVAL_IN_UNREVIEWED_WINDOW"):
+                review.analyze(m, [row], media_file=media)
+            m["windows"][0]["coverage_state"] = "PARTIAL"
+            m["windows"][0]["reviewer_ids"] = ["W_REVIEWER_1"]
+            result = review.analyze(m, [row], media_file=media)
+            self.assertEqual(result["status"], "MEASURE_FIRST")
+            self.assertEqual(result["reviewed_window_seconds"], 0)
+            self.assertEqual(result["aggregate"]["not_qualified"], 1)
+            self.assertEqual(result["window_coverage_counts"]["PENDING"], 5)
+            self.assertEqual(result["window_coverage_counts"]["PARTIAL"], 1)
 
     def test_csv_strict_fields_and_no_extra_columns(self):
         with TemporaryDirectory() as tmp:
