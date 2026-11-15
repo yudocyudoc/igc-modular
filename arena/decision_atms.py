@@ -208,7 +208,7 @@ class Journal:
             "as_known_at": as_known_at, "valid_at": valid_at,
             "active_event_ids": sorted(states_id for states_id, enabled in
                                        states.items() if enabled),
-            "journal_sha256": digest(self.events),
+            "journal_sha256": digest(included),
             "included_event_prefix_sha256": digest(included),
             "labels": normalized,
             "assumption_provenance": assumptions_by_id,
