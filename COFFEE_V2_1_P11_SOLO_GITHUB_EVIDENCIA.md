@@ -38,7 +38,7 @@ permissions:
 
 jobs:
   run-p11:
-    uses: yudocyudoc/igc-modular/.github/workflows/coffee-v2-p11-private-replay.yml@0f3752d639ad60aefe371b29c67ea78715e02002
+    uses: yudocyudoc/igc-modular/.github/workflows/coffee-v2-p11-private-replay.yml@23672ffc4e70c7f2a36cf955f117d2d912c4f585
     with:
       source_release_tag: ${{ inputs.source_release_tag }}
     secrets:
