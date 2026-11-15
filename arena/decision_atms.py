@@ -219,6 +219,40 @@ class Journal:
         snapshot["snapshot_sha256"] = digest(snapshot)
         return snapshot
 
+
+    def what_if(self, *, as_known_at, valid_at, candidate_events):
+        """Ephemeral branch on an as-known prefix; never edits the journal.
+
+        Future canonical events are not included in the fork. The caller must
+        give append-only, later-dated hypothetical operations; resulting
+        supports are not committed or treated as measured evidence.
+        """
+        base = self.snapshot(as_known_at=as_known_at, valid_at=valid_at)
+        need(type(candidate_events) is list and
+             0 < len(candidate_events) <= 12, "WHAT_IF_EVENT_LIMIT")
+        prefix = [e for e in self.events
+                  if stamp(e["recorded_at"]) <= stamp(as_known_at)]
+        fork = Journal(prefix)
+        for e in candidate_events:
+            fork.append(e)
+        last = candidate_events[-1]["recorded_at"]
+        changed = fork.snapshot(as_known_at=last, valid_at=last)
+        nodes = sorted(set(base["labels"]) | set(changed["labels"]))
+        return {
+            "schema":"arena.decision-atms.what-if/1",
+            "baseline_snapshot_sha256":base["snapshot_sha256"],
+            "hypothetical_snapshot":changed,
+            "changed_labels":{
+                node:{"before":base["labels"].get(node,[]),
+                      "after":changed["labels"].get(node,[])}
+                for node in nodes if
+                base["labels"].get(node,[]) != changed["labels"].get(node,[])
+            },
+            "hypothetical_only":True,
+            "canonical_journal_sha256_unchanged":digest(self.events),
+            "no_empirical_inference_or_business_recommendation":True,
+        }
+
     def explain(self, node, *, as_known_at, valid_at):
         _id(node)
         snap = self.snapshot(as_known_at=as_known_at, valid_at=valid_at)
