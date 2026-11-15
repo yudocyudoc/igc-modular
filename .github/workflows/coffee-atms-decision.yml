@@ -4,19 +4,25 @@ on:
   pull_request:
     paths:
       - 'arena/decision_atms.py'
+      - 'arena/decision_atms_gate.py'
       - 'arena/coffee_e2e.py'
       - 'arena/coffee_e2e_protocol.py'
       - 'tests/test_decision_atms.py'
+      - 'tests/test_decision_atms_gate.py'
       - 'COFFEE_ATMS_DECISION_INTEGRATION.md'
+      - 'COFFEE_ATMS_EXECUTION_GATE.md'
       - '.github/workflows/coffee-atms-decision.yml'
   push:
     branches: [main]
     paths:
       - 'arena/decision_atms.py'
+      - 'arena/decision_atms_gate.py'
       - 'arena/coffee_e2e.py'
       - 'arena/coffee_e2e_protocol.py'
       - 'tests/test_decision_atms.py'
+      - 'tests/test_decision_atms_gate.py'
       - 'COFFEE_ATMS_DECISION_INTEGRATION.md'
+      - 'COFFEE_ATMS_EXECUTION_GATE.md'
       - '.github/workflows/coffee-atms-decision.yml'
 
 permissions:
@@ -37,6 +43,8 @@ jobs:
         run: python -m arena.runtime verify
       - name: "ATMS conformance: alternatives, retract, restore, as-of, no truth"
         run: python -m unittest discover -s tests -p 'test_decision_atms.py' -v
+      - name: "ATMS execution gate: retract before P11, restore, reject forged evidence"
+        run: python -m unittest discover -s tests -p 'test_decision_atms_gate.py' -v
       - name: Existing coffee workflow regressions with fictional fixtures
         run: python -m unittest discover -s tests -p 'test_coffee_e2e.py' -v
       - name: Commit scope of evidence
