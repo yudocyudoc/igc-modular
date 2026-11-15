@@ -24,6 +24,8 @@ from . import coffee_v2_reference as physical
 from . import coffee_v2_reference_inputs as inputs
 from . import decision_atms as knowledge
 from . import decision_atms_gate as gate
+from . import coffee_decision_disposition as adjudication
+from . import coffee_next_action as actions
 
 SCHEMA = "arena.coffee-v2.s5-support-occupancy/1"
 SOURCE_RUN_ID = 43684660729
@@ -224,6 +226,16 @@ def compare(view_dir, dossier, protocol):
         "external_consumption":{"provider_POST":0,"new_OMC":0,
                                 "new_synthetic_worlds":0,"G3":0},
     }
+    # This is a new post-comparison ATMS *decision*, not the old static
+    # MEASURE_FIRST string. All six contexts must be present or it fails.
+    final = adjudication.disposition(pre, decision, cases)
+    result["atms_predecision"] = pre
+    result["atms_execution_receipt"] = decision
+    result["atms_disposition"] = final
+    result["decision_readout"]["current_business_choice"] = final[
+        "business_choice"]
+    result["next_action"] = actions.compare(
+        view_dir, dossier, selection=choice)
     return result
 
 
@@ -238,9 +250,38 @@ def export(result,out):
             writer=csv.DictWriter(f,fieldnames=list(rows[0]))
             writer.writeheader()
             writer.writerows(rows)
+    # Full ATMS proof travels separately, concise disposition in decision.json.
+    proof=result["atms_disposition"]
+    gate_receipt=result["atms_execution_receipt"]
+    pre=result["atms_predecision"]
+    need(proof["execution_gate_sha256"]==gate_receipt["gate_sha256"]
+         and proof["predecision_snapshot_sha256"]==
+         pre["snapshot"]["snapshot_sha256"],
+         "ATMS_CHAIN_MISMATCH_BEFORE_EXPORT")
     public={key:value for key,value in result.items()
-            if key not in ("comparison_rows","economic_rows")}
+            if key not in ("comparison_rows","economic_rows",
+                           "atms_predecision","atms_execution_receipt",
+                           "atms_disposition")}
+    public["atms"]={
+        "execution_gate_sha256":gate_receipt["gate_sha256"],
+        "predecision_snapshot_sha256":pre["snapshot"]["snapshot_sha256"],
+        "disposition_sha256":proof["disposition_sha256"],
+        "admitted_under_assumptions":gate_receipt["status"],
+        "post_comparison_claims":proof["claims"],
+        "business_choice":proof["business_choice"],
+        "no_real_profit_claim":True,
+    }
     write_json(out/"decision.json",public,exclusive=True)
+    write_json(out/"ATMS_PREDECISION.json",pre,exclusive=True)
+    write_json(out/"ATMS_GATE.json",gate_receipt,exclusive=True)
+    write_json(out/"ATMS_DISPOSITION.json",proof,exclusive=True)
+    write_json(out/"NEXT_ACTION.json",result["next_action"],exclusive=True)
+    with (out/"next-action-service.csv").open(
+            "x",encoding="utf-8",newline="") as f:
+        rows=result["next_action"]["rows"]
+        writer=csv.DictWriter(f,fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
     lines=[
         "# ¿Cuándo conviene reasignar la entrega al apoyo?",
         "",
@@ -260,6 +301,63 @@ def export(result,out):
             f"{r['S5_p90_full_drain_min']:.2f} min |"
         )
     lines += [
+        "",
+        "## ATMS: premisas, interpretación y disposición",
+        "",
+        "| Compuerta | Evidencia / supuesto | Resultado |",
+        "|---|---|---|",
+        "| Antes de simular | "
+        "P07/P11 construcción; soporte y traspaso ASSUMED | "+
+        gate_receipt["status"]+" |",
+        "| Cobertura de resultados | 2 cargas × 3 disponibilidades, "
+        "sin elegir sólo 100% | "
+        "COMPLETE_SIX_CONTEXT_GRID |",
+        "| Mejoría general del servicio | No empeorar entregas ni P90 "
+        "en ninguna condición y mejorar al menos una | "+
+        ("CON_SOPORTE" if proof["claims"][
+            adjudication.BROAD]["supported"] else
+         "SIN_SOPORTE_ATMS") + " |",
+        "| Efecto puntual P90 | Sólo en determinados escenarios "
+        "sintéticos | "+
+        ("CON_SOPORTE_CONDICIONAL" if proof["claims"][
+            adjudication.P90_SOME]["supported"] else
+         "SIN_SOPORTE") + " |",
+        "| Ganancia económica real | Disponibilidad, costes y valor "
+        "no medidos | SIN_SOPORTE |",
+        "",
+        "**Decisión derivada:** "+proof["business_choice"]+".",
+        "**Generalización selectiva probada:** "+
+        proof["prevented_claim_example"]["classification"]+".",
+        "La heurística insegura tomaría únicamente el mejor P90 y "
+        "aprobaría S5 para todas las condiciones; el soporte ATMS "
+        "exige toda la grilla.",
+        "Cadena temporal replayable: "+
+        proof["cuts"]["predecision_T"]+" → "+
+        proof["cuts"]["evidence_T_plus_microseconds"]+" → "+
+        proof["cuts"]["disposition_T_plus_microseconds"]+".",
+        "Premisas, eventos, respaldos y SHA se publican junto "
+        "a la tabla en ATMS_GATE.json y ATMS_DISPOSITION.json.",
+        "",
+        "## Próxima decisión: preparación manual vs capacidad de máquina",
+        "",
+        "| Carga | Intervención física asumida | Entregas B0 → acción "
+        "| Cambio de P90 (min) |",
+        "|---|---|---|---:|",
+    ]
+    for r in result["next_action"]["rows"]:
+        lines.append(
+            "| "+r["load_label"]+" | "+r["assumed_change"]+" | "+
+            str(r["B0_peak_handoffs"])+" → "+
+            str(r["intervention_peak_handoffs"])+" | "+
+            f'{r["delta_p90_min"]:+.2f}'+" |")
+    lines += [
+        "",
+        "Acciones que merecen MEDIR costes y factibilidad (no comprar aún): "+
+        (", ".join(result["next_action"]["priority_to_measure"])
+         or "ninguna con más entregas en los casos probados")+".",
+        "Reducir tiempo manual al límite declarado no es gratis ni "
+        "un rendimiento medido; una máquina adicional exige "
+        "espacio, energía y trabajo de barista.",
         "",
         "## Decisión práctica pendiente",
         "",
