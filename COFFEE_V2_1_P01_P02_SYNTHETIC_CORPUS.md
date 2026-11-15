@@ -4,7 +4,7 @@
 
 ## Evidencia y versión
 
-El ZIP propietario `paquete_sintetico_pico_v1.zip` se recuperó de la fuente de Google Drive registrada en la auditoría histórica (ID `1GsiI3gmAxqSvMpXBpLudUv8wkgPmtgyC`), fuera del repositorio. Se inspeccionó la versión disponible el 14–15 de noviembre de 2026. **No es la misma versión** que el ZIP de 14 entradas y ~14.2 MB descrito en el informe del 11 de noviembre: ahora hay **23 entradas y 15,351,718 bytes**, con digest completo:
+El ZIP propietario `paquete_sintetico_pico_v1.zip` se recuperó de la fuente de Google Drive registrada en la auditoría histórica (fuente de custodia autenticada), fuera del repositorio. Se inspeccionó la versión disponible el 14–15 de noviembre de 2026. **No es la misma versión** que el ZIP de 14 entradas y ~14.2 MB descrito en el informe del 11 de noviembre: ahora hay **23 entradas y 15,351,718 bytes**, con digest completo:
 
 `dd18a787a1ac3dcd065fe54bff9a2f567d945c60d16e7a646444dacaa6ffbef9`.
 
