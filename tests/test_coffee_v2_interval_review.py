@@ -19,6 +19,8 @@ def fixture(tmp):
         "clock": review.CLOCK,
         "media_sha256": review.sha_file(video),
         "media_duration_s": 90,
+        "max_dual_endpoint_delta_s": 1.0,
+        "agreement_tolerance_reason": "one frame of nominal observation resolution",
         "review_scope": "EXPLORATORY_DESCRIPTIVE_NO_G3",
         "study_question": "S2_MACHINE_BUSY_LIMIT_VS_S5_MANUAL_WORK_LIMIT",
         "windows": [
@@ -52,8 +54,24 @@ def interval(event_id="EVENT_PRIVATE_1", phase="MANUAL_ACTIVE", **kw):
         "second_reviewer": "REVIEWER_PRIVATE_2",
         "confidence": "HIGH",
         "evidence_ref": "FRAME_PATH_PRIVATE_WITH_ID",
+        "second_start_s": "2.5",
+        "second_end_s": "12.5",
+        "second_start_boundary": "OBSERVED",
+        "second_end_boundary": "OBSERVED",
     }
     row.update(kw)
+    if "start_s" in kw and "second_start_s" not in kw:
+        row["second_start_s"] = str(float(row["start_s"]) + 0.5)
+    if "end_s" in kw and "second_end_s" not in kw:
+        row["second_end_s"] = str(float(row["end_s"]) + 0.5)
+    if "start_boundary" in kw and "second_start_boundary" not in kw:
+        row["second_start_boundary"] = row["start_boundary"]
+        if row["start_boundary"] == "CENSORED":
+            row["second_start_s"] = row["start_s"]
+    if "end_boundary" in kw and "second_end_boundary" not in kw:
+        row["second_end_boundary"] = row["end_boundary"]
+        if row["end_boundary"] == "CENSORED":
+            row["second_end_s"] = row["end_s"]
     return row
 
 
@@ -85,6 +103,9 @@ class P07Intervals(unittest.TestCase):
             self.assertEqual(a["overlap_pairs_manual_machine"], 1)
             self.assertEqual(a["overlap_pair_seconds_not_union"], 7.0)
             self.assertEqual(a["same_task_overlap_pairs"], 1)
+            self.assertEqual(a["dual_endpoint_checked"], 2)
+            self.assertEqual(a["max_dual_endpoint_delta_s"], 0.5)
+            self.assertTrue(result["candidate_intervals_not_yet_model_calibration"])
             self.assertEqual(result["status"],
                              "INTERVAL_CANDIDATES_NEED_IDENTIFIABILITY_REVIEW")
             self.assertTrue(result["service_capacity_not_identified"])
@@ -158,6 +179,17 @@ class P07Intervals(unittest.TestCase):
                  "DUPLICATE_EVENT_ID"),
                 ([interval(window_id="w3")],
                  "INVALID_INTERVAL_CONTRACT"),
+                ([interval(second_start_s="8.0")],
+                 "DUAL_ENDPOINT_DISAGREEMENT"),
+                ([interval(second_start_boundary="CENSORED",
+                           second_start_s="0")],
+                 "DUAL_CENSORING_DISAGREEMENT"),
+                ([interval(second_end_s="")],
+                 "DUAL_REVIEW_PROVENANCE"),
+                ([interval(review_state="DRAFT", second_end_s="")],
+                 "PARTIAL_SECOND_OBSERVATION"),
+                ([interval(second_reviewer="REVIEWER_PRIVATE_1")],
+                 "DUAL_REVIEW_PROVENANCE"),
             ]
             for rows, message in cases:
                 with self.subTest(message=message), self.assertRaisesRegex(
@@ -179,6 +211,8 @@ class P07Intervals(unittest.TestCase):
                     {"id": "heldout", "start_s": 3600, "end_s": 3650,
                      "stratum": "UNCERTAIN",
                      "selection_reason": "must not review historical reserve here"}]}),
+                ("no_tolerance", {"max_dual_endpoint_delta_s": None}),
+                ("no_tolerance_justification", {"agreement_tolerance_reason": ""}),
                 ("invalid_review_scope", {"review_scope": "G3_VALIDATED"}),
             ]
             for key, change in cases:
