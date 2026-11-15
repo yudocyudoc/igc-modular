@@ -1,5 +1,6 @@
 """P01/P02 synthetic corpus admission: all fixtures invented, no private ZIP in CI."""
 from collections import Counter
+from contextlib import closing
 import csv
 import hashlib
 import io
@@ -167,7 +168,7 @@ class SyntheticCorpusCensusTests(TestCase):
             corpus.export(result, private_out=private_out,
                           public_out=public_out,
                           key=b"TEST_CUSTODIAN_KEY_NONPUBLIC_32_BYTE_LONG")
-            with sqlite3.connect(private_out / "catalog.sqlite") as conn:
+            with closing(sqlite3.connect(private_out / "catalog.sqlite")) as conn:
                 self.assertEqual(conn.execute(
                     "SELECT COUNT(*) FROM synthetic_cases").fetchone()[0], 54)
                 self.assertEqual(conn.execute(
