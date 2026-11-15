@@ -60,6 +60,8 @@ La salida contiene únicamente `p07-interval-summary.json` y `REVIEW.md`, sin fi
 
 **Hito de instrumentación (este PR):** contrato, plantilla, validador de dos anotaciones temporales, pruebas offline y CI sin acceso a datos privados. No acredita una sola medición verdadera.
 
+**Compuerta de vinculación:** un intervalo completo aislado de máquina o personal mantiene `MEASURE_FIRST`, aunque tenga doble anotación concordante. Sólo una tarea con ambos intervalos vinculados permite el estado `PAIRED_INTERVAL_CANDIDATES_NEED_IDENTIFIABILITY_REVIEW`. Este estado tampoco identifica saturación ni autoriza elegir S2/S5: aún hacen falta disponibilidad, demanda/carga y representatividad.
+
 **Hito de evidencia (requiere video o nueva observación):** suficientes intervalos vinculados y revisados, heterogeneidad de carga reconocida, tareas y recursos definidos, incertidumbre por visibilidad e identificabilidad documentadas. Podrá entonces evaluarse si hay evidencia útil para rangos de tiempo manual/ocupación, y qué medición adicional discrimina S2/S5.
 
 **Hito de decisión posterior:** sólo con mecanismos representados y costes/rangos pertinentes, comparar B0/Sx bajo escenarios y reglas fijadas; no concluir S2/S5 por contar solapamientos. Ni este PR ni el verificador generan un lock científico, G2/G3 ni abren una reserva.
