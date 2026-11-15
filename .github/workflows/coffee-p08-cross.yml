@@ -1,0 +1,70 @@
+name: Coffee P08 — compare native M with specialist without rerunning OMC
+
+on:
+  pull_request:
+    paths:
+      - 'arena/coffee_p08_cross.py'
+      - 'tests/test_coffee_p08_cross.py'
+      - '.github/workflows/coffee-p08-cross.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'arena/coffee_p08_cross.py'
+      - '.github/workflows/coffee-p08-cross.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  contracts:
+    name: P08 cannot claim physical equivalence from aggregate native M
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Only method and epistemic comparison fixtures
+        run: python -m unittest discover -s tests -p test_coffee_p08_cross.py -v
+
+  compare-public-artifacts:
+    needs: contracts
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Download previously computed reference results
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 43697007653 --repo "$GITHUB_REPOSITORY" \
+            --name s5-support-decision-43697007653 \
+            --dir "$RUNNER_TEMP/p08-ref"
+      - name: Download already executed authentic native M outcomes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 43702148041 --repo "$GITHUB_REPOSITORY" \
+            --name coffee-p08-m-43702148041 \
+            --dir "$RUNNER_TEMP/p08-m"
+      - name: Publish cross-method physical comparison and ATMS limits
+        run: |
+          python -m arena.coffee_p08_cross \
+            --reference "$RUNNER_TEMP/p08-ref/NEXT_ACTION.json" \
+            --native "$RUNNER_TEMP/p08-m/result.json" \
+            --out "$RUNNER_TEMP/p08-cross"
+          cat "$RUNNER_TEMP/p08-cross/DECISION.md" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coffee-p08-cross-${{ github.run_id }}
+          path: ${{ runner.temp }}/p08-cross/
+          if-no-files-found: error
+          retention-days: 90
+
+# Read-only replay. 0 R2, provider, OMC, new world, hidden truth or G3.
