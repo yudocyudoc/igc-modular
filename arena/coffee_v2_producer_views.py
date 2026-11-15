@@ -33,6 +33,7 @@ SPLIT_DECLARATION = "P12-SCENARIO-GROUPED-EXPLORATORY/1"
 ALLOWED_PARTS = {"CONSTRUCTION", "DEVELOPMENT"}
 FIVE_MINUTES = 5
 V1_CONSTRUCTION_END = 60.0
+VISUAL_RELEASE_END = 60.0
 CSV_COLUMNS = {
     "producer-case-index.csv": (
         "case_id", "partition", "replication", "days_in_week",
@@ -315,7 +316,7 @@ def build(source, private_dir):
                                  ".10g") if raw else "")
         # The full source's 104 minutes are validated, but historical V1
         # reserve [60,103.237] cannot be released for V2 model development.
-        if minute < V1_CONSTRUCTION_END:
+        if minute < VISUAL_RELEASE_END:
             outputs["producer-video-proxy-minute.csv"].append((
                 minute, sampled, *values,
                 "VISUAL_PRESENCE_PROXY_NOT_ARRIVAL_OR_RESOURCE_UTILIZATION",
