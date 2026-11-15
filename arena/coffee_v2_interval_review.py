@@ -18,7 +18,7 @@ import sys
 
 from .common import ArenaError, write_json
 
-SCHEMA = "arena.coffee-v2.p07-directed-interval-review/2"
+SCHEMA = "arena.coffee-v2.p07-directed-interval-review/3"
 PHASES = {"MANUAL_ACTIVE": "OPERATOR", "MACHINE_BUSY": "MACHINE"}
 BOUNDARIES = {"OBSERVED", "CENSORED"}
 REVIEW_STATES = {"DRAFT", "DUAL_CONFIRMED", "DISPUTED"}
@@ -36,6 +36,27 @@ CLOCK = "ORIGINAL_VIDEO_SECONDS"
 MAX_WINDOWS = 200
 MAX_ROWS = 10000
 PUBLIC_CONSTRUCTION_END_S = 3600.0  # V1 [0,60) minutes; do not select held-out video
+SYSTEMATIC_PLAN = "SYSTEMATIC_FIRST_HOUR_6X180/1"
+DIRECTED_PLAN = "DIRECTED_EXPLORATORY/1"
+COVERAGE_STATES = {"PENDING", "PARTIAL", "REVIEWED", "NOT_VIEWABLE"}
+
+
+def planned_windows():
+    """Six fixed temporal coverage windows; NOT load-balanced, random or blinded."""
+    return [
+        {
+            "id": f"S{i+1:02d}",
+            "start_s": 60 + 600*i,
+            "end_s": 240 + 600*i,
+            "stratum": "UNCERTAIN",
+            "selection_reason": "prospective systematic time coverage; load unknown",
+            "coverage_state": "PENDING",
+            "reviewer_ids": [],
+            "coverage_evidence_ref": "",
+        }
+        for i in range(6)
+    ]
+
 
 
 def need(ok, reason):
@@ -71,9 +92,11 @@ def create_template(out):
         "media_duration_s": None,
         "max_dual_endpoint_delta_s": None,
         "agreement_tolerance_reason": "REPLACE_BEFORE_OBSERVING_EVENTS",
+        "sampling_design": SYSTEMATIC_PLAN,
+        "custom_selection_rationale": "",
         "review_scope": "EXPLORATORY_DESCRIPTIVE_NO_G3",
         "study_question": "S2_MACHINE_BUSY_LIMIT_VS_S5_MANUAL_WORK_LIMIT",
-        "windows": [],
+        "windows": planned_windows(),
     }
     write_json(out / "manifest.template.json", manifest, exclusive=True)
     with (out / "intervals.template.csv").open("x", encoding="utf-8", newline="") as f:
@@ -83,9 +106,12 @@ def create_template(out):
         "1. Conservar el video original localmente; obtener su SHA-256 y "
         "duración real en segundos. Completar manifest y declarar ventanas "
         "ANTES de codificar eventos (incluye intervalos tranquilos y activos).\n"
-        "2. Cada ventana: id, start_s, end_s, stratum (ACTIVITY/QUIET/UNCERTAIN) "
-        "y selection_reason. No convertir proxies de presencia o pagos POS "
-        "sintéticos en duración de servicio.\n"
+        "2. Seis ventanas sistemáticas de 180 s ya fijadas ANTES de la nueva "
+        "revisión (1–4, 11–14, 21–24, 31–34, 41–44 y 51–54 min). No son "
+        "estratos por demanda, ni muestreo aleatorio. Mantener ventanas/razones "
+        "sin cambiarlas bajo el diseño SYSTEMATIC. Marcar coverage_state: "
+        "PENDING, PARTIAL, REVIEWED o NOT_VIEWABLE; REVIEWED requiere IDs "
+        "de dos revisores y coverage_evidence_ref local.\n"
         "3. Una fila por intervalo visible de MANUAL_ACTIVE (OPERATOR) o "
         "MACHINE_BUSY (MACHINE); vincular la misma tarea mediante task_id "
         "opaco cuando sea defendible. Registrar inicio/fin exactos en reloj "
@@ -98,7 +124,10 @@ def create_template(out):
         "sin ser certificable por software.\n"
         "5. Usar --media-file al evaluar: se comprueba SHA, pero nunca se "
         "sube ni modifica el video. No subir manifest, CSV ni video a GitHub.\n"
-        "6. Salida: JSON y REVIEW.md con agregados, jamás IDs/filas/frames. "
+        "6. Para una revisión dirigida alternativa declarar DIRECTED_EXPLORATORY/1 "
+        "y custom_selection_rationale, sin presentar sus ventanas como muestra "
+        "sistemática. Las observaciones P031 previas son EXPLORATORIAS.\n"
+        "7. Salida: JSON y REVIEW.md con agregados, jamás IDs/filas/frames. "
         "Aunque haya intervalos elegibles, NO se infiere automáticamente "
         "capacidad, cuello de botella, rentabilidad ni recomendación S2/S5.\n",
         encoding="utf-8",
@@ -123,7 +152,22 @@ def validate_manifest(manifest):
          type(manifest.get("agreement_tolerance_reason")) is str and
          len(manifest["agreement_tolerance_reason"].strip()) >= 12,
          "AGREEMENT_TOLERANCE_UNJUSTIFIED")
+    sampling = manifest.get("sampling_design")
+    need(sampling in {SYSTEMATIC_PLAN, DIRECTED_PLAN}, "SAMPLING_DESIGN_REQUIRED")
+    if sampling == DIRECTED_PLAN:
+        need(type(manifest.get("custom_selection_rationale")) is str
+             and len(manifest["custom_selection_rationale"].strip()) >= 20,
+             "DIRECTED_SAMPLING_RATIONALE_REQUIRED")
     windows = manifest.get("windows")
+    if sampling == SYSTEMATIC_PLAN:
+        # Review status and attestation may evolve; sampling frame cannot.
+        standard = planned_windows()
+        identifiers = ("id", "start_s", "end_s", "stratum", "selection_reason")
+        need(type(windows) is list and len(windows) == len(standard) and
+             all(type(w) is dict and
+                 all(w.get(k) == reference[k] for k in identifiers)
+                 for w, reference in zip(windows, standard)),
+             "SYSTEMATIC_SAMPLING_FRAME_CHANGED")
     need(type(windows) is list and 0 < len(windows) <= MAX_WINDOWS,
          "WINDOWS_REQUIRED")
     out = {}
@@ -135,13 +179,27 @@ def validate_manifest(manifest):
              len(w["selection_reason"].strip()) >= 12 and
              w.get("stratum") in {"ACTIVITY", "QUIET", "UNCERTAIN"},
              "WINDOW_PROVENANCE")
+        state = w.get("coverage_state")
+        need(state in COVERAGE_STATES and
+             type(w.get("reviewer_ids")) is list and
+             all(type(x) is str and bool(x.strip()) for x in w["reviewer_ids"]) and
+             len(w["reviewer_ids"]) == len(set(w["reviewer_ids"])) and
+             type(w.get("coverage_evidence_ref")) is str,
+             "WINDOW_COVERAGE_CONTRACT")
+        if state == "REVIEWED":
+            need(len(w["reviewer_ids"]) == 2 and
+                 bool(w["coverage_evidence_ref"].strip()),
+                 "REVIEWED_WINDOW_REQUIRES_DUAL_COVERAGE")
+        if state == "PENDING":
+            need(not w["reviewer_ids"] and not w["coverage_evidence_ref"],
+                 "PENDING_WINDOW_CANNOT_CLAIM_COVERAGE")
         start = number(w.get("start_s"), "WINDOW_START")
         end = number(w.get("end_s"), "WINDOW_END")
         need(0 <= start < end <= duration, "WINDOW_BOUNDS")
         need(end <= PUBLIC_CONSTRUCTION_END_S,
              "RESERVED_WINDOW_NOT_FOR_P07")
-        out[w["id"]] = (start, end, w["stratum"])
-    ordered = sorted((start, end) for start, end, _ in out.values())
+        out[w["id"]] = (start, end, w["stratum"], state)
+    ordered = sorted((start, end) for start, end, _, _ in out.values())
     need(all(ordered[i][0] >= ordered[i-1][1]
              for i in range(1, len(ordered))), "WINDOWS_OVERLAP")
     return out
@@ -190,7 +248,9 @@ def analyze(manifest, rows, *, media_file):
              and all(row[k].strip() for k in
                      ("task_id", "resource_id", "primary_reviewer")),
              "INVALID_INTERVAL_CONTRACT")
-        a, b, stratum = windows[row["window_id"]]
+        a, b, stratum, window_state = windows[row["window_id"]]
+        need(window_state in {"PARTIAL", "REVIEWED"},
+             "INTERVAL_IN_UNREVIEWED_WINDOW")
         start = number(row["start_s"], "EVENT_START")
         end = number(row["end_s"], "EVENT_END")
         need(a <= start < end <= b, "INTERVAL_OUTSIDE_WINDOW")
@@ -236,7 +296,8 @@ def analyze(manifest, rows, *, media_file):
         strata[stratum] += 1
         if row["start_boundary"] == "CENSORED" or row["end_boundary"] == "CENSORED":
             counts["censored_intervals"] += 1
-        eligible = (row["review_state"] == "DUAL_CONFIRMED"
+        eligible = (window_state == "REVIEWED"
+                    and row["review_state"] == "DUAL_CONFIRMED"
                     and row["confidence"] == "HIGH"
                     and row["start_boundary"] == "OBSERVED"
                     and row["end_boundary"] == "OBSERVED")
@@ -288,8 +349,13 @@ def analyze(manifest, rows, *, media_file):
         "source_sha256": manifest["media_sha256"],
         "predeclared_max_dual_endpoint_delta_s": tolerance,
         "review_scope": manifest["review_scope"],
+        "sampling_design": manifest["sampling_design"],
         "window_count": len(windows),
-        "declared_window_seconds": sum(b-a for a, b, _ in windows.values()),
+        "declared_window_seconds": sum(b-a for a, b, _, _ in windows.values()),
+        "reviewed_window_seconds": sum(b-a for a, b, _, state in windows.values()
+                                        if state == "REVIEWED"),
+        "window_coverage_counts": dict(sorted(
+            Counter(w[3] for w in windows.values()).items())),
         "window_strata": dict(sorted(Counter(w[2] for w in windows.values()).items())),
         "rows_by_window_stratum": dict(sorted(strata.items())),
         "aggregate": dict(sorted(counts.items())),
@@ -316,8 +382,9 @@ def export(result, out):
         "# P07 — intervalos manuales/máquina, resultado agregado\n\n"
         f"- Estado: **{result['status']}**.\n"
         f"- Ventanas: {result['window_count']}; "
-        f"duración declarada, NO necesariamente revisada: "
-        f"{result['declared_window_seconds']:.3f} s.\n"
+        f"duración declarada: {result['declared_window_seconds']:.3f} s; "
+        f"revisión completa declarada por dos revisores: "
+        f"{result['reviewed_window_seconds']:.3f} s.\n"
         f"- Intervalos registrados: {result['aggregate'].get('interval_rows', 0)}; "
         f"elegibles manuales: {result['aggregate'].get('qualified_MANUAL_ACTIVE', 0)}; "
         f"elegibles máquina: {result['aggregate'].get('qualified_MACHINE_BUSY', 0)}.\n"
@@ -329,7 +396,8 @@ def export(result, out):
         "- La concordancia de dos intervalos se verifica con la tolerancia " 
         f"predeclarada ({result['predeclared_max_dual_endpoint_delta_s']} s), "
         "pero la independencia de los revisores no puede probarse por software. "
-        "No se asignan tiempos a intervalos censurados.\n"
+        "No se asignan tiempos a intervalos censurados. Una ventana "
+        "PENDING, PARTIAL o NOT_VIEWABLE no representa actividad cero.\n"
         "- No se identifica aún cuello de botella S2/S5, demanda, "
         "capacidad física, espera ni rentabilidad. Requiere contraste "
         "de identificabilidad y representatividad antes de B0/Sx.\n"
