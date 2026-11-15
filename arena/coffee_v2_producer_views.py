@@ -79,10 +79,11 @@ def text_enum(raw, field):
     return raw
 
 
-def money(raw, name):
+def money(raw, name, *, signed=False):
     if raw == "":
         return ""
-    return format(corpus.floating(raw, 0, 1_000_000, name), ".10g")
+    lower = -1_000_000 if signed else 0
+    return format(corpus.floating(raw, lower, 1_000_000, name), ".10g")
 
 
 def opaque(key, typ, *values):
@@ -204,8 +205,8 @@ def build(source, private_dir):
             row["timestamp_min_from_peak_start"], kind, status,
             text_enum(row.get("archetype", ""), "ORDER_ARCHETYPE"),
             (corpus.integer(row["beverage_count"], 1, 30, "BEVERAGES")
-             if row.get("beverage_count") else ""),
-            money(row.get("amount_mxn", ""), "POS_AMOUNT"),
+             if kind == "sale" else ""),
+            money(row.get("amount_mxn", ""), "POS_AMOUNT", signed=True),
             money(row.get("refund_amount_mxn", ""), "POS_REFUND"),
             "SYNTHETIC_POS_PAYMENT_NOT_ARRIVAL_OR_PICKUP",
         ))
