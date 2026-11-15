@@ -1,0 +1,26 @@
+name: Coffee Arena - authentic public native preflight
+on:
+  push:
+    branches: ['codex/coffee-complete-r2-run']
+  pull_request:
+    paths: ['arena/coffee_e2e*.py', '.github/workflows/coffee-end-to-end*.yml', 'tests/test_coffee_e2e.py']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  native-preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Workflow syntax
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
+      - name: Offline execution and boundary regressions
+        run: python -m unittest discover -s tests -p test_coffee_e2e.py -v
+      - name: Authenticate real public models and cached physics, without new OMC or provider
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -m arena.coffee_e2e native-preflight --out "$RUNNER_TEMP/coffee-native-preflight"

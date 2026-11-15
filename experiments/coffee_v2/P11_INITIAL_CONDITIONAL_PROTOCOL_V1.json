@@ -1,0 +1,60 @@
+{
+  "schema": "arena.coffee-v2.p11-protocol/1",
+  "scope": "CONDITIONAL_SYNTHETIC_PAID_POS_ONLY_NOT_BUSINESS_VALIDATION",
+  "selection": {
+    "partition": "CONSTRUCTION",
+    "method": "CONSTRUCTION_POS_LOAD_Q25_Q75_INPUT_ONLY/1",
+    "quantile_ranks": [
+      0.25,
+      0.75
+    ],
+    "exclude_zero_paid_days": true,
+    "exclude_partial_or_V1_reserved_days": true,
+    "choose_before_simulation": true
+  },
+  "policies": [
+    "B0",
+    "S5_TRANSFER_HANDOFF_TO_EXISTING_SUPPORT"
+  ],
+  "sensitivity": {
+    "design": "ONE_AT_A_TIME_PLUS_JOINT_EXTREMES_AND_TWO_CAPACITY_CHECKS",
+    "variant_ids": [
+      "NOMINAL",
+      "manual_setup_min_LOW",
+      "manual_setup_min_HIGH",
+      "espresso_auto_min_LOW",
+      "espresso_auto_min_HIGH",
+      "milk_finish_min_LOW",
+      "milk_finish_min_HIGH",
+      "handoff_min_LOW",
+      "handoff_min_HIGH",
+      "ALL_DURATIONS_LOW",
+      "ALL_DURATIONS_HIGH",
+      "BARISTA_UNITS_PLUS_ONE_BOTH_ARMS",
+      "ESPRESSO_GROUP_UNITS_PLUS_ONE_BOTH_ARMS"
+    ],
+    "use_same_pos_and_items_for_both_policies": true,
+    "no_truth_calibration": true
+  },
+  "illustrative_economics": {
+    "incremental_support_opportunity_cost_mxn_per_peak": [
+      0,
+      60,
+      150
+    ],
+    "assumed_value_mxn_per_additional_handoff_inside_peak": [
+      0,
+      20,
+      50
+    ],
+    "interpretation": "ILLUSTRATIVE_TIMING_VALUE_NOT_SALES_PROFIT_OR_REAL_ROI"
+  },
+  "rules": {
+    "count_handoffs_only_before_exclusive_peak_end": true,
+    "report_open_at_cut_and_full_drain_separately": true,
+    "no_revenue_from_faster_service_without_explicit_value_assumption": true,
+    "no_empirical_saturation_claim": true,
+    "no_business_recommendation_or_G3": true,
+    "no_evaluation_partition_access": true
+  }
+}
