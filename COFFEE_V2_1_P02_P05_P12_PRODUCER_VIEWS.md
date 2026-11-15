@@ -14,6 +14,9 @@ La vista productora NO recibe:
 
 El esquema V1 y la evaluación original siguen congelados. Una reserva V2 basada en el mismo generador **no equivale a una muestra externa**, y la mera partición no constituye un lock científico.
 
+**Dependencia irreductible de la fuente:** el manifiesto sintético actualizado declara que el generador utilizó la **forma visual de los 104 minutos** para modular la demanda de todas las semanas. Por ello, aunque esta vista publique sólo los primeros 60 minutos del perfil visual y suprima el tramo V1 del caso histórico, **los POS sintéticos de otros casos siguen reflejando indirectamente esa forma temporal completa**. Ni esta censura ni la partición HMAC restablecen independencia predictiva respecto de la reserva V1. P12 evalúa únicamente el generador sintético bajo alcance declarado, nunca la validez externa o una prueba ciega de la ventana V1.
+
+
 ## Entrega técnica
 
 \`arena/coffee_v2_producer_views.py\` prepara vistas **offline dentro de custodia**, sobre el mismo ZIP y la misma clave/SQLite fijados por el PR #25.
@@ -47,6 +50,10 @@ python -m arena.coffee_v2_producer_views \
 ~~~
 
 El proceso no publica por sí mismo ninguna salida a Actions: el propietario/custodio debe decidir qué directorio se puede transferir a los productores. **Nunca subir** el ZIP, catálogo privado, clave HMAC, lista de casos originales o verdad del simulador. La vista de productor contiene IDs opacos, no necesariamente anonimato estadístico frente a correlaciones de comportamiento.
+
+## Comprobación de la fuente original (independiente del CI)
+
+En inspección local del ZIP actualizado se comprobaron **14,244 claves POS únicas** y **16,097 partidas con padre válido**; ninguna partida se asocia a reembolso y sus timestamps coinciden con los pagos correspondientes. Se identificaron **47 POS y 54 partidas** asociados a pagos en/tras el cierre del pico (103.237 min), que este adaptador excluye de las entradas de la ventana sin convertirlos en cero. Estas verificaciones se hicieron sobre columnas autorizadas, no sobre verdad del simulador. **No** sustituyen todavía una ejecución completa del adaptador usando un catálogo privado persistido sobre el ZIP real.
 
 ## Pruebas y aceptación
 
