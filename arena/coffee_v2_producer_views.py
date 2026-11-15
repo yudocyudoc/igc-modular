@@ -54,7 +54,7 @@ CSV_COLUMNS = {
     "producer-paid-bins-5min.csv": (
         "case_id", "partition", "day_of_week", "bin_start_min",
         "bin_end_min_exclusive", "synthetic_payments", "synthetic_refunds",
-        "payments_equivalent_per_hour", "observable",
+        "payments_equivalent_per_hour", "observable", "coverage_status",
     ),
     "producer-video-proxy-minute.csv": (
         "minute_from_peak_start", "sample_seconds",
@@ -148,8 +148,10 @@ def build(source, private_dir):
         profile = corpus.read_csv(z, "perfil_carga_video.csv", (
             "minute_from_peak_start", "sample_seconds", "synthetic",
             "source_class"), 200)
-
-    horizon = 103.23706667  # source manifest/config verified by corpus.audit
+        # Original configuration has already been authenticated by corpus.audit.
+        config = json.loads(z.read(corpus.CONFIG))
+    horizon = corpus.floating(config["source"]["synthetic_peak_window_minutes"],
+                              60, 180, "SYNTHETIC_PEAK_HORIZON")
     private_filter = (HISTORICAL_V1["scenario_id"],
                       HISTORICAL_V1["replication"],
                       HISTORICAL_V1["day_of_week"])
@@ -255,14 +257,30 @@ def build(source, private_dir):
         for day in range(1, 8):
             for bin_start in range(0, 105, FIVE_MINUTES):
                 end = min(bin_start + FIVE_MINUTES, horizon)
-                paid = paid_by_bin[(sc, rep, day, bin_start, "sale")]
-                refunds = paid_by_bin[(sc, rep, day, bin_start, "refund")]
-                hours = (end-bin_start)/60.0
-                outputs["producer-paid-bins-5min.csv"].append((
-                    case_id, part, day, bin_start, format(end, ".10g"),
-                    paid, refunds, format(paid/hours, ".10g"),
-                    "PAID_POS_EQUIVALENT_RATE_NOT_ARRIVALS_OR_THROUGHPUT",
-                ))
+                historical_day = (sc, rep, day) == private_filter
+                if historical_day and bin_start >= V1_CONSTRUCTION_END:
+                    # Explicitly missing: never turn withheld V1 data into zero.
+                    outputs["producer-paid-bins-5min.csv"].append((
+                        case_id, part, day, bin_start, format(end, ".10g"),
+                        "", "", "",
+                        "PAID_POS_EQUIVALENT_RATE_NOT_ARRIVALS_OR_THROUGHPUT",
+                        "V1_RESERVED_NOT_RELEASED",
+                    ))
+                else:
+                    visible_end = (min(end, V1_CONSTRUCTION_END)
+                                   if historical_day else end)
+                    need(visible_end > bin_start, "EMPTY_OBSERVED_BIN")
+                    paid = paid_by_bin[(sc, rep, day, bin_start, "sale")]
+                    refunds = paid_by_bin[(sc, rep, day, bin_start, "refund")]
+                    hours = (visible_end-bin_start)/60.0
+                    outputs["producer-paid-bins-5min.csv"].append((
+                        case_id, part, day, bin_start,
+                        format(visible_end, ".10g"), paid, refunds,
+                        format(paid/hours, ".10g"),
+                        "PAID_POS_EQUIVALENT_RATE_NOT_ARRIVALS_OR_THROUGHPUT",
+                        ("V1_CONSTRUCTION_ONLY" if historical_day
+                         else "COMPLETE_SYNTHETIC_POS_WINDOW"),
+                    ))
                 bins += 1
     need(len(outputs["producer-case-index.csv"]) == 45
          and bins == 45*7*21, "CASE_AND_BIN_COVERAGE")
@@ -270,9 +288,11 @@ def build(source, private_dir):
          counts["released_pos_events"], "POS_NOT_CONSERVED_BY_CASE")
     need(sum(r[5] for r in outputs["producer-case-index.csv"]) ==
          counts["released_line_items"], "ITEMS_NOT_CONSERVED_BY_CASE")
-    need(sum(r[5] for r in outputs["producer-paid-bins-5min.csv"]) ==
+    need(sum(r[5] for r in outputs["producer-paid-bins-5min.csv"]
+             if isinstance(r[5], int)) ==
          counts["released_pos_sale"], "BIN_PAID_COUNT_NOT_CONSERVED")
-    need(sum(r[6] for r in outputs["producer-paid-bins-5min.csv"]) ==
+    need(sum(r[6] for r in outputs["producer-paid-bins-5min.csv"]
+             if isinstance(r[6], int)) ==
          counts["released_pos_refund"], "BIN_REFUND_COUNT_NOT_CONSERVED")
 
     seen_minute = set()
@@ -293,11 +313,16 @@ def build(source, private_dir):
             raw = row.get(name, "")
             values.append(format(corpus.floating(raw, 0, 1000, name),
                                  ".10g") if raw else "")
-        outputs["producer-video-proxy-minute.csv"].append((
-            minute, sampled, *values,
-            "VISUAL_PRESENCE_PROXY_NOT_ARRIVAL_OR_RESOURCE_UTILIZATION",
-        ))
-    need(seen_minute == set(range(104)), "VISUAL_PROFILE_INCOMPLETE")
+        # The full source's 104 minutes are validated, but historical V1
+        # reserve [60,103.237] cannot be released for V2 model development.
+        if minute < V1_CONSTRUCTION_END:
+            outputs["producer-video-proxy-minute.csv"].append((
+                minute, sampled, *values,
+                "VISUAL_PRESENCE_PROXY_NOT_ARRIVAL_OR_RESOURCE_UTILIZATION",
+            ))
+    need(seen_minute == set(range(104)) and
+         len(outputs["producer-video-proxy-minute.csv"]) == 60,
+         "VISUAL_PROFILE_INCOMPLETE")
 
     output_case_ids = {r[0] for r in outputs["producer-case-index.csv"]}
     need(len(output_case_ids) == 45 and all(
@@ -326,6 +351,8 @@ def build(source, private_dir):
         "excluded_partition": "EVALUATION",
         "historical_V1_reserved_interval_not_used":
             "ON_MATCHING_V1_CASE_DAY1_REP1_EXCLUDE_T_GE_60",
+        "historical_visual_proxy_scope_released": "[0,60) MINUTES",
+        "historical_visual_proxy_scope_withheld": "[60,103.237) MINUTES",
         "synthetic_peak_horizon_minutes": horizon,
         "operators": [TEMPORAL_OPERATOR, LINE_OPERATOR, VISUAL_OPERATOR],
         "declared_before_reference_model_tuning": True,
@@ -346,6 +373,9 @@ def build(source, private_dir):
             "status": "PRODUCER_VIEWS_READY_FOR_REFERENCE_DEVELOPMENT_NOT_EVALUATION",
             "source_sha256": verified["public"]["source_zip_sha256"],
             "allowed_weekly_cases": 45,
+            "visual_proxy_source_minute_rows": len(profile),
+            "visual_proxy_released_minute_rows": 60,
+            "visual_proxy_reserved_minutes_not_released": 44,
             "reserved_weekly_cases_not_released": 9,
             "released_rows": dict(sorted((k, len(v)) for k, v in outputs.items())),
             "exclusion_counts": dict(sorted(counts.items())),
