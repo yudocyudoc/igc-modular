@@ -51,7 +51,7 @@ jobs:
           from pathlib import Path
           import zipfile
           with zipfile.ZipFile("p11-public-source.zip", "w", zipfile.ZIP_DEFLATED) as z:
-              for p in sorted(Path("arena").glob("*.py")):
+              for p in sorted(Path("arena").rglob("*.py")):
                   z.write(p)
               for p in sorted(Path("experiments/coffee_v2").glob("*.json")):
                   z.write(p)
