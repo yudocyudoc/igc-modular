@@ -106,7 +106,8 @@ class ConditionalP11Tests(TestCase):
                               "PRIVATE_LINE_", "SUPER_PRIVATE_TRUTH_CANARY",
                               "seed", "scenario_id", "peak_arrivals_per_minute"):
                 self.assertNotIn(sensitive,text)
-            self.assertIn("NO recomendación real", (out/"REVIEW.md").read_text())
+            self.assertIn("NO recomendación real",
+                          (out/"REVIEW.md").read_text(encoding="utf-8"))
             with self.assertRaisesRegex(ArenaError,"OUTPUT_EXISTS"):
                 p11.export(result,out)
 
