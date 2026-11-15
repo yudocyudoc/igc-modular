@@ -1,0 +1,43 @@
+name: Coffee V2.1 - P02 P05 P12 producer views (offline)
+
+on:
+  pull_request:
+    paths:
+      - 'arena/coffee_v2_producer_views.py'
+      - 'tests/test_coffee_v2_producer_views.py'
+      - 'COFFEE_V2_1_P02_P05_P12_PRODUCER_VIEWS.md'
+      - '.github/workflows/coffee-v2-producer-views.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'arena/coffee_v2_producer_views.py'
+      - 'tests/test_coffee_v2_producer_views.py'
+      - 'COFFEE_V2_1_P02_P05_P12_PRODUCER_VIEWS.md'
+      - '.github/workflows/coffee-v2-producer-views.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-views:
+    name: Verify no evaluation leak and exact POS/bin counts on fictitious ZIP
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify native Arena contracts without provider
+        run: python -m arena.runtime verify
+      - name: Validate producer views against fictitious custodial ZIP
+        run: python -m unittest discover -s tests -p 'test_coffee_v2_producer_views.py' -v
+      - name: Explain test evidence limits
+        run: |
+          {
+            echo "P02/P05/P12 producer-view contract: fictitious ZIP only."
+            echo "No historical raw ZIP, R2, provider, OMC, G3, seed or new worlds."
+            echo "Green CI does not validate physical coffee capacity or S1-S5 effects."
+          } >> "$GITHUB_STEP_SUMMARY"
