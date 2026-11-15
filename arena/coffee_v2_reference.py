@@ -103,6 +103,20 @@ def config_gate(d):
     return resources, durations
 
 
+
+def counterfactual_pair_gate(base, intervention):
+    """For future P11: S5 only reassigns existing handoff, nothing else."""
+    config_gate(base)
+    config_gate(intervention)
+    need(base["policy"] == "B0" and intervention["policy"] == S5,
+         "PAIR_REQUIRES_B0_AND_S5")
+    left = {k: v for k, v in base.items() if k != "policy"}
+    right = {k: v for k, v in intervention.items() if k != "policy"}
+    need(left == right, "POLICY_CANNOT_SECRETLY_CHANGE_RESOURCES_OR_TIMES")
+    return {"scenario_dossier_sha256": digest(left),
+            "comparison_is_conditional_not_executed": True}
+
+
 def paid_gate(positions, lines, horizon):
     horizon = num(horizon, "HORIZON", 0, 180)
     need(horizon > 0 and type(positions) is list and type(lines) is list and
