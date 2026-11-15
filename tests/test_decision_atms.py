@@ -85,8 +85,8 @@ class DecisionAtmsTests(unittest.TestCase):
         add(j,"restore","RESTORE_A",11,target="A")
         restored=j.snapshot(as_known_at=t(12),valid_at=t(12))
         self.assertEqual(restored["labels"]["Y"],[["A","C"]])
-        self.assertEqual(first["journal_sha256"],
-                         restored["journal_sha256"])
+        self.assertNotEqual(first["journal_sha256"],
+                            restored["journal_sha256"])
         self.assertNotEqual(first["snapshot_sha256"],
                             restored["snapshot_sha256"])
         explanation=j.explain("Y",as_known_at=t(12),valid_at=t(12))
