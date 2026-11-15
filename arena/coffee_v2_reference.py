@@ -178,9 +178,33 @@ def percentile(values, fraction):
     return a[lo] if lo == hi else a[lo]*(hi-rank)+a[hi]*(rank-lo)
 
 
-def _engine(positions, lines, dossier, horizon):
+def support_calendar_gate(windows, horizon):
+    """Illustrative reserved time for EXISTING support's other duties.
+
+    Windows are hard reservations, not newly hired staff or a measurement.
+    A whole handoff must fit inside a free interval; it cannot displace
+    other tasks. All reserved intervals end at the peak cut; drain is free.
+    """
+    need(type(windows) in (list, tuple) and len(windows) <= 100,
+         "SUPPORT_CALENDAR_SIZE")
+    accepted = []
+    last = 0.0
+    for pair in windows:
+        need(type(pair) in (tuple, list) and len(pair) == 2,
+             "SUPPORT_WINDOW_SHAPE")
+        start = num(pair[0], "SUPPORT_BUSY_START", 0, horizon)
+        end = num(pair[1], "SUPPORT_BUSY_END", 0, horizon)
+        need(last <= start < end <= horizon,
+             "SUPPORT_CALENDAR_NOT_ORDERED_OR_OVERLAP")
+        accepted.append((start, end))
+        last = end
+    return accepted
+
+
+def _engine(positions, lines, dossier, horizon, *, support_busy_windows=()):
     cap, dur = config_gate(dossier)
     paid, refunds, beverages = paid_gate(positions, lines, horizon)
+    reserved = support_calendar_gate(support_busy_windows, horizon)
     need(cap["steam_wand"] > 0 or not any(
         "con_leche" in o["items"] for o in paid.values()),
         "MILK_REQUIRES_STEAM_WAND")
@@ -194,6 +218,10 @@ def _engine(positions, lines, dossier, horizon):
     busy = defaultdict(float)
     ops = Counter()
     private_intervals = []  # available to tests only; never in public result
+    for first, end in reserved:
+        # Wake blocked handoffs at each availability boundary; these events
+        # change no other resource and cannot count as synthetic payments.
+        heapq.heappush(events, (end, 0, next(nonce), "calendar", None))
     for oid, order in paid.items():
         remaining[oid] = len(order["items"])
         for index, typ in enumerate(order["items"]):
@@ -224,6 +252,8 @@ def _engine(positions, lines, dossier, horizon):
             _, _, _, kind, datum = heapq.heappop(events)
             processed += 1
             need(processed <= 120000, "EVENT_LIMIT")
+            if kind == "calendar":
+                continue
             if kind == "arrive":
                 for index in range(len(paid[datum]["items"])):
                     ready.append({"job": (datum, index), "stage": "manual_setup"})
@@ -257,6 +287,13 @@ def _engine(positions, lines, dossier, horizon):
         waiting = []
         for task in ready:
             req, duration = needed(task)
+            blocked_by_other_work = (
+                dossier["policy"] == S5 and task["stage"] == "handoff"
+                and any(t < end and t + duration > first
+                        for first, end in reserved))
+            if blocked_by_other_work:
+                waiting.append(task)
+                continue
             if all(inuse[r] < cap[r] for r in req):
                 for r in req:
                     inuse[r] += 1
@@ -300,6 +337,10 @@ def _engine(positions, lines, dossier, horizon):
                           "busy_unit_minutes_full_drain": round(busy[r], 10)}
                       for r in RESOURCES},
         "horizon_end_exclusive_min": horizon,
+        "existing_support_other_work_reserved_unit_minutes_in_peak_assumed":
+            round(sum(end-first for first, end in reserved), 10),
+        "support_busy_calendar_is_explicit_unmeasured_scenario": True,
+        "existing_support_other_duties_protected_not_simulated": True,
         "initial_unfinished_orders_assumed_zero_not_observed": True,
         "no_observed_pickup_wait_or_real_utilization": True,
         "not_an_observation_of_capacity_or_bottleneck": True,
@@ -311,9 +352,10 @@ def _engine(positions, lines, dossier, horizon):
     return result, private_intervals, finished
 
 
-def simulate(positions, items, dossier, horizon):
-    """Public API: only aggregated output; no item/order timelines."""
-    return _engine(positions, items, dossier, horizon)[0]
+def simulate(positions, items, dossier, horizon, *, support_busy_windows=()):
+    """Only aggregates; optional protected time for existing support work."""
+    return _engine(positions, items, dossier, horizon,
+                   support_busy_windows=support_busy_windows)[0]
 
 
 def run(view_dir, case_id, day, dossier):
