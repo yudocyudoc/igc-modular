@@ -93,6 +93,27 @@ class DecisionAtmsTests(unittest.TestCase):
         self.assertEqual(explanation["logical_support_environments"],
                          [["A","C"]])
 
+    def test_ephemeral_what_if_reports_impacts_without_changing_canon(self):
+        j=atms.Journal()
+        add(j,"assumption","A",0,node="A_NODE",status="ASSUMED")
+        add(j,"assumption","B",1,node="B_NODE",status="ASSUMED")
+        add(j,"justification","JOIN",2,conclusion="HYPOTHESIS",
+            premises=["A_NODE","B_NODE"])
+        canonical=j.snapshot(as_known_at=t(3),valid_at=t(3))
+        hypothetical=j.what_if(
+            as_known_at=t(3),valid_at=t(3),
+            candidate_events=[
+                atms.event("retract","HYPOTHETICAL_RETIRE",t(4),SRC,
+                           target="A")])
+        self.assertTrue(hypothetical["hypothetical_only"])
+        self.assertEqual(hypothetical["changed_labels"]["HYPOTHESIS"],{
+            "before":[["A","B"]],"after":[]})
+        self.assertEqual(
+            j.snapshot(as_known_at=t(3),valid_at=t(3)), canonical)
+        self.assertEqual(len(j.events),3)
+        self.assertEqual(hypothetical["canonical_journal_sha256_unchanged"],
+                         digest(j.events))
+
     def test_contextual_unsupported_cycles_future_and_provenance(self):
         j=atms.Journal()
         add(j,"justification","CY1",0,conclusion="CYCLE_X",
