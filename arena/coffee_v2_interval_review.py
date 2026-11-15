@@ -33,6 +33,7 @@ HEX_SHA = re.compile(r"^sha256:[a-f0-9]{64}$")
 CLOCK = "ORIGINAL_VIDEO_SECONDS"
 MAX_WINDOWS = 200
 MAX_ROWS = 10000
+PUBLIC_CONSTRUCTION_END_S = 3600.0  # V1 [0,60) minutes; do not select held-out video
 
 
 def need(ok, reason):
@@ -61,7 +62,7 @@ def create_template(out):
     """No fabricated observations: creates an empty private review worksheet."""
     out = Path(out)
     need(not out.exists(), "OUTPUT_EXISTS")
-    out.mkdir(parents=True)
+    out.mkdir(parents=True, mode=0o700)
     manifest = {
         "schema": SCHEMA, "clock": CLOCK,
         "media_sha256": "REPLACE_WITH_SHA256_OF_ORIGINAL_MEDIA",
@@ -125,6 +126,8 @@ def validate_manifest(manifest):
         start = number(w.get("start_s"), "WINDOW_START")
         end = number(w.get("end_s"), "WINDOW_END")
         need(0 <= start < end <= duration, "WINDOW_BOUNDS")
+        need(end <= PUBLIC_CONSTRUCTION_END_S,
+             "RESERVED_WINDOW_NOT_FOR_P07")
         out[w["id"]] = (start, end, w["stratum"])
     ordered = sorted((start, end) for start, end, _ in out.values())
     need(all(ordered[i][0] >= ordered[i-1][1]
@@ -235,7 +238,7 @@ def analyze(manifest, rows, *, media_file):
         "source_sha256": manifest["media_sha256"],
         "review_scope": manifest["review_scope"],
         "window_count": len(windows),
-        "reviewed_window_seconds": sum(b-a for a, b, _ in windows.values()),
+        "declared_window_seconds": sum(b-a for a, b, _ in windows.values()),
         "window_strata": dict(sorted(Counter(w[2] for w in windows.values()).items())),
         "rows_by_window_stratum": dict(sorted(strata.items())),
         "aggregate": dict(sorted(counts.items())),
@@ -255,13 +258,14 @@ def analyze(manifest, rows, *, media_file):
 def export(result, out):
     out = Path(out)
     need(not out.exists(), "OUTPUT_EXISTS")
-    out.mkdir(parents=True)
+    out.mkdir(parents=True, mode=0o700)
     write_json(out / "p07-interval-summary.json", result, exclusive=True)
     report = (
         "# P07 — intervalos manuales/máquina, resultado agregado\n\n"
         f"- Estado: **{result['status']}**.\n"
         f"- Ventanas: {result['window_count']}; "
-        f"duración total revisada: {result['reviewed_window_seconds']:.3f} s.\n"
+        f"duración declarada, NO necesariamente revisada: "
+        f"{result['declared_window_seconds']:.3f} s.\n"
         f"- Intervalos registrados: {result['aggregate'].get('interval_rows', 0)}; "
         f"elegibles manuales: {result['aggregate'].get('qualified_MANUAL_ACTIVE', 0)}; "
         f"elegibles máquina: {result['aggregate'].get('qualified_MACHINE_BUSY', 0)}.\n"
