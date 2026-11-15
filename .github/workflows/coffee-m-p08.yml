@@ -1,0 +1,89 @@
+name: Coffee P08 — original M typed stages vs service actions
+
+on:
+  pull_request:
+    paths:
+      - 'arena/coffee_m_p08.py'
+      - 'tests/test_coffee_m_p08.py'
+      - '.github/workflows/coffee-m-p08.yml'
+      - 'COFFEE_M_P08_DECISION.md'
+  push:
+    branches: [main]
+    paths:
+      - 'arena/coffee_m_p08.py'
+      - '.github/workflows/coffee-m-p08.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: coffee-p08-m-six-native-once
+  cancel-in-progress: false
+
+jobs:
+  p08-contract:
+    name: M representability, typed composition and no fake policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Check public original engine hashes
+        run: python -m arena.runtime verify
+      - name: Run new method-native P08 contract tests
+        run: python -m unittest discover -s tests -p test_coffee_m_p08.py -v
+      - name: Check original M adapter still passes
+        run: python -m unittest discover -s tests -p test_coffee_native_dm.py -v
+
+  p08-six-models:
+    name: Native M B0 / preparation capacity / espresso capacity (6 one-shot OMC)
+    needs: p08-contract
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Retrieve verified aggregated construction decision (no R2 or raw ZIP)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 43697007653 \
+            --repo "$GITHUB_REPOSITORY" \
+            --name s5-support-decision-43697007653 \
+            --dir "$RUNNER_TEMP/p08-source"
+          test -f "$RUNNER_TEMP/p08-source/NEXT_ACTION.json"
+          test -f "$RUNNER_TEMP/p08-source/receipt.json"
+      - name: Prepare six genuine M compositions with public aggregate pulse
+        run: |
+          python -m arena.coffee_m_p08 prepare \
+            --source "$RUNNER_TEMP/p08-source/NEXT_ACTION.json" \
+            --out "$RUNNER_TEMP/p08-m"
+      - name: Pin third-party Modelica libraries and solver image
+        run: python -m arena.runtime libraries
+      - name: Execute exactly six original-molecule variants, with explicit failures and no retry
+        run: python -m arena.coffee_m_p08 run --root "$RUNNER_TEMP/p08-m"
+      - name: Publish business-facing M result and limitation
+        if: success()
+        run: |
+          cat "$RUNNER_TEMP/p08-m/RESULT.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve authentic M source, simulations, CSV and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-p08-m-${{ github.run_id }}
+          path: ${{ runner.temp }}/p08-m/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Erase temporary source artifact from job
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/p08-source"
+
+# No R2 access, Cloudflare POST, new generator worlds, native D/B calls
+# or G3. A new typed role is an explicit M VERSION, not a retroactive
+# claim that the original M/B/D engines represent a physical espresso machine.
