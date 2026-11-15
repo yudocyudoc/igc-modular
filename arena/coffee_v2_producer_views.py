@@ -354,6 +354,8 @@ def build(source, private_dir):
             "ON_MATCHING_V1_CASE_DAY1_REP1_EXCLUDE_T_GE_60",
         "historical_visual_proxy_scope_released": "[0,60) MINUTES",
         "historical_visual_proxy_scope_withheld": "[60,103.237) MINUTES",
+        "original_generator_used_all_104_visual_proxy_minutes_for_shape": True,
+        "synthetic_POS_cannot_validate_V1_future_independently": True,
         "synthetic_peak_horizon_minutes": horizon,
         "operators": [TEMPORAL_OPERATOR, LINE_OPERATOR, VISUAL_OPERATOR],
         "declared_before_reference_model_tuning": True,
