@@ -1,0 +1,89 @@
+{
+  "schema": "arena.coffee-v2.reference-dossier/1",
+  "frontier": "SYNTHETIC_PAID_POS_TO_MODELED_HANDOFF",
+  "policy": "B0",
+  "resources": {
+    "barista": {
+      "units": 1,
+      "status": "ASSUMED",
+      "evidence": "ILLUSTRATIVE_ONLY_NOT_OBSERVED_ON_PREMISES"
+    },
+    "espresso_group": {
+      "units": 1,
+      "status": "ASSUMED",
+      "evidence": "ILLUSTRATIVE_ONLY_NOT_OBSERVED_ON_PREMISES"
+    },
+    "steam_wand": {
+      "units": 1,
+      "status": "ASSUMED",
+      "evidence": "ILLUSTRATIVE_ONLY_NOT_OBSERVED_ON_PREMISES"
+    },
+    "prep_space": {
+      "units": 1,
+      "status": "ASSUMED",
+      "evidence": "ILLUSTRATIVE_ONLY_NOT_OBSERVED_ON_PREMISES"
+    },
+    "pickup_pass": {
+      "units": 1,
+      "status": "ASSUMED",
+      "evidence": "ILLUSTRATIVE_ONLY_NOT_OBSERVED_ON_PREMISES"
+    },
+    "existing_support": {
+      "units": 1,
+      "status": "ASSUMED",
+      "evidence": "ILLUSTRATIVE_ONLY_NOT_OBSERVED_ON_PREMISES"
+    }
+  },
+  "durations": {
+    "manual_setup_min": {
+      "value": 0.5,
+      "bounds": [
+        0.25,
+        1
+      ],
+      "status": "ASSUMED",
+      "evidence": "ILLUSTRATIVE_TEST_VALUES_NOT_EMPIRICAL"
+    },
+    "espresso_auto_min": {
+      "value": 1.5,
+      "bounds": [
+        0.75,
+        3
+      ],
+      "status": "ASSUMED",
+      "evidence": "ILLUSTRATIVE_TEST_VALUES_NOT_EMPIRICAL"
+    },
+    "milk_finish_min": {
+      "value": 0.75,
+      "bounds": [
+        0.375,
+        1.5
+      ],
+      "status": "ASSUMED",
+      "evidence": "ILLUSTRATIVE_TEST_VALUES_NOT_EMPIRICAL"
+    },
+    "handoff_min": {
+      "value": 0.2,
+      "bounds": [
+        0.1,
+        0.4
+      ],
+      "status": "ASSUMED",
+      "evidence": "ILLUSTRATIVE_TEST_VALUES_NOT_EMPIRICAL"
+    }
+  },
+  "initial_open_orders": {
+    "value": 0,
+    "status": "ASSUMED",
+    "evidence": "NO_INITIAL_BACKLOG_MEASUREMENT_ASSUMED_ZERO"
+  },
+  "scope_limits": {
+    "no_cashier_arrivals": true,
+    "no_pre_payment_abandonment": true,
+    "no_post_payment_abandonment": true,
+    "no_inventory_or_cost_calibration": true,
+    "milk_after_extract_serial_per_beverage": true,
+    "no_batching": true,
+    "no_real_pickup_observations": true
+  }
+}

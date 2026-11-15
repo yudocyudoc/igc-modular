@@ -1,0 +1,47 @@
+name: Coffee V2.1 - P06 P07 P10 physical reference (offline)
+
+on:
+  pull_request:
+    paths:
+      - 'arena/coffee_v2_reference.py'
+      - 'arena/coffee_v2_reference_inputs.py'
+      - 'tests/test_coffee_v2_reference.py'
+      - 'experiments/coffee_v2/EXAMPLE_REFERENCE_DOSSIER_ASSUMPTIONS_ONLY.json'
+      - 'COFFEE_V2_1_P06_P07_P10_REFERENCE.md'
+      - '.github/workflows/coffee-v2-reference.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'arena/coffee_v2_reference.py'
+      - 'arena/coffee_v2_reference_inputs.py'
+      - 'tests/test_coffee_v2_reference.py'
+      - 'experiments/coffee_v2/EXAMPLE_REFERENCE_DOSSIER_ASSUMPTIONS_ONLY.json'
+      - 'COFFEE_V2_1_P06_P07_P10_REFERENCE.md'
+      - '.github/workflows/coffee-v2-reference.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  physical-reference:
+    name: Conditional physical process gates, no hidden truth
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify original engines without provider or simulator
+        run: python -m arena.runtime verify
+      - name: Run physical reference tests on fictional producer views only
+        run: python -m unittest discover -s tests -p 'test_coffee_v2_reference.py' -v
+      - name: Distinguish fixture from scientific evidence
+        run: |
+          {
+            echo "P06/P07/P10: physical reference contract and fixture tests only."
+            echo "No original source ZIP, no reserved truth, no provider/OMC/R2/G3."
+            echo "No observed coffee service times, no business recommendation."
+          } >> "$GITHUB_STEP_SUMMARY"
