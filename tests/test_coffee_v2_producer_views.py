@@ -120,6 +120,12 @@ class ProducerViewsTests(TestCase):
             with self.assertRaisesRegex(ArenaError,"OUTPUT_ALREADY_EXISTS"):
                 views.export(result, final_out)
 
+    def test_signed_refund_is_financial_not_new_beverage(self):
+        self.assertEqual(views.money("-65", "REFUND_AMOUNT", signed=True), "-65")
+        self.assertEqual(views.money("65", "REFUNDED_TOTAL"), "65")
+        with self.assertRaisesRegex(ArenaError, "NUMBER_RANGE"):
+            views.money("-65", "NONNEGATIVE_AMOUNT")
+
     def test_cannot_reroll_private_split_or_read_wrong_catalog(self):
         with TemporaryDirectory() as tmp:
             src, private, _, _ = prepare(tmp)
