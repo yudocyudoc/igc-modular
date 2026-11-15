@@ -12,7 +12,7 @@ from arena import coffee_v2_p11 as p11
 from arena import coffee_v2_reference as reference
 from arena import coffee_v2_producer_views as views
 from arena import coffee_v2_reference_inputs as ingress
-from test_coffee_v2_reference import dossier, make_view
+from test_coffee_v2_reference import dossier, make_view, paid, item
 
 
 def contract():
@@ -73,6 +73,10 @@ class ConditionalP11Tests(TestCase):
             self.assertEqual({x["partition"] for x in selected},{"CONSTRUCTION"})
             self.assertEqual(result["selection"]["saturation_status"],
                              "NOT_CLASSIFIED_FROM_PAID_LOAD_ALONE")
+            self.assertEqual(result["selection"]["input_load_contrast"],
+                             "TIED_SELECTED_PAID_INPUT_NO_LOW_HIGH_DISTINCTION")
+            self.assertEqual(result["measurement_next"]["second"]["variable"],
+                             "NOT_RANKABLE_NO_DELIVERY_SENSITIVITY_IN_TESTED_GRID")
             withheld = {r["opaque_case_id"] for r in audited["cases"]
                         if r["partition"]=="EVALUATION"}
             self.assertFalse(withheld & {x["case_id"] for x in selected})
@@ -110,6 +114,34 @@ class ConditionalP11Tests(TestCase):
                           (out/"REVIEW.md").read_text(encoding="utf-8"))
             with self.assertRaisesRegex(ArenaError,"OUTPUT_EXISTS"):
                 p11.export(result,out)
+
+    def test_real_counterfactual_mechanism_changes_modeled_peak_service_in_burst(self):
+        # Fictitious burst: 3 already-paid synthetic orders at t=0, not
+        # synthetic truth or a measured cafeteria demand regime.
+        base = dossier()
+        base["durations"]["espresso_auto_min"].update({
+            "value": 1, "bounds": [0.5, 1.5]})
+        base["durations"]["handoff_min"].update({
+            "value": 2, "bounds": [1, 3]})
+        intervention = copy.deepcopy(base)
+        intervention["policy"] = reference.S5
+        reference.counterfactual_pair_gate(base, intervention)
+        positions = [paid(x) for x in ("A", "B", "C")]
+        items = [item(x) for x in ("A", "B", "C")]
+        b0 = reference.simulate(positions, items, base, 8.5)
+        s5 = reference.simulate(positions, items, intervention, 8.5)
+        self.assertEqual((b0["synthetic_paid_orders"],
+                          s5["synthetic_paid_orders"]), (3, 3))
+        self.assertGreater(
+            s5["modeled_handoffs_during_halfopen_peak"],
+            b0["modeled_handoffs_during_halfopen_peak"])
+        delta = (s5["modeled_handoffs_during_halfopen_peak"] -
+                 b0["modeled_handoffs_during_halfopen_peak"])
+        self.assertEqual(delta, 1)
+        self.assertEqual(delta*20-0, 20)
+        self.assertEqual(delta*20-60, -40)
+        self.assertEqual(b0["modeled_handoffs_after_peak_in_drain"],
+                         s5["modeled_handoffs_after_peak_in_drain"]+1)
 
     def test_protocol_and_business_claims_are_not_mutable(self):
         p = contract()
