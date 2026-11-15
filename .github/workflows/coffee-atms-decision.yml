@@ -1,0 +1,49 @@
+name: Coffee Arena — ATMS decisional, temporal and retractable (offline)
+
+on:
+  pull_request:
+    paths:
+      - 'arena/decision_atms.py'
+      - 'arena/coffee_e2e.py'
+      - 'arena/coffee_e2e_protocol.py'
+      - 'tests/test_decision_atms.py'
+      - 'COFFEE_ATMS_DECISION_INTEGRATION.md'
+      - '.github/workflows/coffee-atms-decision.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'arena/decision_atms.py'
+      - 'arena/coffee_e2e.py'
+      - 'arena/coffee_e2e_protocol.py'
+      - 'tests/test_decision_atms.py'
+      - 'COFFEE_ATMS_DECISION_INTEGRATION.md'
+      - '.github/workflows/coffee-atms-decision.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  conditional-knowledge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Preserve existing native motors, no paid call
+        run: python -m arena.runtime verify
+      - name: "ATMS conformance: alternatives, retract, restore, as-of, no truth"
+        run: python -m unittest discover -s tests -p 'test_decision_atms.py' -v
+      - name: Existing coffee workflow regressions with fictional fixtures
+        run: python -m unittest discover -s tests -p 'test_coffee_e2e.py' -v
+      - name: Commit scope of evidence
+        run: |
+          {
+            echo "ATMS decision projection on FICTIONAL scenarios only."
+            echo "Preserves original historical D/M/B Ledger/ATMS; no real P11 rerun."
+            echo "No provider POST, R2, OMC, actual ZIP or G3."
+            echo "Conditional logical support is not causal/business validation."
+          } >> "$GITHUB_STEP_SUMMARY"

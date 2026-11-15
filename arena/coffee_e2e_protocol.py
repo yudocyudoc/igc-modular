@@ -123,7 +123,7 @@ class CoffeeGitHubBackend:
             raise ArenaError("Coffee result does not match this run.")
         for name, raw in files.items():
             if "/" in name or "\\" in name or name not in {
-                    "result.json", "REPORT.md", "native-scores.csv", "paired-sensitivity.csv", "economics-conditional.csv"}:
+                    "result.json", "REPORT.md", "ATMS_DECISION.json", "native-scores.csv", "paired-sensitivity.csv", "economics-conditional.csv"}:
                 raise ArenaError("Unexpected coffee result artifact member.")
             target = "COFFEE_REPORT.md" if name == "REPORT.md" else name
             (store.root/target).write_bytes(raw)

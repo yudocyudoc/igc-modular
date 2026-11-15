@@ -30,6 +30,7 @@ from . import coffee_dm_campaign as dm, coffee_dm_solver as solver
 from . import coffee_feedback as feedback, coffee_v2_start as history
 from . import coffee_v2_synthetic_corpus as corpus, coffee_v2_producer_views as views
 from . import coffee_v2_p11 as decision
+from . import decision_atms as knowledge
 from .coffee_adapters.b_translation import generate as translate_b, ident
 from .coffee_native_dm import prepare as prepare_dm
 from .coffee_custody import R2Storage, source_key
@@ -142,9 +143,17 @@ def run_decision(view_dir, out):
          "REFERENCE_PROCESS_MUST_NOT_HAVE_PRIVATE_CREDENTIALS")
     dossier = read_json(ROOT/"experiments/coffee_v2/EXAMPLE_REFERENCE_DOSSIER_ASSUMPTIONS_ONLY.json")
     protocol = read_json(ROOT/"experiments/coffee_v2/P11_INITIAL_CONDITIONAL_PROTOCOL_V1.json")
+    # Construction-visible reasoning before any reference simulation or truth.
+    pre = knowledge.scenario_predecision(
+        dossier, protocol, recorded_at=knowledge.utc_now())
     result = decision.compare(view_dir, dossier, protocol)
+    result["atms_predecision_snapshot_sha256"] = pre["snapshot"][
+        "snapshot_sha256"]
     decision.export(result, out)
-    return result["summary"]
+    write_json(Path(out)/"atms-predecision.json", pre, exclusive=True)
+    return dict(result["summary"],
+                atms_admission="S5_ONLY_CONDITIONAL_SYNTHETIC_COMPARISON_ADMITTED",
+                atms_snapshot_sha256=pre["snapshot"]["snapshot_sha256"])
 
 
 def fetch_historical(api, position):
@@ -496,12 +505,33 @@ def final_report(evaluation_dir, decision_dir, admission_dir, out):
     native = read_json(Path(evaluation_dir)/"evaluation.json")
     policy = read_json(Path(decision_dir)/"p11-conditional-summary.json")
     admitted = read_json(Path(admission_dir)/"admission-summary.json")
+    # Old PR #29 source predates ATMS: never fabricate historical predecision.
+    atms_pre = Path(decision_dir)/"atms-predecision.json"
+    if "atms_predecision_snapshot_sha256" in policy:
+        need(atms_pre.is_file(), "MISSING_MANDATORY_ATMS_PREDECISION")
+        pre = read_json(atms_pre)
+        need(pre["snapshot"]["snapshot_sha256"] ==
+             policy["atms_predecision_snapshot_sha256"],
+             "P11_ATMS_PREDECISION_PARENT_CHANGED")
+        atms_result = knowledge.postevaluation(
+            pre, policy, native, recorded_at=knowledge.utc_now())
+    else:
+        need(not atms_pre.exists(),
+             "UNLINKED_ATMS_PREDECISION_MUST_NOT_BE_ASSUMED")
+        atms_result = {
+            "schema":"arena.coffee-atms.postevaluation/1",
+            "status":"LEGACY_RUN_NO_PREDECISION_ATMS_NOT_RETROACTIVELY_CLAIMED",
+            "real_business_recommendation":False,
+            "not_a_what_if_experiment":True,
+            "requires_new_prospective_decision_run_for_full_integration":True,
+        }
     reconciled = "technical_reclassification" in native
     new_omc = native["new_omc_attempts"]
     original_reference = policy["summary"]["physical_reference_simulations"]
     summary = {"schema": SCHEMA, "status":"END_TO_END_COMPLETED_WITH_DECLARED_LIMITS",
                "corpus": admitted, "native_evaluation": native,
                "reference_policy_comparison": policy,
+               "decision_atms_status":atms_result["status"],
                "business_conclusion":"CONDITIONAL_REFERENCE_ONLY_ORIGINAL_ARMS_CANNOT_PREDICT_S5",
                "provider_posts":0,"new_omc_attempts":new_omc,"cached_dm_simulations":12,
                "cached_b_simulations":1 if reconciled else 0,
@@ -510,6 +540,7 @@ def final_report(evaluation_dir, decision_dir, admission_dir, out):
                "execution":{"run_id":int(os.environ.get("GITHUB_RUN_ID", "0")),
                             "code_sha":os.environ.get("GITHUB_SHA"),
                             "mode":"SEALED_TRACE_RECLASSIFICATION" if reconciled else "FULL_PIPELINE"}}
+    write_json(out/"ATMS_DECISION.json", atms_result, exclusive=True)
     write_json(out/"result.json", summary, exclusive=True)
     lines = ["# Arena: resultado del recorrido completo", "",
              f"Fuente R2: {admitted['weekly_cases']} semanas sintéticas, {admitted['pos_rows']} registros POS.",
@@ -532,6 +563,12 @@ def final_report(evaluation_dir, decision_dir, admission_dir, out):
               f"Diferencia de entregas antes del cierre: {s['min_delta_peak_handoffs']} a {s['max_delta_peak_handoffs']} pedidos.",
               f"Resultado nominal por carga: {s['nominal_delta_by_load']}.",
               f"Clasificaciones económicas ilustrativas: {s['economic_grid_sign_counts']}.",
+              "", "## Memoria ATMS decisional", "",
+              f"Estado ATMS: {atms_result['status']}.",
+              "La admisibilidad lógica de S5 bajo supuestos no acredita",
+              "disponibilidad real del apoyo, causalidad ni beneficio económico.",
+              "La memoria y el cambio de soporte están en ATMS_DECISION.json;",
+              "no reemplazan el Ledger/ATMS histórico propio de D/M/B.",
               "", "## Qué confirma y qué falta", "",
               "El recorrido de datos, métodos, simulación, memoria, sellado y contraste se ejecutó en GitHub.",
               "El error predictivo permite detectar límites de los modelos; completar el recorrido no significa acertar.",
