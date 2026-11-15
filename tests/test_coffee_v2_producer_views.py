@@ -118,9 +118,10 @@ class ProducerViewsTests(TestCase):
     def test_cannot_reroll_private_split_or_read_wrong_catalog(self):
         with TemporaryDirectory() as tmp:
             src, private, _, _ = prepare(tmp)
-            with sqlite3.connect(private/"catalog.sqlite") as conn:
+            with closing(sqlite3.connect(private/"catalog.sqlite")) as conn:
                 conn.execute("UPDATE synthetic_cases SET partition='EVALUATION' "
-                             "WHERE rowid=(SELECT MIN(rowid) FROM synthetic_cases)")
+                             "WHERE rowid=(SELECT MIN(rowid) FROM synthetic_cases "
+                             "WHERE partition='CONSTRUCTION')")
                 conn.commit()
             with self.assertRaisesRegex(ArenaError, "PRIVATE_CATALOG_PARTITION_CHANGED"):
                 build_fixture(src, private)
