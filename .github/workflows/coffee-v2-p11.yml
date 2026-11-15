@@ -8,6 +8,7 @@ on:
       - 'COFFEE_V2_1_P11_CONDITIONAL_B0_S5.md'
       - 'experiments/coffee_v2/P11_INITIAL_CONDITIONAL_PROTOCOL_V1.json'
       - '.github/workflows/coffee-v2-p11.yml'
+      - '.github/workflows/coffee-v2-p11-private-replay.yml'
   push:
     branches: [main]
     paths:
@@ -40,25 +41,9 @@ jobs:
         run: |
           {
             echo "P11 fixture-only conditional B0/S5: NOT business validation."
+            echo "No authentic ZIP is executed here; real source runs only in a PRIVATE GitHub Actions caller."
             echo "Input-only construction selection, no truth or G3."
             echo "Illustrative opportunity costs, NOT actual salary or ROI."
             echo "No OMC, R2, POST, provider calls, or new synthetic worlds."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Bundle public reference source for private offline replay
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import zipfile
-          with zipfile.ZipFile("p11-public-source.zip", "w", zipfile.ZIP_DEFLATED) as z:
-              for p in sorted(Path("arena").rglob("*.py")):
-                  z.write(p)
-              for p in sorted(Path("experiments/coffee_v2").glob("*.json")):
-                  z.write(p)
-          PY
-      - uses: actions/upload-artifact@v4
-        with:
-          name: p11-public-source
-          path: p11-public-source.zip
-          retention-days: 7
-          if-no-files-found: error
