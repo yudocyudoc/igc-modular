@@ -31,6 +31,7 @@ from . import coffee_feedback as feedback, coffee_v2_start as history
 from . import coffee_v2_synthetic_corpus as corpus, coffee_v2_producer_views as views
 from . import coffee_v2_p11 as decision
 from . import decision_atms as knowledge
+from . import decision_atms_gate as execution_gate
 from .coffee_adapters.b_translation import generate as translate_b, ident
 from .coffee_native_dm import prepare as prepare_dm
 from .coffee_custody import R2Storage, source_key
@@ -137,7 +138,7 @@ def download_views(out, storage=None):
     return {"status": "AUTHORIZED_VIEWS_ONLY_DOWNLOADED", "files": len(VIEW_FILES)}
 
 
-def run_decision(view_dir, out):
+def run_decision(view_dir, out, *, atms_revision_events=()):
     execution_identity()
     need(not any(os.environ.get(k) for k in dm.NO_R2),
          "REFERENCE_PROCESS_MUST_NOT_HAVE_PRIVATE_CREDENTIALS")
@@ -146,14 +147,30 @@ def run_decision(view_dir, out):
     # Construction-visible reasoning before any reference simulation or truth.
     pre = knowledge.scenario_predecision(
         dossier, protocol, recorded_at=knowledge.utc_now())
+    # The operational decision, not only the prose report, is derived from
+    # the ATMS support graph. Revocations are a fixture/API seam, NOT a CLI
+    # flag; no untrusted revisions are imported from a run configuration.
+    gate = execution_gate.gate(
+        pre, dossier, protocol, revision_events=atms_revision_events)
+    if gate["status"] != execution_gate.EXECUTE:
+        # Preserve evidence of abstention. In GitHub Actions the job fails
+        # closed before P11; a failure-only artifact can retain this receipt.
+        Path(out).mkdir(mode=0o700, parents=True, exist_ok=False)
+        write_json(Path(out)/"atms-predecision.json", pre, exclusive=True)
+        write_json(Path(out)/"atms-execution-gate.json", gate, exclusive=True)
+        raise ArenaError("COFFEE_ATMS_ABSTAIN_MEASURE_FIRST_NO_P11_SIMULATION")
+    execution_gate.require_executable(gate)
     result = decision.compare(view_dir, dossier, protocol)
     result["atms_predecision_snapshot_sha256"] = pre["snapshot"][
         "snapshot_sha256"]
+    result["atms_execution_gate_sha256"] = gate["gate_sha256"]
     decision.export(result, out)
     write_json(Path(out)/"atms-predecision.json", pre, exclusive=True)
+    write_json(Path(out)/"atms-execution-gate.json", gate, exclusive=True)
     return dict(result["summary"],
-                atms_admission="S5_ONLY_CONDITIONAL_SYNTHETIC_COMPARISON_ADMITTED",
-                atms_snapshot_sha256=pre["snapshot"]["snapshot_sha256"])
+                atms_admission=gate["status"],
+                atms_snapshot_sha256=gate["atms_snapshot"]["snapshot_sha256"],
+                atms_execution_gate_sha256=gate["gate_sha256"])
 
 
 def fetch_historical(api, position):
@@ -513,8 +530,20 @@ def final_report(evaluation_dir, decision_dir, admission_dir, out):
         need(pre["snapshot"]["snapshot_sha256"] ==
              policy["atms_predecision_snapshot_sha256"],
              "P11_ATMS_PREDECISION_PARENT_CHANGED")
+        gate_path = Path(decision_dir)/"atms-execution-gate.json"
+        need(gate_path.is_file(), "P11_ATMS_GATE_MISSING")
+        gate = read_json(gate_path)
+        execution_gate.require_executable(gate)
+        need(gate["predecision_snapshot_sha256"] ==
+             pre["snapshot"]["snapshot_sha256"] and
+             gate["dossier_sha256"] == pre["dossier_sha256"] and
+             gate["protocol_sha256"] == pre["protocol_sha256"] and
+             policy.get("atms_execution_gate_sha256") ==
+             gate["gate_sha256"],
+             "P11_ATMS_EXECUTION_GATE_PARENT_CHANGED")
         atms_result = knowledge.postevaluation(
-            pre, policy, native, recorded_at=knowledge.utc_now())
+            pre, policy, native, recorded_at=knowledge.utc_now(),
+            execution_receipt=gate)
     else:
         need(not atms_pre.exists(),
              "UNLINKED_ATMS_PREDECISION_MUST_NOT_BE_ASSUMED")
