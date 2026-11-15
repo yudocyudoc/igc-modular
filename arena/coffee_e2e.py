@@ -17,6 +17,7 @@ from pathlib import Path
 import re
 import secrets
 import subprocess
+import sys
 from tempfile import TemporaryDirectory
 import zipfile
 
@@ -147,7 +148,7 @@ def run_decision(view_dir, out):
 def fetch_historical(api, position):
     run, artifact, sha, workflow, event, name, checksum, _ = history.HISTORY[position]
     return feedback._fetch(api, run_id=run, sha=sha, artifact_id=artifact,
-                           archive_sha=checksum, workflow=workflow,
+                           archive_sha="sha256:"+checksum, workflow=workflow,
                            artifact_name=name, event=event)
 
 

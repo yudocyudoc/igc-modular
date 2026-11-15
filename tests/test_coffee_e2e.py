@@ -37,6 +37,19 @@ def lock_fixture():
 
 
 class CoffeeEndToEndTests(unittest.TestCase):
+    def test_historical_artifact_digest_preserves_required_sha256_prefix(self):
+        with patch.object(e2e.feedback,"_fetch",return_value={}) as fetch:
+            e2e.fetch_historical(Mock(),4)
+        self.assertEqual(fetch.call_args.kwargs["archive_sha"],
+                         "sha256:"+e2e.history.HISTORY[4][6])
+
+    def test_cli_reports_preflight_failure_without_hiding_original_error(self):
+        from contextlib import redirect_stderr
+        capture = io.StringIO()
+        with patch.object(e2e,"stage_native",side_effect=ArenaError("known failure")), redirect_stderr(capture):
+            self.assertEqual(e2e.main(["native-preflight","--out","unused"]),2)
+        self.assertEqual(json.loads(capture.getvalue())["reason"],"known failure")
+
     def config(self):
         return {"id":"coffee-test", "protocol":"coffee_end_to_end_v1", "backend":"github",
                 "budget":{"omc":1,"provider_posts":0,"workflow":1},
