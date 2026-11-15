@@ -1,0 +1,80 @@
+name: Coffee — does S5 help when support is already busy?
+
+on:
+  pull_request:
+    paths:
+      - 'arena/coffee_v2_reference.py'
+      - 'arena/coffee_s5_availability.py'
+      - 'tests/test_coffee_s5_availability.py'
+      - '.github/workflows/coffee-s5-availability.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'arena/coffee_v2_reference.py'
+      - 'arena/coffee_s5_availability.py'
+      - '.github/workflows/coffee-s5-availability.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coffee-s5-support-availability-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test-physical-mechanism:
+    name: Physics and decision behavior on fictional data (no source access)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Check workflow syntax
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
+      - name: Existing conservation and availability regressions
+        run: |
+          python -m unittest discover -s tests -p 'test_coffee_v2_reference.py' -v
+          python -m unittest discover -s tests -p 'test_coffee_v2_p11.py' -v
+          python -m unittest discover -s tests -p 'test_coffee_s5_availability.py' -v
+          python -m unittest discover -s tests -p 'test_decision_atms_gate.py' -v
+
+  real-synthetic-decision:
+    name: Six S5 counterfactual pairs on EXISTING construction views (no new worlds)
+    needs: test-physical-mechanism
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    environment: arena-custodian
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Read ONLY authorized existing P05 producer views from original GitHub run
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CT03_R2_BUCKET: ${{ vars.CT03_R2_BUCKET || 'igc-ct03-private-custody' }}
+          CT03_R2_ACCESS_KEY_ID: ${{ secrets.CT03_R2_ACCESS_KEY_ID }}
+          CT03_R2_SECRET_ACCESS_KEY: ${{ secrets.CT03_R2_SECRET_ACCESS_KEY }}
+        run: python -m arena.coffee_s5_availability fetch-views --out "$RUNNER_TEMP/producer-views"
+      - name: Run actual S5 support-availability pilot without secrets or provider
+        run: |
+          python -m arena.coffee_s5_availability compare \
+            --views "$RUNNER_TEMP/producer-views" \
+            --out "$RUNNER_TEMP/support-decision"
+          cat "$RUNNER_TEMP/support-decision/DECISION.md" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: s5-support-decision-${{ github.run_id }}
+          path: ${{ runner.temp }}/support-decision/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Clear R2 views from the temporary job directory
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/producer-views"
+
+# Distinct from the original expensive end-to-end run: 0 new OMC,
+# 0 provider POST, 0 synthetic worlds, no truth and no G3.
