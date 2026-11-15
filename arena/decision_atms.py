@@ -348,17 +348,33 @@ def scenario_predecision(dossier, protocol, *, recorded_at):
     }
 
 
-def postevaluation(pre, policy, native, *, recorded_at):
+def postevaluation(pre, policy, native, *, recorded_at, execution_receipt=None):
     """Append post-seal observations; never mutate pre-decision cut or labels."""
     need(type(pre) is dict and
          pre.get("schema")=="arena.coffee-atms.predecision/1" and
          pre.get("status")=="S5_ONLY_CONDITIONAL_SYNTHETIC_COMPARISON_ADMITTED"
          and pre.get("no_truth_access") is True, "PREDECISION_PROOF_REQUIRED")
     journal=Journal(pre["journal"])
-    before=pre["snapshot"]
-    need(journal.snapshot(as_known_at=before["as_known_at"],
-                          valid_at=before["valid_at"])==before,
+    original=pre["snapshot"]
+    need(journal.snapshot(as_known_at=original["as_known_at"],
+                          valid_at=original["valid_at"])==original,
          "PREDECISION_SNAPSHOT_CHANGED")
+    if execution_receipt is not None:
+        from . import decision_atms_gate as contract
+        contract.require_executable(execution_receipt)
+        need(execution_receipt["predecision_snapshot_sha256"] ==
+             original["snapshot_sha256"] and
+             policy.get("atms_execution_gate_sha256") ==
+             execution_receipt["gate_sha256"],
+             "ATMS_EXECUTION_PARENT_MISMATCH")
+        for amendment in execution_receipt["revision_events"]:
+            journal.append(amendment)
+        before=execution_receipt["atms_snapshot"]
+        need(journal.snapshot(as_known_at=before["as_known_at"],
+                              valid_at=before["valid_at"])==before,
+             "ATMS_GATE_REVISION_SNAPSHOT_CHANGED")
+    else:
+        before=original
     need(type(policy) is dict and
          policy.get("dossier_sha256")==pre["dossier_sha256"] and
          policy.get("protocol_sha256")==pre["protocol_sha256"] and
@@ -408,7 +424,10 @@ def postevaluation(pre, policy, native, *, recorded_at):
     return {
         "schema":"arena.coffee-atms.postevaluation/1",
         "status":"POST_SEAL_ATMS_UPDATED_NO_BUSINESS_RECOMMENDATION",
-        "predecision_snapshot_sha256":before["snapshot_sha256"],
+        "predecision_snapshot_sha256":original["snapshot_sha256"],
+        "execution_snapshot_sha256":before["snapshot_sha256"],
+        "execution_gate_sha256":(
+            execution_receipt["gate_sha256"] if execution_receipt else None),
         "post_snapshot":after, "revision_events":journal.events[len(pre["journal"]):],
         "changed_support_nodes":changed,
         "conditionally_model_beneficial":bool(
