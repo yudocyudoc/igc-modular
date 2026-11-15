@@ -56,13 +56,15 @@ def gate(pre, dossier, protocol, *, revision_events=()):
          len(revision_events) <= MAX_REVISIONS,
          "REVISION_COUNT_OR_TYPE")
     journal = atms.Journal(pre["journal"])
+    locally_created_conflicts = set()
     for revision in revision_events:
         need(type(revision) is dict, "REVISION_RECORD_REQUIRED")
         operation = revision.get("op")
         need(operation in {"retract", "restore", "nogood"},
              "NO_ARBITRARY_NEW_PREMISES_OR_JUSTIFICATIONS")
         if operation in ("retract", "restore"):
-            need(revision.get("target") in REVISION_TARGETS,
+            need(revision.get("target") in
+                 (REVISION_TARGETS | locally_created_conflicts),
                  "REVISION_OUTSIDE_P11_PREMISES")
         else:
             values = revision.get("assumptions")
@@ -76,6 +78,8 @@ def gate(pre, dossier, protocol, *, revision_events=()):
         need(revision["valid_from"] == revision["recorded_at"],
              "NO_RETROACTIVE_AUTHORING_IN_THIS_GATE")
         journal.append(revision)
+        if operation == "nogood":
+            locally_created_conflicts.add(revision["id"])
     cut = (revision_events[-1]["recorded_at"] if revision_events
            else pre["snapshot"]["as_known_at"])
     candidate = journal.snapshot(as_known_at=cut, valid_at=cut)
