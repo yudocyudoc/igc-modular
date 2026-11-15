@@ -1,0 +1,41 @@
+name: Coffee V2.1 - P01 P02 synthetic corpus admission (offline contracts)
+
+on:
+  pull_request:
+    paths:
+      - 'arena/coffee_v2_synthetic_corpus.py'
+      - 'tests/test_coffee_v2_synthetic_corpus.py'
+      - 'COFFEE_V2_1_P01_P02_SYNTHETIC_CORPUS.md'
+      - '.github/workflows/coffee-v2-synthetic-corpus.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'arena/coffee_v2_synthetic_corpus.py'
+      - 'tests/test_coffee_v2_synthetic_corpus.py'
+      - 'COFFEE_V2_1_P01_P02_SYNTHETIC_CORPUS.md'
+      - '.github/workflows/coffee-v2-synthetic-corpus.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-corpus:
+    name: Schema/joins/custody partitions on fictitious ZIP only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify originals and migration contracts
+        run: python -m arena.runtime verify
+      - name: Validate private/public contract against fictional ZIP only
+        run: python -m unittest discover -s tests -p 'test_coffee_v2_synthetic_corpus.py' -v
+      - name: Evidence classification
+        run: |
+          echo "P01/P02 ZIP integrity and grouped partitions: fixture only." >> "$GITHUB_STEP_SUMMARY"
+          echo "Original ZIP not in CI. No R2, supplier, OMC or G3." >> "$GITHUB_STEP_SUMMARY"
+          echo "No physical treatment or business recommendation is evaluated." >> "$GITHUB_STEP_SUMMARY"
