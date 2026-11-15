@@ -3,7 +3,7 @@ on:
   push:
     branches: ['codex/coffee-complete-r2-run']
   pull_request:
-    paths: ['arena/coffee_e2e*.py', 'arena/decision_atms.py', '.github/workflows/coffee-end-to-end*.yml', '.github/workflows/coffee-atms-decision.yml', 'tests/test_coffee_e2e.py', 'tests/test_decision_atms.py']
+    paths: ['arena/coffee_e2e*.py', 'arena/decision_atms.py', 'arena/decision_atms_gate.py', '.github/workflows/coffee-end-to-end*.yml', '.github/workflows/coffee-atms-decision.yml', 'tests/test_coffee_e2e.py', 'tests/test_decision_atms.py', 'tests/test_decision_atms_gate.py']
 permissions:
   contents: read
   actions: read
@@ -22,6 +22,8 @@ jobs:
         run: python -m unittest discover -s tests -p test_coffee_e2e.py -v
       - name: ATMS decision regression (synthetic fixtures only, no truth or provider)
         run: python -m unittest discover -s tests -p test_decision_atms.py -v
+      - name: ATMS execution gate regression without invoking P11 on rejected support
+        run: python -m unittest discover -s tests -p test_decision_atms_gate.py -v
       - name: Authenticate real public models and cached physics, without new OMC or provider
         env:
           GH_TOKEN: ${{ github.token }}
