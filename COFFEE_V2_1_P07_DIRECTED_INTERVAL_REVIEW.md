@@ -34,7 +34,7 @@ No se define aquí un umbral artificial de N intervalos para declarar identifica
 
 El módulo `arena/coffee_v2_interval_review.py` usa solamente biblioteca estándar y `arena.common`. No abre los CSV de P01, ni B0, ni la fuente ZIP, ni el generador, ni la reserva. No decodifica ni reextrae video; **comprueba su hash** para ligar las anotaciones al medio exacto.
 
-Primero crear una plantilla privada vacía:
+Primero crear una plantilla privada de **observaciones vacías**, con seis ventanas temporales predeclaradas y marcadas `PENDING`:
 
 ~~~sh
 python -m arena.coffee_v2_interval_review --init --out /ruta-privada/p07-hoja
@@ -50,11 +50,26 @@ python -m arena.coffee_v2_interval_review \
   --out /ruta-privada/p07-result
 ~~~
 
-El contrato del borrador se versiona como `arena.coffee-v2.p07-directed-interval-review/2`, sin compatibilidad implícita con plantillas preliminares del borrador. La discrepancia entre revisores se registra y verifica, pero los intervalos siguen siendo **candidatos para posterior revisión de identificabilidad**, no medidas validadas de capacidad.
+El contrato actual del borrador se versiona como `arena.coffee-v2.p07-directed-interval-review/3`; no se asume compatibilidad automática con las plantillas preliminares anteriores. La discrepancia entre revisores se registra y verifica, pero los intervalos siguen siendo **candidatos para posterior revisión de identificabilidad**, no medidas validadas de capacidad.
 
-Cada ventana exige `id`, `start_s`, `end_s`, `stratum` (`ACTIVITY`, `QUIET`, `UNCERTAIN`) y `selection_reason`. Los segundos pertenecen al reloj del **video original**, no a horas de POS. Cada fila usa exactamente las columnas de la plantilla: un intervalo manual o de máquina, sus límites, origen, revisores, nivel de confianza y referencia local de evidencia. Intervalos confirmados exactos del mismo recurso que se solapan son rechazados: dos tareas incompatibles no pueden ocuparlo a la vez.
+El plan sistemático `SYSTEMATIC_FIRST_HOUR_6X180/1` fija seis ventanas de tres minutos: 1–4, 11–14, 21–24, 31–34, 41–44 y 51–54 min. No se eligen según pagos sintéticos, eventos reconstruidos ni supuesta carga real. No son muestra aleatoria ni representan los 60 minutos enteros. Su posición no puede modificarse silenciosamente: si se necesitan ventanas adicionales, declarar otro protocolo `DIRECTED_EXPLORATORY/1` y justificar la selección.
+
+Cada ventana exige `id`, `start_s`, `end_s`, `stratum` (`ACTIVITY`, `QUIET`, `UNCERTAIN`), `selection_reason`, `coverage_state`, `reviewer_ids` y `coverage_evidence_ref`. `coverage_state` puede ser `PENDING`, `PARTIAL`, `REVIEWED` o `NOT_VIEWABLE`. Para contar una ventana `REVIEWED`, dos revisores distintos declaran cobertura completa y evidencia local. Ventana vacía de filas **no equivale a inactividad observada**. Sólo los intervalos de ventanas completamente revisadas pueden llegar a contarse como candidatos aptos; las ventanas parciales y censuradas permanecen registradas.
+
+Cada ventana también conserva su `selection_reason`. Los segundos pertenecen al reloj del **video original**, no a horas de POS. Cada fila usa exactamente las columnas de la plantilla: un intervalo manual o de máquina, sus límites, origen, revisores, nivel de confianza y referencia local de evidencia. Intervalos confirmados exactos del mismo recurso que se solapan son rechazados: dos tareas incompatibles no pueden ocuparlo a la vez.
 
 La salida contiene únicamente `p07-interval-summary.json` y `REVIEW.md`, sin filas ni IDs, tiempos individuales, video, fotogramas ni referencias locales. Existen pruebas negativas para la ausencia/adulteración del medio, solapamientos físicamente incompatibles, censura, alteración del contrato y filtración de IDs. Un `MEDIA_HASH_MISMATCH` o falta de video bloquea el cálculo. El hash sólo verifica que los bytes del archivo corresponden a los declarados; no verifica que el medio sea la grabación original ni que las marcas sean correctas. `DUAL_CONFIRMED` con extremos distintos fuera de tolerancia provoca un error explícito y exige resolver la disputa; nunca se corrige el dato automáticamente.
+
+
+## Revisión histórica P031: evidencia previa, NO medición certificada
+
+Existe un informe del 4 de noviembre de 2026, `INFORME_REVISION4_P031.md`, que trabajó sobre fotogramas del segmento 2748–2902 s (45:48–48:22). El informe registra la huella del video original como `sha256:cd37c9d3f231f4d307c4f3353ce1dc096fad4185bbdf6ffab06266b9d41290c5`, en aquel momento cotejada contra Drive; **este PR no ha recuperado ni cotejado de nuevo el MP4**. La revisión consistió en 78 fotogramas separados por dos segundos y 45 de refinamiento a un segundo, no en dos anotadores independientes del video continuo. Se documentó manipulación del barista y coexistencia local de hasta tres recipientes con contenido, sin prueba de tres bebidas terminadas, trabajo manual continuo ni motor de máquina activo.
+
+P031 sirve como **pista exploratoria** para definir los tipos de anotación y posibles límites de visibilidad. No introduce duraciones a la calibración ni modifica las seis ventanas sistemáticas. Si se decide examinar P031 de nuevo, se registra como muestreo dirigido retrospectivo, con su sesgo de selección conocido y nuevas mediciones independientes; no se presenta como muestra de carga representativa.
+
+## Relojes y recursos
+
+Los tiempos que se registran son **segundos del video**. La verificación de checksum no acredita velocidad de reproducción real, continuidad del archivo o que 1 segundo de video sea 1 segundo de servicio. Antes de traducirlos en parámetros físicos debe verificarse esa correspondencia. El ID de recurso debe designar la **unidad exclusiva apropiada**: un grupo de extracción puede operar en paralelo a otro grupo o al vaporizador; un ID para toda la máquina podría crear incompatibilidades artificiales. La disponibilidad real y las pausas de equipo son mediciones separadas, todavía faltantes.
 
 ## Criterio para permitir el siguiente paso
 
