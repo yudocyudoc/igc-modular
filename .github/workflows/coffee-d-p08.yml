@@ -1,0 +1,117 @@
+name: Coffee PR37 — D stage-capacity and three-method decision
+
+on:
+  pull_request:
+    paths:
+      - 'arena/coffee_d_p08.py'
+      - 'arena/coffee_p08_threeway.py'
+      - 'tests/test_coffee_d_p08.py'
+      - 'tests/test_coffee_p08_threeway.py'
+      - '.github/workflows/coffee-d-p08.yml'
+      - 'COFFEE_D_P08_DECISION.md'
+  push:
+    branches: [main]
+    paths:
+      - 'arena/coffee_d_p08.py'
+      - 'arena/coffee_p08_threeway.py'
+      - '.github/workflows/coffee-d-p08.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: coffee-d-p08-six-native-once
+  cancel-in-progress: false
+
+jobs:
+  contracts:
+    name: D original equations, stage-only variants, ATMS negative reasoning
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Verify original D/M source hashes
+        run: python -m arena.runtime verify
+      - name: Versioned D stage-capacity contract tests
+        run: python -m unittest discover -s tests -p test_coffee_d_p08.py -v
+      - name: Three-method ATMS selection and time cuts tests
+        run: python -m unittest discover -s tests -p test_coffee_p08_threeway.py -v
+      - name: Original native D/M and coffee P08 invariants
+        run: |
+          python -m unittest discover -s tests -p test_coffee_native_dm.py -v
+          python -m unittest discover -s tests -p test_coffee_m_p08.py -v
+
+  six-d-and-threeway:
+    name: Six native D OMC, then D/M/reference disposition
+    needs: contracts
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Download fixed public aggregate reference result from GitHub Actions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 43697007653 \
+            --repo "$GITHUB_REPOSITORY" \
+            --name s5-support-decision-43697007653 \
+            --dir "$RUNNER_TEMP/p08-ref"
+          test -f "$RUNNER_TEMP/p08-ref/NEXT_ACTION.json"
+          test -f "$RUNNER_TEMP/p08-ref/receipt.json"
+      - name: Download six previous native M results (not re-simulated)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 43702148041 \
+            --repo "$GITHUB_REPOSITORY" \
+            --name coffee-p08-m-43702148041 \
+            --dir "$RUNNER_TEMP/p08-m"
+          test -f "$RUNNER_TEMP/p08-m/result.json"
+      - name: Prepare six D native models with capacity split but same D source equations
+        run: |
+          python -m arena.coffee_d_p08 prepare \
+            --source "$RUNNER_TEMP/p08-ref/NEXT_ACTION.json" \
+            --out "$RUNNER_TEMP/p08-d"
+      - name: Pin original third-party libraries and OMC image
+        run: python -m arena.runtime libraries
+      - name: Run exactly six one-shot D OMC variants
+        run: python -m arena.coffee_d_p08 run --root "$RUNNER_TEMP/p08-d"
+      - name: Choose next diagnostic from actual D/M/reference differences
+        run: |
+          python -m arena.coffee_p08_threeway \
+            --reference "$RUNNER_TEMP/p08-ref/NEXT_ACTION.json" \
+            --M "$RUNNER_TEMP/p08-m/result.json" \
+            --D "$RUNNER_TEMP/p08-d/result.json" \
+            --out "$RUNNER_TEMP/p08-threeway"
+          cat "$RUNNER_TEMP/p08-d/RESULT.md" >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/p08-threeway/DECISION.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve authentic D model source, per-model CSV and solver logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-p08-d-${{ github.run_id }}
+          path: ${{ runner.temp }}/p08-d/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Preserve actual three-method ATMS decision
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-p08-threeway-${{ github.run_id }}
+          path: ${{ runner.temp }}/p08-threeway/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Remove source artifacts after use
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/p08-ref" "$RUNNER_TEMP/p08-m"
+
+# No R2, provider, new worlds, B invocations or reserved truth.
+# No D differential equations are invented; only the three stage limits differ.
