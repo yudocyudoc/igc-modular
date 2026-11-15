@@ -185,7 +185,7 @@ class P07Intervals(unittest.TestCase):
                            second_start_s="0")],
                  "DUAL_CENSORING_DISAGREEMENT"),
                 ([interval(second_end_s="")],
-                 "DUAL_REVIEW_PROVENANCE"),
+                 "PARTIAL_SECOND_OBSERVATION"),
                 ([interval(review_state="DRAFT", second_end_s="")],
                  "PARTIAL_SECOND_OBSERVATION"),
                 ([interval(second_reviewer="REVIEWER_PRIVATE_1")],
