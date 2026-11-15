@@ -208,7 +208,10 @@ class DecisionAtmsTests(unittest.TestCase):
                 reported=e2e.final_report(
                     root/"evaluation",root/"decision",
                     root/"admission",root/"new-report")
-            self.assertEqual(reported["decision_atms_status"],
+            self.assertEqual(reported["status"],
+                             "END_TO_END_COMPLETED_WITH_DECLARED_LIMITS")
+            self.assertEqual(
+                read_json(root/"new-report"/"result.json")["decision_atms_status"],
                 "POST_SEAL_ATMS_UPDATED_NO_BUSINESS_RECOMMENDATION")
             receipt=read_json(root/"new-report"/"ATMS_DECISION.json")
             self.assertEqual(receipt["predecision_snapshot_sha256"],
@@ -225,7 +228,10 @@ class DecisionAtmsTests(unittest.TestCase):
             write_json(root/"decision"/"p11-conditional-summary.json",old)
             legacy=e2e.final_report(root/"evaluation",root/"decision",
                                     root/"admission",root/"legacy-report")
-            self.assertEqual(legacy["decision_atms_status"],
+            self.assertEqual(legacy["status"],
+                             "END_TO_END_COMPLETED_WITH_DECLARED_LIMITS")
+            self.assertEqual(
+                read_json(root/"legacy-report"/"result.json")["decision_atms_status"],
                 "LEGACY_RUN_NO_PREDECISION_ATMS_NOT_RETROACTIVELY_CLAIMED")
 
     def test_run_decision_calls_admission_before_simulator(self):
