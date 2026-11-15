@@ -545,7 +545,9 @@ def final_report(evaluation_dir, decision_dir, admission_dir, out):
             pre, policy, native, recorded_at=knowledge.utc_now(),
             execution_receipt=gate)
     else:
-        need(not atms_pre.exists(),
+        need(not atms_pre.exists() and
+             not (Path(decision_dir)/"atms-execution-gate.json").exists() and
+             "atms_execution_gate_sha256" not in policy,
              "UNLINKED_ATMS_PREDECISION_MUST_NOT_BE_ASSUMED")
         atms_result = {
             "schema":"arena.coffee-atms.postevaluation/1",
