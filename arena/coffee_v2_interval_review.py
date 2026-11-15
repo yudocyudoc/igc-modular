@@ -18,7 +18,7 @@ import sys
 
 from .common import ArenaError, write_json
 
-SCHEMA = "arena.coffee-v2.p07-directed-interval-review/1"
+SCHEMA = "arena.coffee-v2.p07-directed-interval-review/2"
 PHASES = {"MANUAL_ACTIVE": "OPERATOR", "MACHINE_BUSY": "MACHINE"}
 BOUNDARIES = {"OBSERVED", "CENSORED"}
 REVIEW_STATES = {"DRAFT", "DUAL_CONFIRMED", "DISPUTED"}
@@ -28,6 +28,8 @@ FIELDS = (
     "phase", "start_s", "end_s", "start_boundary", "end_boundary",
     "source", "review_state", "primary_reviewer", "second_reviewer",
     "confidence", "evidence_ref",
+    "second_start_s", "second_end_s", "second_start_boundary",
+    "second_end_boundary",
 )
 HEX_SHA = re.compile(r"^sha256:[a-f0-9]{64}$")
 CLOCK = "ORIGINAL_VIDEO_SECONDS"
@@ -67,6 +69,8 @@ def create_template(out):
         "schema": SCHEMA, "clock": CLOCK,
         "media_sha256": "REPLACE_WITH_SHA256_OF_ORIGINAL_MEDIA",
         "media_duration_s": None,
+        "max_dual_endpoint_delta_s": None,
+        "agreement_tolerance_reason": "REPLACE_BEFORE_OBSERVING_EVENTS",
         "review_scope": "EXPLORATORY_DESCRIPTIVE_NO_G3",
         "study_question": "S2_MACHINE_BUSY_LIMIT_VS_S5_MANUAL_WORK_LIMIT",
         "windows": [],
@@ -86,9 +90,12 @@ def create_template(out):
         "MACHINE_BUSY (MACHINE); vincular la misma tarea mediante task_id "
         "opaco cuando sea defendible. Registrar inicio/fin exactos en reloj "
         "del video y marcar CENSORED si ocurrió fuera del campo o ventana.\n"
-        "4. Un DUAL_CONFIRMED exige dos revisores distintos, cotejo directo "
-        "contra el video, evidencia_ref local y confianza HIGH; el programa "
-        "comprueba declaraciones y coherencia, no puede certificar revisión humana.\n"
+        "4. Declarar max_dual_endpoint_delta_s y agreement_tolerance_reason "
+        "ANTES de revisar. Registrar los dos intervalos medidos por separado "
+        "con extremos y censura de ambos observadores. DUAL_CONFIRMED "
+        "exige concordancia de inicios/fines en la tolerancia, revisores "
+        "distintos y evidencia_ref; la independencia real de revisión sigue "
+        "sin ser certificable por software.\n"
         "5. Usar --media-file al evaluar: se comprueba SHA, pero nunca se "
         "sube ni modifica el video. No subir manifest, CSV ni video a GitHub.\n"
         "6. Salida: JSON y REVIEW.md con agregados, jamás IDs/filas/frames. "
@@ -111,6 +118,11 @@ def validate_manifest(manifest):
          "MEDIA_SHA256_REQUIRED")
     duration = number(manifest.get("media_duration_s"), "MEDIA_DURATION")
     need(0 < duration <= 86400, "MEDIA_DURATION_RANGE")
+    tolerance = number(manifest.get("max_dual_endpoint_delta_s"), "AGREEMENT_TOLERANCE")
+    need(0 <= tolerance <= 30 and
+         type(manifest.get("agreement_tolerance_reason")) is str and
+         len(manifest["agreement_tolerance_reason"].strip()) >= 12,
+         "AGREEMENT_TOLERANCE_UNJUSTIFIED")
     windows = manifest.get("windows")
     need(type(windows) is list and 0 < len(windows) <= MAX_WINDOWS,
          "WINDOWS_REQUIRED")
@@ -160,6 +172,7 @@ def analyze(manifest, rows, *, media_file):
     counts = Counter()
     strata = Counter()
     qualified = []
+    tolerance = number(manifest["max_dual_endpoint_delta_s"], "AGREEMENT_TOLERANCE")
     for row in rows:
         need(type(row) is dict and set(row) == set(FIELDS)
              and all(type(v) is str for v in row.values()),
@@ -182,15 +195,42 @@ def analyze(manifest, rows, *, media_file):
         end = number(row["end_s"], "EVENT_END")
         need(a <= start < end <= b, "INTERVAL_OUTSIDE_WINDOW")
         if row["start_boundary"] == "CENSORED":
-            need(math.isclose(start, a, abs_tol=1e-9), "LEFT_CENSOR_BOUNDARY")
+            need(math.isclose(start, a, rel_tol=0, abs_tol=1e-9), "LEFT_CENSOR_BOUNDARY")
         if row["end_boundary"] == "CENSORED":
-            need(math.isclose(end, b, abs_tol=1e-9), "RIGHT_CENSOR_BOUNDARY")
+            need(math.isclose(end, b, rel_tol=0, abs_tol=1e-9), "RIGHT_CENSOR_BOUNDARY")
+        second_fields = ("second_start_s", "second_end_s",
+                         "second_start_boundary", "second_end_boundary")
+        has_second = [bool(row[k].strip()) for k in second_fields]
+        need(all(has_second) or not any(has_second), "PARTIAL_SECOND_OBSERVATION")
         if row["review_state"] == "DUAL_CONFIRMED":
-            need(row["second_reviewer"].strip()
+            need(all(has_second) and row["second_reviewer"].strip()
                  and row["second_reviewer"] != row["primary_reviewer"]
                  and row["evidence_ref"].strip() and
                  row["source"] == "VIDEO_DIRECT",
                  "DUAL_REVIEW_PROVENANCE")
+        if all(has_second):
+            second_start = number(row["second_start_s"], "SECOND_START")
+            second_end = number(row["second_end_s"], "SECOND_END")
+            need(a <= second_start < second_end <= b and
+                 row["second_start_boundary"] in BOUNDARIES and
+                 row["second_end_boundary"] in BOUNDARIES,
+                 "SECOND_INTERVAL_BOUNDS")
+            if row["second_start_boundary"] == "CENSORED":
+                need(math.isclose(second_start, a, rel_tol=0, abs_tol=1e-9),
+                     "SECOND_LEFT_CENSOR_BOUNDARY")
+            if row["second_end_boundary"] == "CENSORED":
+                need(math.isclose(second_end, b, rel_tol=0, abs_tol=1e-9),
+                     "SECOND_RIGHT_CENSOR_BOUNDARY")
+            if row["review_state"] == "DUAL_CONFIRMED":
+                need(row["start_boundary"] == row["second_start_boundary"]
+                     and row["end_boundary"] == row["second_end_boundary"],
+                     "DUAL_CENSORING_DISAGREEMENT")
+                delta = max(abs(start-second_start), abs(end-second_end))
+                need(delta <= tolerance + 1e-9,
+                     "DUAL_ENDPOINT_DISAGREEMENT")
+                counts["dual_endpoint_checked"] += 1
+                counts["max_dual_endpoint_delta_s"] = max(
+                    counts["max_dual_endpoint_delta_s"], delta)
         counts["interval_rows"] += 1
         counts[row["phase"]] += 1
         strata[stratum] += 1
@@ -234,8 +274,10 @@ def analyze(manifest, rows, *, media_file):
         "schema": SCHEMA,
         "status": status,
         "question": "S2 versus S5; NO causal bottleneck selected",
-        "source_verified_by_sha256": True,
+        "media_bytes_match_declared_sha256": True,
+        "originality_and_annotation_accuracy_not_software_verified": True,
         "source_sha256": manifest["media_sha256"],
+        "predeclared_max_dual_endpoint_delta_s": tolerance,
         "review_scope": manifest["review_scope"],
         "window_count": len(windows),
         "declared_window_seconds": sum(b-a for a, b, _ in windows.values()),
@@ -243,7 +285,8 @@ def analyze(manifest, rows, *, media_file):
         "rows_by_window_stratum": dict(sorted(strata.items())),
         "aggregate": dict(sorted(counts.items())),
         "eligible_definition": "dual-asserted direct-video HIGH confidence with two observed endpoints",
-        "dual_review_is_self_attested_not_machine_verified": True,
+        "independent_review_process_not_software_verifiable": True,
+        "candidate_intervals_not_yet_model_calibration": True,
         "censored_and_legacy_rows_never_calibrate": True,
         "overlap_pair_seconds_not_distinct_occupancy": True,
         "service_capacity_not_identified": True,
@@ -272,7 +315,9 @@ def export(result, out):
         f"- Pares de solapamiento: "
         f"{result['aggregate'].get('overlap_pairs_manual_machine', 0)} "
         "(un par no equivale a ocupación total ni productividad).\n"
-        "- La doble revisión está declarada, no demostrada por software. "
+        "- La concordancia de dos intervalos se verifica con la tolerancia " 
+        f"predeclarada ({result['predeclared_max_dual_endpoint_delta_s']} s), "
+        "pero la independencia de los revisores no puede probarse por software. "
         "No se asignan tiempos a intervalos censurados.\n"
         "- No se identifica aún cuello de botella S2/S5, demanda, "
         "capacidad física, espera ni rentabilidad. Requiere contraste "
