@@ -8,7 +8,8 @@ No engine, simulator, provider, R2 or held-out evaluation is invoked.
 """
 from __future__ import annotations
 
-from collections import Counter, defaultdict
+from collections import Counter
+from contextlib import closing
 import argparse
 import csv
 import hashlib
@@ -409,7 +410,7 @@ def export(result, *, private_out, public_out, key):
     (private_out / "custody-key.bin").write_bytes(key)
     (private_out / "custody-key.bin").chmod(0o600)
     database = private_out / "catalog.sqlite"
-    with sqlite3.connect(database) as conn:
+    with closing(sqlite3.connect(database)) as conn:
         conn.executescript("""
             CREATE TABLE source_files(
                 path TEXT PRIMARY KEY, class TEXT NOT NULL, sha256 TEXT NOT NULL,
