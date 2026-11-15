@@ -18,7 +18,7 @@
 | Inicio/fin censurado | límite visible de ventana, con indicador de censura | evidencia de visibilidad, no duración exacta | reemplazar un extremo oculto por uno inventado |
 | Recurso disponible, cola, entrega, demanda, ticket | pendiente de observaciones independientes | no representado en el validador actual | inferirlo de personas visibles o del POS sintético |
 
-`task_id` relaciona tareas sin asignar identidad de cliente ni vínculo POS. `resource_id` identifica localmente una máquina o un operador sin indicar identidad personal. `evidence_ref` se conserva solo en la hoja **privada** y apunta a la zona/tiempo revisados en video; no se copia a la salida. Los intervalos `DUAL_CONFIRMED` son **aseveraciones de los revisores**: el software verifica dos IDs distintos, evidencia y coherencia, pero no puede certificar que hayan examinado correctamente el video.
+`task_id` relaciona tareas sin asignar identidad de cliente ni vínculo POS. `resource_id` identifica localmente una máquina o un operador sin indicar identidad personal. `evidence_ref` se conserva solo en la hoja **privada** y apunta a la zona/tiempo revisados en video; no se copia a la salida. Los intervalos `DUAL_CONFIRMED` contienen **dos juegos de extremos temporales y censura**, uno por revisor. El software verifica concordancia frente a la tolerancia fijada en el manifiesto (`max_dual_endpoint_delta_s`, segundos, más `agreement_tolerance_reason`), IDs distintos, evidencia y coherencia, pero **no puede certificar independencia real entre revisores ni autenticidad del medio**. Los archivos privados deben conservar ambas hojas originales antes de su consolidación.
 
 ## Diseño mínimo para primera revisión
 
@@ -50,13 +50,15 @@ python -m arena.coffee_v2_interval_review \
   --out /ruta-privada/p07-result
 ~~~
 
+El contrato del borrador se versiona como `arena.coffee-v2.p07-directed-interval-review/2`, sin compatibilidad implícita con plantillas preliminares del borrador. La discrepancia entre revisores se registra y verifica, pero los intervalos siguen siendo **candidatos para posterior revisión de identificabilidad**, no medidas validadas de capacidad.
+
 Cada ventana exige `id`, `start_s`, `end_s`, `stratum` (`ACTIVITY`, `QUIET`, `UNCERTAIN`) y `selection_reason`. Los segundos pertenecen al reloj del **video original**, no a horas de POS. Cada fila usa exactamente las columnas de la plantilla: un intervalo manual o de máquina, sus límites, origen, revisores, nivel de confianza y referencia local de evidencia. Intervalos confirmados exactos del mismo recurso que se solapan son rechazados: dos tareas incompatibles no pueden ocuparlo a la vez.
 
-La salida contiene únicamente `p07-interval-summary.json` y `REVIEW.md`, sin filas ni IDs, tiempos individuales, video, fotogramas ni referencias locales. Existen pruebas negativas para la ausencia/adulteración del medio, solapamientos físicamente incompatibles, censura, alteración del contrato y filtración de IDs. Un `MEDIA_HASH_MISMATCH` o falta de video bloquea el cálculo.
+La salida contiene únicamente `p07-interval-summary.json` y `REVIEW.md`, sin filas ni IDs, tiempos individuales, video, fotogramas ni referencias locales. Existen pruebas negativas para la ausencia/adulteración del medio, solapamientos físicamente incompatibles, censura, alteración del contrato y filtración de IDs. Un `MEDIA_HASH_MISMATCH` o falta de video bloquea el cálculo. El hash sólo verifica que los bytes del archivo corresponden a los declarados; no verifica que el medio sea la grabación original ni que las marcas sean correctas. `DUAL_CONFIRMED` con extremos distintos fuera de tolerancia provoca un error explícito y exige resolver la disputa; nunca se corrige el dato automáticamente.
 
 ## Criterio para permitir el siguiente paso
 
-**Hito de instrumentación (este PR):** contrato, plantilla, validador, pruebas offline y CI sin acceso a datos privados. No acredita una sola medición verdadera.
+**Hito de instrumentación (este PR):** contrato, plantilla, validador de dos anotaciones temporales, pruebas offline y CI sin acceso a datos privados. No acredita una sola medición verdadera.
 
 **Hito de evidencia (requiere video o nueva observación):** suficientes intervalos vinculados y revisados, heterogeneidad de carga reconocida, tareas y recursos definidos, incertidumbre por visibilidad e identificabilidad documentadas. Podrá entonces evaluarse si hay evidencia útil para rangos de tiempo manual/ocupación, y qué medición adicional discrimina S2/S5.
 
