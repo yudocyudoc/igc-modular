@@ -26,6 +26,7 @@ from . import runtime
 
 SCHEMA = "arena.coffee.p08-m-aggregate-capacity/1"
 SOURCE_RUN = 43697007653
+PRODUCER_VIEWS_RUN = 43684660729
 SOURCE_ARTIFACT = "s5-support-decision-43697007653"
 INPUT_HORIZON_MIN = 105.0
 START = 0.0
@@ -56,7 +57,7 @@ def input_cases(source, receipt):
          and source.get("status") == "TWO_MECHANISMS_COMPARED_WITH_FIXED_B0"
          and source.get("real_profit_or_new_sales_inferred") is False,
          "REFERENCE_SOURCE_NOT_P08")
-    need(type(receipt) is dict and receipt.get("source_run_id") == SOURCE_RUN
+    need(type(receipt) is dict and receipt.get("source_run_id") == PRODUCER_VIEWS_RUN
          and receipt.get("no_reserved_truth") is True,
          "SOURCE_ARTIFACT_RECEIPT_MISMATCH")
     cases = source.get("baseline")
@@ -291,6 +292,11 @@ def audit_csv(path, record):
 
 
 def run(root):
+    need(os.environ.get("GITHUB_REPOSITORY")=="yudocyudoc/igc-modular"
+         and os.environ.get("GITHUB_REF")=="refs/heads/main"
+         and os.environ.get("GITHUB_EVENT_NAME")=="push"
+         and os.environ.get("GITHUB_RUN_ATTEMPT")=="1",
+         "REAL_OMC_GITHUB_MAIN_FIRST_ATTEMPT_ONLY")
     root=Path(root)
     mfest=read_json(root/"manifest.json")
     need(mfest["schema"]==SCHEMA and
@@ -382,7 +388,7 @@ def run(root):
     write_json(root/"result.json",report,exclusive=True)
     lines=["# P08 — Does M independently respond to preparation/espresso capacity?",
            "",
-           "Native original E1/BounedQueue dynamics, versioned typed espresso role.",
+           "Native original E1/BoundedQueue dynamics, versioned typed espresso role.",
            "**Aggregate orders, NOT coffee recipes, physical machine cycles,",
            "staff sharing, individual P90, or proven real business capacity.**",
            "",
