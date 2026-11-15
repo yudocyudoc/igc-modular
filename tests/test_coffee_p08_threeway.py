@@ -21,6 +21,12 @@ def scenario():
         "stage_mapping_validated":False,
         "pairwise_comparisons":[],
     }
+    # Deliberate conflict: physical reference reports espresso gain, while
+    # D and M generic proxies still classify it as unchanged.
+    for row in r["rows"]:
+        if row["mechanism"]=="ONE_ADDITIONAL_ESPRESSO_GROUP":
+            row["intervention_peak_handoffs"]+=1
+            row["delta_peak_handoffs_not_new_sales"]+=1
     for label in d.LOADS:
         for variant in d.VARIANTS[1:]:
             delta=1.1 if variant=="PREP_CAPACITY_X2" else 0.0
