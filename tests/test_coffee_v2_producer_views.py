@@ -1,5 +1,6 @@
 """V2.1 P02/P05/P12: fictional corpus views, protected split and source lineage."""
 import csv
+from contextlib import closing
 import hashlib
 import io
 import json
@@ -68,7 +69,7 @@ class ProducerViewsTests(TestCase):
             self.assertEqual(result["summary"]["released_rows"][
                 "producer-paid-bins-5min.csv"], 45*7*21)
             self.assertEqual(result["summary"]["released_rows"][
-                "producer-video-proxy-minute.csv"], 104)
+                "producer-video-proxy-minute.csv"], 60)
             self.assertEqual(result["plan"]["weekly_counts"],
                              {"CONSTRUCTION":36, "DEVELOPMENT":9,
                               "EVALUATION":9})
@@ -76,6 +77,8 @@ class ProducerViewsTests(TestCase):
             self.assertTrue(result["plan"]["evaluation_truth_not_accessed"])
             self.assertEqual(result["summary"]["exclusion_counts"][
                 "evaluation_pos_never_released"], 9)
+            self.assertEqual(result["summary"]["visual_proxy_source_minute_rows"],104)
+            self.assertEqual(result["summary"]["visual_proxy_reserved_minutes_not_released"],44)
             allowed = {r["opaque_case_id"] for r in audited["cases"]
                        if r["partition"] != "EVALUATION"}
             eval_cases = {r["opaque_case_id"] for r in audited["cases"]
@@ -109,6 +112,8 @@ class ProducerViewsTests(TestCase):
                            "TEST_CUSTODIAN", "this-is-a-private-fixture-key"):
                 self.assertNotIn(secret, full_output)
             for r in read_csv(final_out/"producer-paid-bins-5min.csv"):
+                self.assertEqual(r["coverage_status"],
+                                 "COMPLETE_SYNTHETIC_POS_WINDOW")
                 self.assertLess(float(r["bin_start_min"]),
                                 float(r["bin_end_min_exclusive"]))
                 self.assertLessEqual(float(r["bin_end_min_exclusive"]),104)
@@ -150,13 +155,19 @@ class ProducerViewsTests(TestCase):
                 "producer-case-index.csv"], 45)
             self.assertEqual(result["summary"]["released_rows"][
                 "producer-paid-bins-5min.csv"], 45*7*21)
+            reserved_bins = [row for row in
+                             result["tables"]["producer-paid-bins-5min.csv"]
+                             if row[-1] == "V1_RESERVED_NOT_RELEASED"]
+            self.assertEqual(len(reserved_bins), 20)
+            self.assertTrue(all(row[5] == "" and row[6] == "" and row[7] == ""
+                                for row in reserved_bins))
 
     def test_failed_key_and_wrong_zip_hash_do_not_generate_release(self):
         with TemporaryDirectory() as tmp:
             src, private, _, audited = prepare(tmp)
             key_path = private/"custody-key.bin"
             key_path.write_bytes(b"other-valid-private-key-12345678901234567890")
-            with self.assertRaisesRegex(ArenaError,"CUSTODY_KEY_NOT_MATCHING_CORPUS"):
+            with self.assertRaisesRegex(ArenaError,"CATALOG_SOURCE_OR_KEY_MISMATCH"):
                 build_fixture(src, private)
             key_path.write_bytes(KEY)
             # New/unknown bytes are rejected by real admission.
