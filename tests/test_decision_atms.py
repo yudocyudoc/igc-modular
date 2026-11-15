@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from arena.common import ArenaError, digest, read_json, write_json
 from arena import decision_atms as atms
+from arena import decision_atms_gate as execution_gate
 from arena import coffee_e2e as e2e
 from test_coffee_v2_reference import dossier
 from test_coffee_v2_p11 import contract
@@ -224,6 +225,11 @@ class DecisionAtmsTests(unittest.TestCase):
                        {"weekly_cases":54,"pos_rows":100})
             write_json(root/"decision"/"p11-conditional-summary.json",policy)
             write_json(root/"decision"/"atms-predecision.json",pre)
+            admission=execution_gate.gate(pre,dossier(),contract())
+            policy["atms_execution_gate_sha256"]=admission["gate_sha256"]
+            write_json(root/"decision"/"p11-conditional-summary.json",policy)
+            write_json(root/"decision"/"atms-execution-gate.json",
+                       admission)
             write_json(root/"evaluation"/"evaluation.json",native)
             with patch.object(e2e.knowledge,"utc_now",return_value=t(200)):
                 reported=e2e.final_report(
@@ -246,6 +252,8 @@ class DecisionAtmsTests(unittest.TestCase):
                                  root/"admission",root/"failed-report")
             old=copy.deepcopy(policy)
             old.pop("atms_predecision_snapshot_sha256")
+            old.pop("atms_execution_gate_sha256")
+            (root/"decision"/"atms-execution-gate.json").unlink()
             write_json(root/"decision"/"p11-conditional-summary.json",old)
             legacy=e2e.final_report(root/"evaluation",root/"decision",
                                     root/"admission",root/"legacy-report")
