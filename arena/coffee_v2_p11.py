@@ -179,6 +179,11 @@ def _verified_load_choices(view_dir):
         "construction_day_count": 36*7,
         "selection_based_on": "SYNTHETIC_PAID_INPUT_NOT_SERVICE_OUTCOMES",
         "saturation_status": "NOT_CLASSIFIED_FROM_PAID_LOAD_ALONE",
+        "input_load_contrast": (
+            "DISTINCT_SELECTED_PAID_INPUT_LOAD"
+            if chosen[0][:2] != chosen[1][:2] else
+            "TIED_SELECTED_PAID_INPUT_NO_LOW_HIGH_DISTINCTION"
+        ),
     }
 
 
@@ -330,6 +335,32 @@ def compare(view_dir, dossier, protocol):
         impacts[name] = magnitude
     conditional_signs = dict(sorted(Counter(
         item["conditional_sign_only"] for item in money_cells).items()))
+    max_impact = max(impacts.values())
+    if max_impact > 0:
+        second = {
+            "variable": sorted(impacts, key=lambda k: (-impacts[k],k))[0],
+            "priority_basis": (
+                "largest modeled OAT change among declared duration bounds, "
+                "not an observed effect"
+            ),
+            "modeled_max_absolute_delivery_delta_change": max_impact,
+            "method": (
+                "paired start/end timings per task and resource; "
+                "preserve concurrency/censoring"
+            ),
+            "unit": "min per task or beverage under declared frontier",
+        }
+    else:
+        second = {
+            "variable": "NOT_RANKABLE_NO_DELIVERY_SENSITIVITY_IN_TESTED_GRID",
+            "priority_basis": (
+                "no tested duration bound changed the peak handoff delta; "
+                "do not prescribe an arbitrary next timing measurement"
+            ),
+            "modeled_max_absolute_delivery_delta_change": 0,
+            "method": "revisit mechanism or ask whether another KPI matters",
+            "unit": "not applicable",
+        }
     return {
         "schema": SCHEMA,
         "status": "P11_CONDITIONAL_CONSEQUENCES_NOT_BUSINESS_RECOMMENDATION",
@@ -376,14 +407,7 @@ def compare(view_dir, dossier, protocol):
                 "unit": "worker-minutes free per peak and pickup handoff overlap",
                 "change_criterion": "if no spare support, S5 is not representable under this scope",
             },
-            "second": {
-                "variable": sorted(impacts, key=lambda k: (-impacts[k],k))[0],
-                "priority_basis": "largest modeled OAT change among declared duration bounds, not an observed effect",
-                "modeled_max_absolute_delivery_delta_change":
-                    max(impacts.values()),
-                "method": "paired start/end timings per applicable task and resource; preserve concurrency/censoring",
-                "unit": "min per task or beverage under declared frontier",
-            },
+            "second": second,
             "economic": {
                 "variables": [
                     "real opportunity cost of moving support away from other tasks",
