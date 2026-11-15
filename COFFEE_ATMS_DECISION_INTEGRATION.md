@@ -20,7 +20,7 @@ En GitHub el **PR #30 ya fue usado y fusionado** para recuperar Buffalo G2 desde
 
 Límites conservadores: 160 eventos, 24 supuestos, 256 entornos por nodo y 160 rondas de cierre; si se exceden, se lanza `COMBINATORIAL_LIMIT_REACHED` / `FIXPOINT_LIMIT_REACHED`: **no se publica una conclusión completa basada en un resultado truncado**. Esta es una política fail-closed de la vertical mínima, no la semántica final de respuesta parcial del servicio ATMS IGC completo.
 
-Las consultas `snapshot` y `explain` permiten saber qué entornos mínimos sostienen una proposición, qué justificaciones están activas y qué antecedentes faltan. No infieren que dos textos sean contradicciones ni convierten desacuerdos en nogood; se requiere una regla explícita. Tampoco etiquetan un respaldo lógico como verdad del negocio.
+Las consultas `snapshot`, `explain` y `what_if` permiten saber qué entornos mínimos sostienen una proposición, qué justificaciones están activas, qué antecedentes faltan y qué nodos cambiarían en una bifurcación efímera por retractación/restauración. `what_if` no modifica el journal canónico ni publica la rama como evidencia. No infieren que dos textos sean contradicciones ni convierten desacuerdos en nogood; se requiere una regla explícita. Tampoco etiquetan un respaldo lógico como verdad del negocio.
 
 ## Prueba de retirada, restitución y cortes
 
