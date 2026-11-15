@@ -1,0 +1,40 @@
+name: Coffee V2.1 - P07 offline interval review contract
+
+on:
+  pull_request:
+    paths:
+      - 'arena/coffee_v2_interval_review.py'
+      - 'tests/test_coffee_v2_interval_review.py'
+      - 'COFFEE_V2_1_P07_DIRECTED_INTERVAL_REVIEW.md'
+      - '.github/workflows/coffee-v2-p07-review.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'arena/coffee_v2_interval_review.py'
+      - 'tests/test_coffee_v2_interval_review.py'
+      - 'COFFEE_V2_1_P07_DIRECTED_INTERVAL_REVIEW.md'
+      - '.github/workflows/coffee-v2-p07-review.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-review:
+    name: Validate review schema on fictional fixtures only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Preserve original engine verification
+        run: python -m arena.runtime verify
+      - name: Run offline review contract tests
+        run: python -m unittest discover -s tests -p 'test_coffee_v2_interval_review.py' -v
+      - name: Confirm no real video or private artifact was required
+        run: |
+          echo "P07 offline contract only: 0 R2, OMC, POST, original video and reserved truth." >> "$GITHUB_STEP_SUMMARY"
+          echo "A green CI does not validate service times or an S2/S5 decision." >> "$GITHUB_STEP_SUMMARY"
