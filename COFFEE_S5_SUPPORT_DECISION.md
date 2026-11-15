@@ -26,3 +26,16 @@ El workflow \`.github/workflows/coffee-s5-availability.yml\` hace CI con fixture
 El resultado será útil para plantear una visita breve a la cafetería: medir tiempos de ocupación del apoyo, tiempo de preparación manual y de entrega y coste de oportunidad. Si el apoyo no tiene ventanas libres, S5 puede ser peor sin importar cuán prometedora pareciera la simulación de antes.
 
 **Límite:** la referencia especializada sigue siendo diferente de D/M/B. La siguiente prueba que aporte valor a los brazos será P08: representación versionada de la misma intervención en al menos un método, no atribuirla a un modelo original que no tiene esa tarea.
+
+
+## Siguiente incremento: ATMS decide con resultados, no sólo autoriza
+
+El resultado del PR #33 carecía de una disposición ATMS derivada de los resultados. Este ajuste exige **las seis condiciones** (dos cargas por tres disponibilidades), con conservación de pedidos y deltas comprobables. Sólo concede soporte a una mejora general si **ninguna condición empeora ni las entregas del pico ni el P90**, y al menos una mejora. Puede conservar un hallazgo parcial de mejora P90 sin promoverlo a mejora universal ni a utilidad real.
+
+La disposición incorpora el contrafactual de una heurística insegura y específica: *elegir la condición con mejor P90 y generalizarla*. Una prueba negativa alimenta el gate con ese único caso favorable y confirma rechazo por cobertura incompleta; **no se afirma que un sistema real sin ATMS hubiera decidido así**.
+
+Se publican `ATMS_PREDECISION.json`, `ATMS_GATE.json` y `ATMS_DISPOSITION.json`. Los cortes son predecisión T, evidencia T+n microsegundos y disposición T+m microsegundos, con eventos append-only y hashes para reconstruir los tres snapshots. `decision.json` muestra los claims y enlaces por hash; `DECISION.md` presenta inline las condiciones y veredictos.
+
+**Siguiente mecanismo físico y utilidad**: se comparan la preparación manual al límite inferior del dossier y un grupo de espresso adicional, con los mismos pagos, barista y demás recursos que B0. Son cuatro pares adicionales (dos cargas, dos intervenciones), usando la misma referencia especializada; no se afirma que D/M/B hayan aprendido esas políticas. El coste y la factibilidad son desconocidos y se exponen como una prioridad de medición, no como un resultado económico.
+
+El workflow realiza pruebas y cálculos **exclusivamente en GitHub**. Reutiliza las vistas CONSTRUCTION autorizadas; no regenera un mundo ni abre truth, reserva, proveedores o Modelica.
