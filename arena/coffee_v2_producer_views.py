@@ -262,7 +262,7 @@ def build(source, private_dir):
                 if historical_day and bin_start >= V1_CONSTRUCTION_END:
                     # Explicitly missing: never turn withheld V1 data into zero.
                     outputs["producer-paid-bins-5min.csv"].append((
-                        case_id, part, day, bin_start, format(end, ".10g"),
+                        case_id, part, day, bin_start, repr(end),
                         "", "", "",
                         "PAID_POS_EQUIVALENT_RATE_NOT_ARRIVALS_OR_THROUGHPUT",
                         "V1_RESERVED_NOT_RELEASED",
@@ -276,7 +276,7 @@ def build(source, private_dir):
                     hours = (visible_end-bin_start)/60.0
                     outputs["producer-paid-bins-5min.csv"].append((
                         case_id, part, day, bin_start,
-                        format(visible_end, ".10g"), paid, refunds,
+                        repr(visible_end), paid, refunds,
                         format(paid/hours, ".10g"),
                         "PAID_POS_EQUIVALENT_RATE_NOT_ARRIVALS_OR_THROUGHPUT",
                         ("V1_CONSTRUCTION_ONLY" if historical_day
