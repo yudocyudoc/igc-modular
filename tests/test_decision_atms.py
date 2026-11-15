@@ -252,6 +252,8 @@ class DecisionAtmsTests(unittest.TestCase):
                                  root/"admission",root/"failed-report")
             old=copy.deepcopy(policy)
             old.pop("atms_predecision_snapshot_sha256")
+            old.pop("atms_execution_gate_sha256")
+            (root/"decision"/"atms-execution-gate.json").unlink()
             write_json(root/"decision"/"p11-conditional-summary.json",old)
             legacy=e2e.final_report(root/"evaluation",root/"decision",
                                     root/"admission",root/"legacy-report")
