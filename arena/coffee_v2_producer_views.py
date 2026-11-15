@@ -142,7 +142,8 @@ def build(source, private_dir):
         pos = corpus.read_csv(z, "pos_observed.csv", (
             "scenario_id", "replication", "day_of_week", "pos_record_id",
             "order_id", "timestamp_min_from_peak_start", "pos_record_type",
-            "sale_status", "synthetic", "source_class"), 20000)
+            "sale_status", "synthetic", "source_class",
+            "beverage_count"), 20000)
         items = corpus.read_csv(z, "pos_line_items.csv", (
             "scenario_id", "replication", "day_of_week", "pos_record_id",
             "order_id", "pos_line_id", "quantity", "synthetic", "source_class"),
