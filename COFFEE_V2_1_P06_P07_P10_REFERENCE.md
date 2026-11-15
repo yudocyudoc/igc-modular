@@ -26,6 +26,8 @@ Políticas estructurales admitidas:
 
 No se implementan S1–S4 ni se elige todavía ninguna intervención como recomendación.
 
+La función `counterfactual_pair_gate(B0,S5)` protege el futuro P11: exige un mismo dossier de recursos, tiempos, stock inicial y alcance; **la única diferencia permitida es la reasignación de la tarea de handoff**. Rechaza aumentar encubiertamente grupos, personal o acelerar tareas al cambiar de política. Esta compuerta por sí misma no simula ni clasifica políticas.
+
 ## P07: hipótesis e identificabilidad
 
 `arena/coffee_v2_reference.py` requiere un dossier versionado con seis recursos (barista, grupo de espresso, vapor, espacio, pase, apoyo existente), cuatro duraciones, unidades, límites, procedencia y estado `ASSUMED`/`BOUNDED`. El modelo no acepta ahora `MEASURED` porque todavía no existe una verificación de mediciones físicas dentro de este contrato. Se declara el estado inicial **cero pendiente supuesto**, no observado. Reporta como `NOT_IDENTIFIABLE_FOR_THIS_CASE` las duraciones/capacidades reales, llegadas, espera real de pago a entrega y resultados económicos.
