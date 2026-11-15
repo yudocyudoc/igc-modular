@@ -123,7 +123,7 @@ class ProducerViewsTests(TestCase):
     def test_signed_refund_is_financial_not_new_beverage(self):
         self.assertEqual(views.money("-65", "REFUND_AMOUNT", signed=True), "-65")
         self.assertEqual(views.money("65", "REFUNDED_TOTAL"), "65")
-        with self.assertRaisesRegex(ArenaError, "NUMBER_RANGE"):
+        with self.assertRaisesRegex(ArenaError, "BAD_NONNEGATIVE_AMOUNT"):
             views.money("-65", "NONNEGATIVE_AMOUNT")
 
     def test_cannot_reroll_private_split_or_read_wrong_catalog(self):
