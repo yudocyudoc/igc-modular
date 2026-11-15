@@ -81,7 +81,9 @@ class P08DNativeTests(unittest.TestCase):
                 for i in range(d.INTERVALS+1):
                     t=i*d.STOP_HOURS/d.INTERVALS
                     y=19*min(t/d.HORIZON_HOURS,1.0)
-                    writer.writerow([t,y,0,max(0,19-y),0,0])
+                    # Fixture has no backlog: admitted mass grows with paid
+                    # input; do not preload 19 orders at time zero.
+                    writer.writerow([t,y,0,0,0,0])
             rec={"input_paid_orders":19,"rectangular_rate_per_hour":
                  19/d.HORIZON_HOURS}
             result=d.verify_csv(f,rec)
