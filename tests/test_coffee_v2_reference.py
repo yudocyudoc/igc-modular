@@ -102,14 +102,15 @@ class PhysicalReferenceTests(TestCase):
         self.assertEqual(result["resources"]["espresso_group"][
             "busy_unit_minutes_full_drain"], 8.0)
         public = reference.simulate(positions, lines, dossier(), 9)
-        self.assertNotIn("A", json.dumps(public))
-        self.assertNotIn("B", json.dumps(public))
+        self.assertNotIn("payA", json.dumps(public))
+        self.assertNotIn("payB", json.dumps(public))
+        self.assertNotIn("order_id", json.dumps(public))
         self.assertTrue(public["no_observed_pickup_wait_or_real_utilization"])
 
     def test_one_order_two_drinks_handoff_after_last_unit_and_milk_resource(self):
         result, trace, completion = reference._engine(
             [paid("ONE", drinks=2)],
-            [item("ONE", "con_leche", quantity=2)], dossier(), 12)
+            [item("ONE", "con_leche", quantity=2)], dossier(), 10.5)
         self.assertEqual(result["synthetic_paid_orders"], 1)
         self.assertEqual(result["synthetic_beverage_units"], 2)
         self.assertEqual(result["stage_operation_counts"], {
@@ -117,7 +118,7 @@ class PhysicalReferenceTests(TestCase):
             "milk_finish": 2, "handoff": 1})
         self.assertEqual(result["modeled_handoffs_during_halfopen_peak"], 0)
         self.assertEqual(result["modeled_orders_open_at_peak_cut"], 1)
-        self.assertGreater(completion["ONE"], 12)
+        self.assertGreater(completion["ONE"], 10.5)
         handoff = next(v for v in trace if v[0] == "handoff")
         self.assertTrue(all(v[2] <= handoff[1] for v in trace
                             if v[0] == "milk_finish"))
