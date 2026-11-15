@@ -65,6 +65,9 @@ from .coffee_peak import CoffeePeakCapacityV1
 
 _registry = {"ct03": CT03(), "coffee_peak_capacity_v1": CoffeePeakCapacityV1()}
 
+from .coffee_e2e_protocol import CoffeeEndToEnd
+_registry["coffee_end_to_end_v1"] = CoffeeEndToEnd()
+
 
 def register(name, adapter):
     if not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,60}", name):

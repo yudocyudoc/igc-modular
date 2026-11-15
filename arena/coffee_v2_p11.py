@@ -35,6 +35,12 @@ VARIANTS = ("NOMINAL",) + tuple(
 LIMIT_PAIRS = 2 * len(VARIANTS)
 
 
+def strict_preference_reversal(sign_counts):
+    """A tie and one strict preference do not reverse B0 versus S5."""
+    return (sign_counts.get("S5_IF_ASSUMPTIONS", 0) > 0 and
+            sign_counts.get("B0_IF_ASSUMPTIONS", 0) > 0)
+
+
 def need(ok, code):
     if not ok:
         raise ArenaError("COFFEE_V2_P11_" + code)
@@ -388,7 +394,8 @@ def compare(view_dir, dossier, protocol):
             "economic_grid_sign_counts": conditional_signs,
             "one_factor_peak_delivery_sensitivity_max_abs_delta":
                 dict(sorted(impacts.items())),
-            "assumptions_reversal_possible": len(conditional_signs) > 1,
+            "assumptions_reversal_possible": strict_preference_reversal(conditional_signs),
+            "economic_classification_varies": len(conditional_signs) > 1,
             "business_decision": "NOT_IDENTIFIABLE_WITHOUT_REAL_SERVICE_COSTS",
             "real_saturation_or_throughput_measured": False,
             "costs_and_value_are_hypotheses_only": True,

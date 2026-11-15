@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import Counter
 from contextlib import closing
+import copy
 import argparse
 import csv
 import hashlib
@@ -32,6 +33,7 @@ OUT = ROOT + "salida/"
 MANIFEST = OUT + "manifest.json"
 CONFIG = ROOT + "parametros_escenarios.json"
 PINNED_ZIP_SHA256 = "dd18a787a1ac3dcd065fe54bff9a2f567d945c60d16e7a646444dacaa6ffbef9"
+PINNED_CONTAINER_SHA256 = "4ff97ae4d8fe52a5c1d1701aa713fda09b6730ef63d9cbab23e6af30dfad2a5f"
 MANIFEST_SCHEMA = "cafeteria.synthetic-output-manifest/2"
 PARTITION_POLICY = "SCENARIO_GROUPED_HMAC_12_3_3/1"
 FILES = (
@@ -165,7 +167,45 @@ def allocate(scenarios, key):
     return out
 
 
-def audit(source, *, key, expected_sha=PINNED_ZIP_SHA256):
+class SourceArchive:
+    """Canonical names over either pinned archive; original bytes stay intact.
+
+    The historical documentation package contains the same corpus under video2/.
+    Expose only its 23 corpus members, never other observations or private files.
+    This changes the container adapter, not source hashes or generated records.
+    """
+    def __init__(self, source, source_sha):
+        self.archive = zipfile.ZipFile(source)
+        self.prefix = "video2/" if source_sha == PINNED_CONTAINER_SHA256 else ""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.archive.close()
+
+    def infolist(self):
+        if not self.prefix:
+            return self.archive.infolist()
+        result = []
+        for info in self.archive.infolist():
+            if info.filename.startswith(self.prefix) and info.filename[len(self.prefix):] in REQUIRED:
+                item = copy.copy(info)
+                item.filename = info.filename[len(self.prefix):]
+                result.append(item)
+        return result
+
+    def getinfo(self, name):
+        return self.archive.getinfo(self.prefix + name)
+
+    def open(self, name, mode="r"):
+        return self.archive.open(self.prefix + name, mode)
+
+    def read(self, name):
+        return self.archive.read(self.prefix + name)
+
+
+def audit(source, *, key, expected_sha=None):
     """Return private catalog data and a sanitized public review.
 
     A matching ZIP checksum and 19 verified output digests attest bytes.
@@ -175,9 +215,10 @@ def audit(source, *, key, expected_sha=PINNED_ZIP_SHA256):
     need(source.is_file() and 0 < source.stat().st_size < 40_000_000,
          "LOCAL_SOURCE_ZIP_REQUIRED")
     actual = sha_file(source)
-    need(actual == expected_sha, "ZIP_SHA256_MISMATCH")
+    need(actual == expected_sha if expected_sha is not None else
+         actual in (PINNED_ZIP_SHA256, PINNED_CONTAINER_SHA256), "ZIP_SHA256_MISMATCH")
     try:
-        with zipfile.ZipFile(source) as z:
+        with SourceArchive(source, actual) as z:
             infos = z.infolist()
             names = [i.filename for i in infos]
             need(len(names) == len(set(names)) and set(names) == REQUIRED

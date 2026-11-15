@@ -1,0 +1,173 @@
+name: Coffee Arena - one complete R2 run
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/coffee-end-to-end.yml']
+  workflow_dispatch:
+    inputs:
+      authorized:
+        description: 'One complete lot: 0 provider POST, at most 1 new B OMC, 52 reference runs'
+        type: choice
+        options: ['no', 'yes']
+        default: 'no'
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: coffee-arena-one-complete-initial-run
+  cancel-in-progress: false
+
+jobs:
+  corpus:
+    if: github.run_attempt == 1 && github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.authorized == 'yes')
+    runs-on: ubuntu-24.04
+    environment: arena-custodian
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Prepare corpus using existing R2 custody; source and key remain private
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CT03_R2_BUCKET: ${{ vars.CT03_R2_BUCKET || 'igc-ct03-private-custody' }}
+          CT03_R2_ACCESS_KEY_ID: ${{ secrets.CT03_R2_ACCESS_KEY_ID }}
+          CT03_R2_SECRET_ACCESS_KEY: ${{ secrets.CT03_R2_SECRET_ACCESS_KEY }}
+        run: python -m arena.coffee_e2e prepare-corpus --out "$RUNNER_TEMP/coffee-corpus"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coffee-e2e-admission-${{ github.run_id }}
+          path: ${{ runner.temp }}/coffee-corpus/admission-summary.json
+          if-no-files-found: error
+
+  reference:
+    needs: corpus
+    runs-on: ubuntu-24.04
+    environment: arena-custodian
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Transport authorized producer views only; no source ZIP or key in this job
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CT03_R2_BUCKET: ${{ vars.CT03_R2_BUCKET || 'igc-ct03-private-custody' }}
+          CT03_R2_ACCESS_KEY_ID: ${{ secrets.CT03_R2_ACCESS_KEY_ID }}
+          CT03_R2_SECRET_ACCESS_KEY: ${{ secrets.CT03_R2_SECRET_ACCESS_KEY }}
+        run: python -m arena.coffee_e2e download-views --out "$RUNNER_TEMP/coffee-views"
+      - name: Compare B0 and S5 without private credentials
+        run: python -m arena.coffee_e2e decision --views "$RUNNER_TEMP/coffee-views" --out "$RUNNER_TEMP/coffee-decision"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coffee-e2e-decision-${{ github.run_id }}
+          path: ${{ runner.temp }}/coffee-decision/
+          if-no-files-found: error
+
+  native:
+    needs: corpus
+    runs-on: ubuntu-24.04
+    environment: arena-custodian
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Verify preserved methods
+        run: python -m arena.runtime verify
+      - name: Regenerate D/M, authenticate cached physics and consume own feedback
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -m arena.coffee_e2e stage-native --out "$RUNNER_TEMP/coffee-native"
+      - name: Stage pinned OMC image before reserving an attempt
+        run: |
+          image="$(python -c 'from arena.runtime import IMAGE; print(IMAGE)')"
+          docker pull "$image"
+      - name: Reserve at most one B OMC attempt durably in existing R2
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CT03_R2_BUCKET: ${{ vars.CT03_R2_BUCKET || 'igc-ct03-private-custody' }}
+          CT03_R2_ACCESS_KEY_ID: ${{ secrets.CT03_R2_ACCESS_KEY_ID }}
+          CT03_R2_SECRET_ACCESS_KEY: ${{ secrets.CT03_R2_SECRET_ACCESS_KEY }}
+        run: python -m arena.coffee_e2e reserve-physical --out "$RUNNER_TEMP/coffee-native"
+      - name: Execute authentic Buffalo R1 once with no credentials or Docker network
+        run: python -m arena.coffee_e2e run-b --out "$RUNNER_TEMP/coffee-native"
+      - name: Seal all predictions before any reserved read
+        run: python -m arena.coffee_e2e lock --native "$RUNNER_TEMP/coffee-native" --out "$RUNNER_TEMP/coffee-lock"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coffee-e2e-lock-${{ github.run_id }}
+          path: ${{ runner.temp }}/coffee-lock/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Preserve native attempts and diagnostics, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-e2e-native-${{ github.run_id }}
+          path: ${{ runner.temp }}/coffee-native/
+          if-no-files-found: warn
+          retention-days: 90
+
+  evaluate:
+    needs: native
+    runs-on: ubuntu-24.04
+    environment: arena-custodian
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Verify GitHub archive and model coupling BEFORE opening truth
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CT03_R2_BUCKET: ${{ vars.CT03_R2_BUCKET || 'igc-ct03-private-custody' }}
+          CT03_R2_ACCESS_KEY_ID: ${{ secrets.CT03_R2_ACCESS_KEY_ID }}
+          CT03_R2_SECRET_ACCESS_KEY: ${{ secrets.CT03_R2_SECRET_ACCESS_KEY }}
+        run: python -m arena.coffee_e2e evaluate --out "$RUNNER_TEMP/coffee-evaluation"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coffee-e2e-evaluation-${{ github.run_id }}
+          path: ${{ runner.temp }}/coffee-evaluation/
+          if-no-files-found: error
+
+  report:
+    needs: [corpus, reference, evaluate]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: coffee-e2e-admission-${{ github.run_id }}
+          path: ${{ runner.temp }}/admission
+      - uses: actions/download-artifact@v4
+        with:
+          name: coffee-e2e-decision-${{ github.run_id }}
+          path: ${{ runner.temp }}/decision
+      - uses: actions/download-artifact@v4
+        with:
+          name: coffee-e2e-evaluation-${{ github.run_id }}
+          path: ${{ runner.temp }}/evaluation
+      - name: One result and readable report
+        run: |
+          python -m arena.coffee_e2e report --evaluation "$RUNNER_TEMP/evaluation" --decision "$RUNNER_TEMP/decision" --admission "$RUNNER_TEMP/admission" --out "$RUNNER_TEMP/result"
+          cat "$RUNNER_TEMP/result/REPORT.md" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coffee-e2e-result-${{ github.run_id }}
+          path: ${{ runner.temp }}/result/
+          if-no-files-found: error
+          retention-days: 90

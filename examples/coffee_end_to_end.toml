@@ -1,0 +1,14 @@
+id = "coffee-end-to-end"
+protocol = "coffee_end_to_end_v1"
+backend = "github"
+
+[budget]
+omc = 1
+provider_posts = 0
+workflow = 1
+
+[github]
+repository = "yudocyudoc/igc-modular"
+ref = "main"
+freeze_sha = "HEAD"
+poll_seconds = 15

@@ -76,9 +76,11 @@ No se vuelve a extraer el MP4 como requisito de infraestructura; una nueva medic
 
 `.github/workflows/coffee-v2-p11.yml`: CI offline con regresiones de motores originales, sin fuente privada ni LLM.
 
-## 7. Ejecución offline de la comparación real-sintética (no evaluación G3)
+## 7. Ejecución integrada en GitHub con R2 existente
 
-El operador autorizado dispone de las **vistas preparadas por PR #26** (45 semanas publicables), sin datos ni secretos de la reserva, y ejecuta:
+El workflow **Coffee Arena - one complete R2 run** obtiene el contenedor histórico ya custodiado, fijado por SHA `4ff97ae4d8fe52a5c1d1701aa713fda09b6730ef63d9cbab23e6af30dfad2a5f`. El adaptador de corpus valida los mismos miembros bajo el prefijo `video2/`, conservando la identidad del archivo original. No depende de subir otra versión del ZIP ni de crear un repositorio privado.
+
+El custodio prepara y conserva en R2 las 45 semanas autorizadas. Otro job recibe sólo las vistas; el proceso de referencia no recibe credenciales R2 ni el ZIP. La ejecución del siguiente comando ocurre dentro de ese job de GitHub:
 
 ~~~sh
 python -m arena.coffee_v2_p11 \
@@ -90,4 +92,4 @@ python -m arena.coffee_v2_p11 \
 
 Se producen `paired-sensitivity.csv`, `economics-conditional.csv`, `p11-conditional-summary.json`, `REVIEW.md` y `receipt.json`. Los archivos son reproducibles con el mismo bundle/manifiesto, dossier y protocolo. No abrir ninguno en un directorio de truth o en la partición EVALUATION.
 
-**Alcance de aceptación:** P11 condicional implementado, sin afirmar conclusión empresarial ni evaluación reservada. Siguiente bloque de la ruta: P03/P09 mínimos y posterior cierre P12 sólo si existe campaña/lock independiente y se autoriza.
+**Alcance:** P11 sigue siendo condicional. El mismo workflow incorpora por separado el contraste retrospectivo de los D/M/B originales con el caso V1, usando un lock archivado antes de abrir la verdad; no confunde ese contraste con validación causal de S5. Ver `COFFEE_END_TO_END.md` para la entrada, artifacts, presupuesto y límites.

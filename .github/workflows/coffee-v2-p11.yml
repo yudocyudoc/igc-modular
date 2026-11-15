@@ -8,7 +8,6 @@ on:
       - 'COFFEE_V2_1_P11_CONDITIONAL_B0_S5.md'
       - 'experiments/coffee_v2/P11_INITIAL_CONDITIONAL_PROTOCOL_V1.json'
       - '.github/workflows/coffee-v2-p11.yml'
-      - '.github/workflows/coffee-v2-p11-private-replay.yml'
   push:
     branches: [main]
     paths:
@@ -41,7 +40,7 @@ jobs:
         run: |
           {
             echo "P11 fixture-only conditional B0/S5: NOT business validation."
-            echo "No authentic ZIP is executed here; real source runs only in a PRIVATE GitHub Actions caller."
+            echo "No authentic ZIP is executed here; the complete R2 run is coffee-end-to-end.yml."
             echo "Input-only construction selection, no truth or G3."
             echo "Illustrative opportunity costs, NOT actual salary or ROI."
             echo "No OMC, R2, POST, provider calls, or new synthetic worlds."

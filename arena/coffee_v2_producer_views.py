@@ -138,7 +138,7 @@ def build(source, private_dir):
     # Recheck all 19 output byte hashes, but do not parse truth rows.
     verified = corpus.audit(source, key=key)
     key, mapped, commitment = catalog_attestation(private_dir, verified)
-    with zipfile.ZipFile(source, "r") as z:
+    with corpus.SourceArchive(source, verified["public"]["source_zip_sha256"].removeprefix("sha256:")) as z:
         pos = corpus.read_csv(z, "pos_observed.csv", (
             "scenario_id", "replication", "day_of_week", "pos_record_id",
             "order_id", "timestamp_min_from_peak_start", "pos_record_type",

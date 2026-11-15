@@ -11,6 +11,9 @@ def write_report(result, root):
         lines += ["Admisión B0 con POS sintético y proxy visual. No ejecutó D/B/M, OMC, Buffalo, lock ni evaluación reservada; cero consumo y ninguna conclusión empresarial.", ""]
     if result["evidence_kind"] == "INTEGRATION_FIXTURE":
         lines += ["Prueba de integración con fixtures. No ejecutó OMC ni Buffalo y no constituye un resultado científico.", ""]
+    if result["evidence_kind"] == "COFFEE_SYNTHETIC_NATIVE_CONTRAST_AND_CONDITIONAL_DECISION":
+        lines += ["Contraste de D/M/B con verdad sintética y comparación condicional de la referencia.",
+                  "Informe de cafetería y límites: [COFFEE_REPORT.md](COFFEE_REPORT.md).", ""]
     lines += ["| Recurso | Límite | Intentos observados | Registro completo | Saldo |",
               "| --- | ---: | ---: | --- | ---: |"]
     for name, item in run["consumption"].items():
