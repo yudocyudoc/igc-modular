@@ -127,11 +127,11 @@ def prepare(source_path, out):
     source_path = Path(source_path)
     directory = source_path.parent
     receipt = read_json(directory/"receipt.json")
-    source = read_json(source_path)
-    cases = input_cases(source,receipt)
     need(receipt.get("outputs",{}).get("NEXT_ACTION.json") ==
          sha_bytes(source_path.read_bytes()),
          "DOWNLOADED_SOURCE_HASH_CHANGED")
+    source = read_json(source_path)
+    cases = input_cases(source,receipt)
     _, backend, swap, cfg, classes, key, graph = typed_version()
     need(not Path(out).exists(),"NO_OVERWRITE")
     out=Path(out)
