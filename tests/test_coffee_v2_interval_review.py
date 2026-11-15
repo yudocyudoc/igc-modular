@@ -171,6 +171,10 @@ class P07Intervals(unittest.TestCase):
                     {**manifest["windows"][0], "end_s": 91}]}),
                 ("clock", {"clock": "POS_SYNTHETIC_MINUTES"}),
                 ("no_windows", {"windows": []}),
+                ("reserved", {"media_duration_s": 4000, "windows": [
+                    {"id": "heldout", "start_s": 3600, "end_s": 3650,
+                     "stratum": "UNCERTAIN",
+                     "selection_reason": "must not review historical reserve here"}]}),
                 ("invalid_review_scope", {"review_scope": "G3_VALIDATED"}),
             ]
             for key, change in cases:
