@@ -89,6 +89,9 @@ class StaffAvailabilityDecisionTests(unittest.TestCase):
             self.assertEqual({p.name for p in out.iterdir()},{
                 "support-availability-service.csv",
                 "support-availability-economics.csv",
+                "next-action-service.csv",
+                "ATMS_PREDECISION.json","ATMS_GATE.json",
+                "ATMS_DISPOSITION.json","NEXT_ACTION.json",
                 "decision.json","DECISION.md","receipt.json"})
             self.assertEqual(json.loads((out/"receipt.json").read_text())[
                 "source_run_id"],pilot.SOURCE_RUN_ID)
