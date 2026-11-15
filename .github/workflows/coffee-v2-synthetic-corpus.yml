@@ -36,6 +36,8 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_coffee_v2_synthetic_corpus.py' -v
       - name: Evidence classification
         run: |
-          echo "P01/P02 ZIP integrity and grouped partitions: fixture only." >> "$GITHUB_STEP_SUMMARY"
-          echo "Original ZIP not in CI. No R2, supplier, OMC or G3." >> "$GITHUB_STEP_SUMMARY"
-          echo "No physical treatment or business recommendation is evaluated." >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "P01/P02 ZIP integrity and grouped partitions: fixture only."
+            echo "Original ZIP not in CI. No R2, supplier, OMC or G3."
+            echo "No physical treatment or business recommendation is evaluated."
+          } >> "$GITHUB_STEP_SUMMARY"
