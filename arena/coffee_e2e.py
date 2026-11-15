@@ -219,8 +219,17 @@ def verify_b_csv(path, native):
             "predictions": project(rows, mapping["counter"])}
 
 
-def stage_native(out, api=None):
-    run_id, sha = execution_identity()
+def stage_native(out, api=None, *, preflight=False):
+    if preflight:
+        e = os.environ
+        need(e.get("GITHUB_REPOSITORY") == REPO and
+             e.get("GITHUB_EVENT_NAME") in ("push", "pull_request") and
+             re.fullmatch(r"[1-9][0-9]*", e.get("GITHUB_RUN_ID", "")) and
+             re.fullmatch(r"[0-9a-f]{40}", e.get("GITHUB_SHA", "")),
+             "PUBLIC_NATIVE_PREFLIGHT_REQUIRES_GITHUB")
+        run_id, sha = int(e["GITHUB_RUN_ID"]), e["GITHUB_SHA"]
+    else:
+        run_id, sha = execution_identity()
     need(not any(os.environ.get(k) for k in dm.NO_R2), "PRODUCER_PRIVATE_CREDENTIAL")
     api = api or api_client()
     out = Path(out)
@@ -525,7 +534,7 @@ def final_report(evaluation_dir, decision_dir, admission_dir, out):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("prepare-corpus", "download-views", "stage-native", "reserve-physical", "run-b", "evaluate"):
+    for name in ("prepare-corpus", "download-views", "stage-native", "native-preflight", "reserve-physical", "run-b", "evaluate"):
         p = sub.add_parser(name)
         p.add_argument("--out", required=True)
     p = sub.add_parser("decision"); p.add_argument("--views", required=True); p.add_argument("--out", required=True)
@@ -538,7 +547,9 @@ def main(argv=None):
                  "stage-native":stage_native,"reserve-physical":reserve_physical,
                  "run-b":run_b,"evaluate":evaluate}
     try:
-        if args.command in functions:
+        if args.command == "native-preflight":
+            result = stage_native(args.out, preflight=True)
+        elif args.command in functions:
             result = functions[args.command](args.out)
         elif args.command == "decision":
             result = run_decision(args.views, args.out)

@@ -16,6 +16,8 @@ from arena import coffee_e2e as e2e
 from arena import coffee_v2_synthetic_corpus as corpus
 from arena.coffee_v2_p11 import strict_preference_reversal
 from test_coffee_v2_synthetic_corpus import synthetic_archive
+from arena.coffee_e2e_protocol import CoffeeGitHubBackend
+from arena.store import RunStore
 
 ENV = {"GITHUB_REPOSITORY":e2e.REPO, "GITHUB_REF":"refs/heads/main",
        "GITHUB_EVENT_NAME":"push", "GITHUB_RUN_ATTEMPT":"1",
@@ -35,6 +37,52 @@ def lock_fixture():
 
 
 class CoffeeEndToEndTests(unittest.TestCase):
+    def config(self):
+        return {"id":"coffee-test", "protocol":"coffee_end_to_end_v1", "backend":"github",
+                "budget":{"omc":1,"provider_posts":0,"workflow":1},
+                "github":{"repository":e2e.REPO,"ref":"main","freeze_sha":"HEAD","poll_seconds":1}}
+
+    def test_existing_exact_commit_run_is_followed_without_another_dispatch(self):
+        api = Mock()
+        api.repo.side_effect = [{"sha":"a"*40}, {"total_count":1,"workflow_runs":[{
+            "id":12345,"head_sha":"a"*40,"head_branch":"main","run_attempt":1,"event":"push"}]}]
+        api.run.return_value = {"head_sha":"a"*40,"head_branch":"main","run_attempt":1,
+                                "path":".github/workflows/coffee-end-to-end.yml",
+                                "status":"completed","conclusion":"success"}
+        payload = {"status":"END_TO_END_COMPLETED_WITH_DECLARED_LIMITS",
+                   "native_evaluation":{"run_id":12345,"code_sha":"a"*40},
+                   "new_omc_attempts":1,"provider_posts":0}
+        api.artifact.return_value = {"result.json":json.dumps(payload).encode(),"REPORT.md":b"Detailed result"}
+        with TemporaryDirectory() as tmp:
+            store = RunStore(Path(tmp)/"run", config=self.config())
+            try:
+                result = CoffeeGitHubBackend(api).execute(store, authorize=True)
+                self.assertEqual(result["run"]["status"],"COMPLETED")
+                self.assertEqual(result["run"]["consumption"]["workflow"]["observed_attempts"],0)
+                self.assertEqual(result["run"]["consumption"]["omc"]["observed_attempts"],1)
+                self.assertTrue((store.root/"COFFEE_REPORT.md").is_file())
+                api.dispatch.assert_not_called()
+            finally:
+                store.close()
+
+    def test_uncertain_dispatch_is_recorded_and_never_automatically_repeated(self):
+        api = Mock()
+        api.repo.side_effect = [{"sha":"a"*40},{"total_count":0,"workflow_runs":[]}]
+        api.dispatch.side_effect = ArenaError("uncertain network reply")
+        with TemporaryDirectory() as tmp:
+            store = RunStore(Path(tmp)/"run", config=self.config())
+            try:
+                backend = CoffeeGitHubBackend(api)
+                with self.assertRaisesRegex(ArenaError,"uncertain network"):
+                    backend.execute(store,authorize=True)
+                with self.assertRaisesRegex(ArenaError,"automatic retry refused"):
+                    backend.execute(store)
+                self.assertEqual(api.dispatch.call_count,1)
+                self.assertEqual(store.report()["status"],"NEEDS_RECONCILIATION")
+                self.assertEqual(store.report()["consumption"]["workflow"]["observed_attempts"],1)
+            finally:
+                store.close()
+
     def test_reversal_requires_both_strict_preferences_not_ties(self):
         for counts, expected in (({"B0_IF_ASSUMPTIONS":1,"TIE_IF_ASSUMPTIONS":1},False),
                                  ({"S5_IF_ASSUMPTIONS":1,"TIE_IF_ASSUMPTIONS":1},False),
