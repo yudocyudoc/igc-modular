@@ -1,0 +1,31 @@
+name: Coffee Arena - recover sealed B trace without another simulation
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/coffee-end-to-end-reconcile.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  reconcile:
+    if: github.ref == 'refs/heads/main' && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Verify original equations and pre-reveal CSV; no R2, OMC, provider or new forecast
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -m arena.coffee_e2e reconcile --out "$RUNNER_TEMP/coffee-result"
+      - name: Readable corrected result
+        run: cat "$RUNNER_TEMP/coffee-result/REPORT.md" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coffee-e2e-result-${{ github.run_id }}
+          path: ${{ runner.temp }}/coffee-result/
+          if-no-files-found: error
+          retention-days: 90

@@ -8,32 +8,6 @@ permissions:
   contents: read
   actions: read
 jobs:
-  inspect-existing-b-attempt:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with: {persist-credentials: false}
-      - uses: actions/setup-python@v5
-        with: {python-version: '3.12'}
-      - name: Read the exact first B log; no solver invocation or private source
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          python - <<'PY'
-          import json, os
-          from arena.github import GitHub
-          from arena.connections import Secret
-          from arena.coffee_feedback import _safe_archive
-          api=GitHub('yudocyudoc/igc-modular',Secret(os.environ['GH_TOKEN'],'GITHUB_TOKEN'))
-          artifact=14148819847
-          expected='sha256:65e5f4f830302ca22bbe753f0565af5ebe584dea2f6add834c3e34a2b36e22de'
-          meta=api.repo('GET',f'/actions/artifacts/{artifact}')
-          assert meta['digest']==expected and meta['workflow_run']['id']==43684660729
-          files=_safe_archive(api.repo('GET',f'/actions/artifacts/{artifact}/zip',binary=True),expected_digest=expected)
-          print(files['B-result.json'].decode())
-          print(files['B.log'].decode(errors='replace'))
-          PY
   native-preflight:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -50,3 +24,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python -m arena.coffee_e2e native-preflight --out "$RUNNER_TEMP/coffee-native-preflight"
+      - name: Reclassify the already sealed B CSV without another simulation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -m arena.coffee_e2e reconcile-preflight --out "$RUNNER_TEMP/coffee-reconciliation-preview"
