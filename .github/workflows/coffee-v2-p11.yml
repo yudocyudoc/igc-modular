@@ -1,0 +1,46 @@
+name: Coffee V2.1 - P11 conditional B0 S5 (offline)
+
+on:
+  pull_request:
+    paths:
+      - 'arena/coffee_v2_p11.py'
+      - 'tests/test_coffee_v2_p11.py'
+      - 'COFFEE_V2_1_P11_CONDITIONAL_B0_S5.md'
+      - 'experiments/coffee_v2/P11_INITIAL_CONDITIONAL_PROTOCOL_V1.json'
+      - '.github/workflows/coffee-v2-p11.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'arena/coffee_v2_p11.py'
+      - 'tests/test_coffee_v2_p11.py'
+      - 'COFFEE_V2_1_P11_CONDITIONAL_B0_S5.md'
+      - 'experiments/coffee_v2/P11_INITIAL_CONDITIONAL_PROTOCOL_V1.json'
+      - '.github/workflows/coffee-v2-p11.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  p11-conditional:
+    name: P11 identical demand and physical resources, no reserved data
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify native engine conservation
+        run: python -m arena.runtime verify
+      - name: Verify predeclared P11 P12 and physical sensitivity on fictional data
+        run: python -m unittest discover -s tests -p 'test_coffee_v2_p11.py' -v
+      - name: Scientific scope reminder
+        run: |
+          {
+            echo "P11 fixture-only conditional B0/S5: NOT business validation."
+            echo "Input-only construction selection, no truth or G3."
+            echo "Illustrative opportunity costs, NOT actual salary or ROI."
+            echo "No OMC, R2, POST, provider calls, or new synthetic worlds."
+          } >> "$GITHUB_STEP_SUMMARY"
