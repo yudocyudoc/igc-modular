@@ -146,6 +146,25 @@ class PhysicalReferenceTests(TestCase):
             reference.simulate(pos, items,
                                dossier(reference.S5, support=0), 13)
 
+    def test_counterfactual_policy_gate_cannot_hide_new_resources(self):
+        base = dossier()
+        change = dossier(reference.S5)
+        matched = reference.counterfactual_pair_gate(base, change)
+        self.assertTrue(matched["comparison_is_conditional_not_executed"])
+        change["resources"]["espresso_group"]["units"] = 2
+        with self.assertRaisesRegex(
+            ArenaError, "POLICY_CANNOT_SECRETLY_CHANGE_RESOURCES_OR_TIMES"
+        ):
+            reference.counterfactual_pair_gate(base, change)
+        change = dossier(reference.S5)
+        change["durations"]["handoff_min"]["value"] = 0.5
+        with self.assertRaisesRegex(
+            ArenaError, "POLICY_CANNOT_SECRETLY_CHANGE_RESOURCES_OR_TIMES"
+        ):
+            reference.counterfactual_pair_gate(base, change)
+        with self.assertRaisesRegex(ArenaError, "PAIR_REQUIRES_B0_AND_S5"):
+            reference.counterfactual_pair_gate(base, base)
+
     def test_no_invented_measurement_no_wrong_units_and_mass_gates(self):
         bad = dossier()
         bad["durations"]["manual_setup_min"]["status"] = "MEASURED"
