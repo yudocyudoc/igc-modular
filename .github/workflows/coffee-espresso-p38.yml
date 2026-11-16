@@ -1,0 +1,104 @@
+name: Coffee PR38 — why espresso helps reference but not aggregates
+
+on:
+  pull_request:
+    paths:
+      - 'arena/coffee_v2_reference.py'
+      - 'arena/coffee_espresso_p38.py'
+      - 'tests/test_coffee_espresso_p38.py'
+      - '.github/workflows/coffee-espresso-p38.yml'
+      - 'COFFEE_ESPRESSO_P38_DECISION.md'
+  push:
+    branches: [main]
+    paths:
+      - 'arena/coffee_v2_reference.py'
+      - 'arena/coffee_espresso_p38.py'
+      - '.github/workflows/coffee-espresso-p38.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: coffee-p38-espresso-mechanism-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  contracts:
+    name: Trace does not change physical reference; original M artifact only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Existing reference and next-action regression tests
+        run: |
+          python -m unittest discover -s tests -p test_coffee_v2_reference.py -v
+          python -m unittest discover -s tests -p test_coffee_s5_availability.py -v
+      - name: Narrow P38 espresso diagnostics and tampering tests
+        run: python -m unittest discover -s tests -p test_coffee_espresso_p38.py -v
+
+  diagnose-espresso:
+    name: Two original construction loads, B0 and espresso +1, no new worlds or OMC
+    needs: contracts
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    environment: arena-custodian
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Retrieve same fixed reference artifact from GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 43697007653 \
+            --repo "$GITHUB_REPOSITORY" \
+            --name s5-support-decision-43697007653 \
+            --dir "$RUNNER_TEMP/pr38-reference"
+      - name: Retrieve previous real native M solver CSV, do NOT rerun OMC
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 43702148041 \
+            --repo "$GITHUB_REPOSITORY" \
+            --name coffee-p08-m-43702148041 \
+            --dir "$RUNNER_TEMP/pr38-m"
+      - name: Read ONLY existing P05 construction producer views, no original corpus
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CT03_R2_BUCKET: ${{ vars.CT03_R2_BUCKET || 'igc-ct03-private-custody' }}
+          CT03_R2_ACCESS_KEY_ID: ${{ secrets.CT03_R2_ACCESS_KEY_ID }}
+          CT03_R2_SECRET_ACCESS_KEY: ${{ secrets.CT03_R2_SECRET_ACCESS_KEY }}
+        run: |
+          python -m arena.coffee_s5_availability fetch-views \
+            --out "$RUNNER_TEMP/pr38-views"
+      - name: Diagnose resource-blocked espresso tasks versus aggregate M stage limit
+        run: |
+          python -m arena.coffee_espresso_p38 \
+            --views "$RUNNER_TEMP/pr38-views" \
+            --reference "$RUNNER_TEMP/pr38-reference/NEXT_ACTION.json" \
+            --native-M "$RUNNER_TEMP/pr38-m" \
+            --dossier experiments/coffee_v2/EXAMPLE_REFERENCE_DOSSIER_ASSUMPTIONS_ONLY.json \
+            --out "$RUNNER_TEMP/pr38-result"
+          cat "$RUNNER_TEMP/pr38-result/DECISION.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish only aggregate diagnostic and answer; never upload raw POS
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-espresso-p38-${{ github.run_id }}
+          path: ${{ runner.temp }}/pr38-result/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Erase private producer views and downloaded native CSV
+        if: always()
+        run: |
+          rm -rf "$RUNNER_TEMP/pr38-views" "$RUNNER_TEMP/pr38-m" \
+                 "$RUNNER_TEMP/pr38-reference"
+
+# No new OMC, cloud provider POST, synthetic world, original ZIP, G3 or truth.
+# The only physical simulator runs are existing CONSTRUCTION B0 and espresso +1.

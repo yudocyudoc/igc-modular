@@ -201,7 +201,8 @@ def support_calendar_gate(windows, horizon):
     return accepted
 
 
-def _engine(positions, lines, dossier, horizon, *, support_busy_windows=()):
+def _engine(positions, lines, dossier, horizon, *, support_busy_windows=(),
+            diagnose_stage_waits=False):
     cap, dur = config_gate(dossier)
     paid, refunds, beverages = paid_gate(positions, lines, horizon)
     reserved = support_calendar_gate(support_busy_windows, horizon)
@@ -218,6 +219,19 @@ def _engine(positions, lines, dossier, horizon, *, support_busy_windows=()):
     busy = defaultdict(float)
     ops = Counter()
     private_intervals = []  # available to tests only; never in public result
+    # Opt-in stage mechanics trace. This changes no scheduling rule or event.
+    enqueued_at = {}
+    blocked_by = defaultdict(set)
+    waited_minutes = defaultdict(float)
+    waited_in_peak = defaultdict(float)
+    waited_tasks = Counter()
+
+    def enqueue(task, now):
+        ready.append(task)
+        if diagnose_stage_waits:
+            key = (task["job"], task["stage"])
+            need(key not in enqueued_at, "DIAGNOSTIC_STAGE_DOUBLE_ENQUEUE")
+            enqueued_at[key] = now
     for first, end in reserved:
         # Wake blocked handoffs at each availability boundary; these events
         # change no other resource and cannot count as synthetic payments.
@@ -256,7 +270,7 @@ def _engine(positions, lines, dossier, horizon, *, support_busy_windows=()):
                 continue
             if kind == "arrive":
                 for index in range(len(paid[datum]["items"])):
-                    ready.append({"job": (datum, index), "stage": "manual_setup"})
+                    enqueue({"job": (datum, index), "stage": "manual_setup"}, t)
             else:
                 need(kind == "finish", "EVENT_TYPE")
                 task, req, started = datum
@@ -276,14 +290,14 @@ def _engine(positions, lines, dossier, horizon, *, support_busy_windows=()):
                     sequence = stages[(oid, index)]
                     step = sequence.index(stage)+1
                     if step < len(sequence):
-                        ready.append({"job": (oid, index),
-                                      "stage": sequence[step]})
+                        enqueue({"job": (oid, index),
+                                 "stage": sequence[step]}, t)
                     else:
                         remaining[oid] -= 1
                         need(remaining[oid] >= 0, "NEGATIVE_PENDING_ITEMS")
                         if remaining[oid] == 0:
-                            ready.append({"job": (oid, -1),
-                                          "stage": "handoff"})
+                            enqueue({"job": (oid, -1),
+                                     "stage": "handoff"}, t)
         waiting = []
         for task in ready:
             req, duration = needed(task)
@@ -295,6 +309,17 @@ def _engine(positions, lines, dossier, horizon, *, support_busy_windows=()):
                 waiting.append(task)
                 continue
             if all(inuse[r] < cap[r] for r in req):
+                if diagnose_stage_waits:
+                    key = (task["job"],task["stage"])
+                    need(key in enqueued_at, "DIAGNOSTIC_MISSING_READY_TIMESTAMP")
+                    created = enqueued_at.pop(key)
+                    need(t >= created, "DIAGNOSTIC_NEGATIVE_WAIT")
+                    delay = t-created
+                    stage = task["stage"]
+                    waited_minutes[stage] += delay
+                    waited_in_peak[stage] += max(0.0,min(t,horizon)-min(created,horizon))
+                    if delay > 1e-9:
+                        waited_tasks[stage] += 1
                 for r in req:
                     inuse[r] += 1
                     need(inuse[r] <= cap[r], "RESOURCE_OVERBOOKED")
@@ -302,6 +327,9 @@ def _engine(positions, lines, dossier, horizon, *, support_busy_windows=()):
                 heapq.heappush(events, (t+duration, 0, next(nonce),
                                         "finish", (task, req, t)))
             else:
+                if diagnose_stage_waits:
+                    key = (task["job"],task["stage"])
+                    blocked_by[key].update(r for r in req if inuse[r] >= cap[r])
                 waiting.append(task)
         ready = waiting
 
@@ -349,6 +377,38 @@ def _engine(positions, lines, dossier, horizon, *, support_busy_windows=()):
         "engine_role": "SPECIALIZED_REFERENCE_NOT_D_M_B_OR_GENERATOR",
         "external_cost": {"R2": 0, "OMC": 0, "POST": 0, "G3": 0},
     }
+    if diagnose_stage_waits:
+        need(not enqueued_at, "DIAGNOSTIC_UNFINISHED_STAGE_READY")
+        espresso_busy_in_peak = sum(
+            max(0.0,min(end,horizon)-max(0.0,start))
+            for stage,start,end,_ in private_intervals
+            if stage == "espresso_auto")
+        espresso_blocked = sum(
+            "espresso_group" in resources
+            for (job,stage),resources in blocked_by.items()
+            if stage == "espresso_auto")
+        result["mechanism_diagnostics"] = {
+            "schema":"arena.coffee-v2.stage-wait-diagnostic/1",
+            "scope":"SYNTHETIC_CONSTRUCTION_SCHEDULER_INTERNALS_NOT_OBSERVED",
+            "espresso_tasks_blocked_by_group_count":espresso_blocked,
+            "espresso_auto_waiting_task_count":waited_tasks["espresso_auto"],
+            "espresso_auto_queued_minutes_full_drain":round(
+                waited_minutes["espresso_auto"],10),
+            "espresso_auto_queued_minutes_before_cut":round(
+                waited_in_peak["espresso_auto"],10),
+            "espresso_group_busy_unit_minutes_before_cut":round(
+                espresso_busy_in_peak,10),
+            "espresso_group_assumed_units":cap["espresso_group"],
+            "espresso_group_busy_fraction_of_capacity_before_cut":round(
+                espresso_busy_in_peak/(cap["espresso_group"]*horizon),10),
+            "manual_setup_queued_minutes_before_cut":round(
+                waited_in_peak["manual_setup"],10),
+            "milk_finish_queued_minutes_before_cut":round(
+                waited_in_peak["milk_finish"],10),
+            "handoff_queued_minutes_before_cut":round(
+                waited_in_peak["handoff"],10),
+            "diagnostic_does_not_modify_scheduling":True,
+        }
     return result, private_intervals, finished
 
 
