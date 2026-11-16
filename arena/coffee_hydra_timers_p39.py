@@ -178,7 +178,7 @@ def fetch_and_export(out,*,storage=None):
     import os
     need(os.environ.get("GITHUB_REPOSITORY")=="yudocyudoc/igc-modular"
          and os.environ.get("GITHUB_REF")=="refs/heads/main"
-         and os.environ.get("GITHUB_EVENT_NAME")=="push"
+         and os.environ.get("GITHUB_EVENT_NAME") in ("push","workflow_dispatch")
          and os.environ.get("GITHUB_RUN_ATTEMPT")=="1",
          "CUSTODIAN_GITHUB_MAIN_ONLY")
     out=Path(out)
