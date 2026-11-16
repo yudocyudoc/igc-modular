@@ -55,7 +55,7 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main' && github.run_attempt == 1 &&
       ((github.event_name == 'workflow_dispatch' && inputs.run_authentic_integration == true) ||
-       (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'P39_AUTHORIZED_37_TIMERS_4_CASES_20261116_ONESHOT')))
+       (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'P39_AUTHORIZED_37_TIMERS_4_CASES_20261116_RETRY_HORIZON')))
     runs-on: ubuntu-24.04
     environment: arena-custodian
     timeout-minutes: 22
