@@ -8,12 +8,6 @@ on:
       - 'tests/test_coffee_espresso_p38.py'
       - '.github/workflows/coffee-espresso-p38.yml'
       - 'COFFEE_ESPRESSO_P38_DECISION.md'
-  push:
-    branches: [main]
-    paths:
-      - 'arena/coffee_v2_reference.py'
-      - 'arena/coffee_espresso_p38.py'
-      - '.github/workflows/coffee-espresso-p38.yml'
 
 permissions:
   contents: read
