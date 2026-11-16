@@ -166,7 +166,7 @@ class HydraTimerIntegrationTests(unittest.TestCase):
                 positions=[paid(str(i)+label,time=2*i) for i in range(n)]
                 lines=[item(str(i)+label,time=2*i) for i in range(n)]
                 days[label]={"positions":positions,"items":lines,
-                             "partition":"CONSTRUCTION","horizon":105.0}
+                             "partition":"CONSTRUCTION","horizon":104.0}
                 selected.append({"load_label":label,"case_id":label,"day":1})
             with patch.object(hydra.p11,"_verified_load_choices",
                               return_value={"selected":selected}), \
@@ -180,6 +180,7 @@ class HydraTimerIntegrationTests(unittest.TestCase):
             self.assertEqual(result["configured_installed_groups"],
                              list(timers.GROUPS))
             for r in result["scenarios"]:
+                self.assertEqual(r["source_horizon_minutes"],104.0)
                 b,a=r["comparison"]
                 self.assertEqual([b["assumed_enabled_group_count"],
                                   a["assumed_enabled_group_count"]],[1,3])
