@@ -293,7 +293,12 @@ def export(result,out):
         "Cálculo: sólo GitHub Actions; OMC 0, POST 0, nuevos mundos 0.",
     ]
     (out/"DECISION.md").write_text("\n".join(lines)+"\n",encoding="utf-8")
-    print("\n".join(lines))
+    # Writing UTF-8 report files remains lossless; Windows cp1252 CI
+    # consoles cannot encode the Delta/arrow characters used in tables.
+    import sys
+    report="\n".join(lines)
+    encoding=sys.stdout.encoding or "utf-8"
+    print(report.encode(encoding,errors="backslashreplace").decode(encoding))
 
 
 def main(argv=None):
