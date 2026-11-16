@@ -232,3 +232,82 @@ def select_case_day(view_dir, case_id, day):
         "manifest_sha256": "sha256:"+sha_file(path/"producer-manifest.json"),
         "source_sha256": source, "coverage": "FULL_SYNTHETIC_POS_DAY_NOT_ARRIVALS",
     }
+
+
+def read_hydra_machine_view(machine_dir):
+    """Read the P39 sidecar, not the historical ZIP or synthetic POS records.
+
+    Distinct source: first 15 minutes of video2, not the synthetic cases.
+    Historical P05 eight-file view contract and its digest remain unchanged.
+    """
+    from . import coffee_hydra_timers_p39 as timer
+    path=Path(machine_dir)/"machine-timers.json"
+    need(path.is_file() and not path.is_symlink() and
+         path.stat().st_size < 500_000,"P39_MACHINE_VIEW_SIZE")
+    data=json.loads(path.read_text(encoding="utf-8"))
+    need(type(data) is dict and
+         data.get("schema")==timer.SCHEMA and
+         data.get("source_archive_sha256")==
+         "sha256:"+timer.SOURCE_SHA and
+         type(data.get("rows")) is list and len(data["rows"])==37 and
+         data.get("count_by_labeled_group")==timer.EXPECTED and
+         data.get("source_rows_are_not_complete_extraction_cycles") is True and
+         data.get("observed_group_presence_not_simultaneous_availability") is True,
+         "P39_MACHINE_PROJECTION_CONTRACT")
+    seen=set()
+    counted=Counter()
+    compatible=0
+    mismatched=0
+    resets=0
+    for row in data["rows"]:
+        id=row.get("registro_id")
+        group=row.get("grupo")
+        need(type(id) is str and id not in seen and
+             group in timer.GROUPS and
+             row.get("unidad_medida")=="s_mostrados_contador" and
+             row.get("complete_extraction_duration_s") is None and
+             row.get("unknown_full_cycle_endpoints") is True,
+             "P39_TIMER_ROW_OR_CYCLE_FALSELY_IDENTIFIED")
+        seen.add(id)
+        counted[group]+=1
+        t0=timer.number(row.get("observado_desde_video_s"),"TIME0")
+        t1=timer.number(row.get("observado_hasta_video_s"),"TIME1")
+        c0=timer.number(row.get("lectura_inicial"),"COUNTER0")
+        c1=timer.number(row.get("lectura_final"),"COUNTER1")
+        need(t0<=t1<=900.5 and
+             row.get("pair_observation_status") ==
+             ("RESET_OR_WRAP_OR_DIFFERENT_ACTIVATION" if c1<c0 else
+              "LOCAL_COUNTER_DELTA_COMPATIBLE_NOT_FULL_CYCLE"
+              if abs((t1-t0)-(c1-c0))<=2.0 else
+              "CLOCK_DELTA_MISMATCH_OR_MISSING_CONTEXT"),
+             "P39_TIMER_CLOCK_OR_STATUS_TAMPERED")
+        kind=row["pair_observation_status"]
+        if kind.startswith("LOCAL_COUNTER"):compatible+=1
+        elif kind.startswith("RESET"):resets+=1
+        else:mismatched+=1
+    need(dict(counted)==timer.EXPECTED and
+         set(timer.EXAMPLES).issubset(seen),
+         "P39_GROUP_COUNTS_OR_PINNED_EXAMPLES")
+    for rid,(grp,t0,t1,c0,c1) in timer.EXAMPLES.items():
+        row=next(x for x in data["rows"] if x["registro_id"]==rid)
+        need(row["grupo"]==grp and
+             abs(float(row["observado_desde_video_s"])-t0)<0.015 and
+             abs(float(row["observado_hasta_video_s"])-t1)<0.015 and
+             abs(float(row["lectura_inicial"])-c0)<0.05 and
+             abs(float(row["lectura_final"])-c1)<0.05,
+             "P39_PINNED_TIMER_EXAMPLES_CHANGED")
+    return {
+        "schema":"arena.coffee.p39.hydra-machine-input/1",
+        "member_sha256":data["consolidated_member_sha256"],
+        "source_sha256":data["source_archive_sha256"],
+        "timer_pairs":len(data["rows"]),
+        "group_presence_counts":dict(sorted(counted.items())),
+        "timer_pair_local_compatible":compatible,
+        "timer_pair_clock_mismatched":mismatched,
+        "timer_pair_reset_or_unknown_activation":resets,
+        "identifiable_complete_auto_extraction_cycles":0,
+        "certified_automatic_extraction_duration_seconds":None,
+        "video2_first15min_not_synthetic_pos":True,
+        "distinct_groups_observed_not_concurrent_capacity_proved":True,
+        "machine_group_evidence_used_for_configuration":True,
+    }

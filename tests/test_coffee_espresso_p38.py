@@ -175,13 +175,51 @@ class EspressoMechanismTests(unittest.TestCase):
                 self.assertEqual(output["new_omc"],0)
                 p38.export(output,Path(folder)/"out")
                 self.assertIn("Hipótesis",(
-                    Path(folder)/"out/DECISION.md").read_text())
+                    Path(folder)/"out/DECISION.md").read_text(encoding="utf-8"))
                 corrupted=copy.deepcopy(d)
                 corrupted["durations"]["manual_setup_min"]["value"]=0.75
                 with self.assertRaisesRegex(ArenaError,
                                             "REFERENCE_ASSUMPTIONS_CHANGED"):
                     p38.compare(folder,source_path,Path(folder)/"m",corrupted)
 
+
+    def test_p2_preparation_capacity_binding_is_high_only_not_inferred_from_espresso(self):
+        """P2: no prep saturation in low demand; prep saturation in high.
+
+        CSV is a fictional material-conserving fixture, not authentic OMC.
+        Authentic historical M values are checked only in the gated P39 run.
+        """
+        with TemporaryDirectory() as folder:
+            tiny_m_artifact(folder)
+            mroot=Path(folder)
+            high=next(row for row in read_json(mroot/"manifest.json")["models"]
+                      if row["load_label"]==p38.LOADS[1]
+                      and row["variant"]=="BASE")
+            path=mroot/high["csv"]
+            with path.open("w",newline="") as file:
+                writer=csv.writer(file)
+                writer.writerow(["time","deliveredTotal",
+                                 "preparation0.waiting",
+                                 "espresso0.waiting","dispatch0.waiting"])
+                for i in range(p38.m.INTERVALS+1):
+                    t=i*p38.m.STOP/p38.m.INTERVALS
+                    paid=46*min(t/(p38.m.INPUT_HORIZON_MIN/60),1)
+                    prep=(min(1.2,paid*0.1) if t<=1.75
+                          else 1.2*max(0,1-(t-1.75)/0.25))
+                    writer.writerow([t,paid-prep,prep,0,0])
+            result=read_json(mroot/"result.json")
+            for row in result["pairwise_comparisons"]:
+                if row["load_label"]==p38.LOADS[1]:
+                    row["native_M_B0_continuous_handoffs_at_cut"]=44.8
+            write_json(mroot/"result.json",result)
+            low=p38.native_m_stage_diagnostic(mroot,p38.LOADS[0],19)
+            high_actual=p38.native_m_stage_diagnostic(mroot,p38.LOADS[1],46)
+            self.assertFalse(low["M_preparation_capacity_binding_in_sample"])
+            self.assertFalse(low["M_espresso_capacity_bound_active_in_sample"])
+            self.assertTrue(high_actual["M_preparation_capacity_binding_in_sample"])
+            self.assertFalse(high_actual["M_espresso_capacity_bound_active_in_sample"])
+            self.assertAlmostEqual(
+                high_actual["M_max_uncapped_preparation_release_per_hour"],12)
 
 if __name__=="__main__":
     unittest.main()
