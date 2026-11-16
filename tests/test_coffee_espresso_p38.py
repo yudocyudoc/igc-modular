@@ -175,7 +175,7 @@ class EspressoMechanismTests(unittest.TestCase):
                 self.assertEqual(output["new_omc"],0)
                 p38.export(output,Path(folder)/"out")
                 self.assertIn("Hipótesis",(
-                    Path(folder)/"out/DECISION.md").read_text())
+                    Path(folder)/"out/DECISION.md").read_text(encoding="utf-8"))
                 corrupted=copy.deepcopy(d)
                 corrupted["durations"]["manual_setup_min"]["value"]=0.75
                 with self.assertRaisesRegex(ArenaError,
