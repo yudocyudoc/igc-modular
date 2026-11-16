@@ -165,6 +165,8 @@ class EspressoMechanismTests(unittest.TestCase):
                               return_value={
                                  "M_espresso_stage_cap_not_hit":True,
                                  "M_espresso_x2_delta_continuous_at_cut":0,
+                                 "M_max_uncapped_espresso_release_per_hour":0.0,
+                                 "M_espresso_limit_assumed_orders_per_hour":15,
                               }):
                 output=p38.compare(folder,source_path,Path(folder)/"m",d)
                 self.assertEqual(len(output["cases"]),2)
