@@ -83,6 +83,14 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --name s5-support-decision-43697007653 \
             --dir "$RUNNER_TEMP/p39-reference"
+      - name: Reuse prior authentic native M CSV (no OMC rerun)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 43702148041 \
+            --repo "$GITHUB_REPOSITORY" \
+            --name coffee-p08-m-43702148041 \
+            --dir "$RUNNER_TEMP/p39-native-M"
       - name: Consume machine evidence and simulate four fixed reference cases only
         run: |
           python -m arena.coffee_hydra_p39 \
@@ -91,6 +99,7 @@ jobs:
             --equipment experiments/coffee_v2/HYDRA_THREE_GROUPS_DECLARED_P39.json \
             --historical-dossier experiments/coffee_v2/EXAMPLE_REFERENCE_DOSSIER_ASSUMPTIONS_ONLY.json \
             --reference "$RUNNER_TEMP/p39-reference/NEXT_ACTION.json" \
+            --native-M "$RUNNER_TEMP/p39-native-M" \
             --out "$RUNNER_TEMP/p39-report"
           cat "$RUNNER_TEMP/p39-report/DECISION.md" >> "$GITHUB_STEP_SUMMARY"
       - name: Publish only aggregate diagnosis; timer row-level view stays custodian
@@ -105,7 +114,7 @@ jobs:
         if: always()
         run: |
           rm -rf "$RUNNER_TEMP/p39-machine" "$RUNNER_TEMP/p39-views" \
-                 "$RUNNER_TEMP/p39-reference"
+                 "$RUNNER_TEMP/p39-reference" "$RUNNER_TEMP/p39-native-M"
 
 # This workflow NEVER runs scientific simulations on PR/push.
 # Authentic 37 source rows + exactly four reference construction scenarios
