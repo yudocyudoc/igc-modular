@@ -11,6 +11,11 @@ on:
       - 'tests/test_coffee_hydra_p39.py'
       - '.github/workflows/coffee-hydra-p39.yml'
       - 'COFFEE_HYDRA_P39_DECISION.md'
+  # One explicitly authorized merge commit only. A normal push cannot run custody.
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/coffee-hydra-p39.yml'
   workflow_dispatch:
     inputs:
       run_authentic_integration:
@@ -47,7 +52,10 @@ jobs:
   real-historical-machine-view:
     name: Authenticated historical timer pairs -> 3-group model -> 4 reference cases
     needs: fixture-contracts
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.run_authentic_integration == true && github.run_attempt == 1
+    if: >-
+      github.ref == 'refs/heads/main' && github.run_attempt == 1 &&
+      ((github.event_name == 'workflow_dispatch' && inputs.run_authentic_integration == true) ||
+       (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'P39_AUTHORIZED_37_TIMERS_4_CASES_20261116_ONESHOT')))
     runs-on: ubuntu-24.04
     environment: arena-custodian
     timeout-minutes: 22
@@ -116,6 +124,6 @@ jobs:
           rm -rf "$RUNNER_TEMP/p39-machine" "$RUNNER_TEMP/p39-views" \
                  "$RUNNER_TEMP/p39-reference" "$RUNNER_TEMP/p39-native-M"
 
-# This workflow NEVER runs scientific simulations on PR/push.
-# Authentic 37 source rows + exactly four reference construction scenarios
-# are opt-in ONLY via workflow_dispatch main, first attempt. No G3/OMC/POST.
+# Exactly ONE explicitly authorized merge title can run four reference cases on push.
+# No arbitrary PR/push can run scientific cases. Future runs require manual dispatch.
+# Custodian checks remain main-only and first-attempt; no G3/OMC/POST.
