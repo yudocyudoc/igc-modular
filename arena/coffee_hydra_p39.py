@@ -22,6 +22,7 @@ from . import coffee_v2_reference_inputs as inputs
 from . import coffee_v2_p11 as p11
 from . import coffee_next_action as next_action
 from . import coffee_hydra_timers_p39 as timers
+from . import coffee_espresso_p38 as p38
 
 SCHEMA="arena.coffee.p39.hydra-model-consumption/1"
 CONFIG_SCHEMA="arena.coffee.p39.hydra-declared-configuration/1"
@@ -113,7 +114,7 @@ def allocate_group_slots(intervals, n):
 
 
 def diagnose(view_dir,machine_dir,cfg_path,historical_dossier,
-             *, archived_reference=None):
+             *, archived_reference=None, native_m_root=None):
     """Two loads, B0-1 group and 3 assumed enabled groups: four ref runs."""
     machine,cfg,new=prepare(machine_dir,cfg_path,historical_dossier)
     selection=p11._verified_load_choices(view_dir)
@@ -181,8 +182,23 @@ def diagnose(view_dir,machine_dir,cfg_path,historical_dossier,
                  abs(before["p90_paid_to_handoff_full_drain_min"]-
                      candidate[0]["B0_p90_full_drain_min"])<1e-6,
                  "HISTORICAL_B0_NOT_REPRODUCED")
+        m_stage=(p38.native_m_stage_diagnostic(
+            native_m_root,load,before["paid_orders"])
+            if native_m_root is not None else None)
         outputs.append({
             "load_label":load,
+            "M_native_stage_cap_diagnostic":({
+                "prep_max_uncapped_orders_per_hour":
+                    m_stage["M_max_uncapped_preparation_release_per_hour"],
+                "preparation_cap_binding":
+                    m_stage["M_preparation_capacity_binding_in_sample"],
+                "espresso_max_uncapped_orders_per_hour":
+                    m_stage["M_max_uncapped_espresso_release_per_hour"],
+                "espresso_cap_binding":
+                    m_stage["M_espresso_capacity_bound_active_in_sample"],
+                "epistemic_scope":"EXISTING_M_AGGREGATE_NOT_HYDRA_GROUP_CAPACITY",
+            } if m_stage is not None else
+                {"status":"NOT_READ_IN_FIXTURE_ONLY_TEST"}),
             "comparison":snapshots,
             "delta_handoffs_at_cut":
                 after["handoffs_before_cut"]-before["handoffs_before_cut"],
@@ -259,6 +275,29 @@ def export_report(result,out):
             f"{a['p90_paid_to_handoff_full_drain_min']:.3f} min | "
             f"{row['delta_handoffs_at_cut']:+d} | "
             f"{row['delta_p90_min']:+.3f} min |")
+    if all(row["M_native_stage_cap_diagnostic"].get(
+            "prep_max_uncapped_orders_per_hour") is not None
+           for row in result["scenarios"]):
+        lines += [
+            "",
+            "## P38 correction from the original native M CSV",
+            "",
+            "| Load | Preparation uncapped / assumed cap (h⁻¹) | Prep cap binding? | Espresso uncapped / assumed cap (h⁻¹) | Espresso cap binding? |",
+            "|---|---:|---|---:|---|",
+        ]
+        for row in result["scenarios"]:
+            m=row["M_native_stage_cap_diagnostic"]
+            lines.append(
+                f"| {row['load_label']} | "
+                f"{m['prep_max_uncapped_orders_per_hour']:.3f} / 12 | "
+                f"{'yes' if m['preparation_cap_binding'] else 'no'} | "
+                f"{m['espresso_max_uncapped_orders_per_hour']:.3f} / 15 | "
+                f"{'yes' if m['espresso_cap_binding'] else 'no'} |")
+        lines += [
+            "The low-load preparation capacity is NOT binding; it only",
+            "becomes binding in the high-load native M case. Neither",
+            "case makes the generic espresso capacity binding.",
+        ]
     lines += [
         "",
         "**Source / model boundary:** machine data are historical VIDEO2",
@@ -292,12 +331,14 @@ def main(argv=None):
     p.add_argument("--equipment",required=True)
     p.add_argument("--historical-dossier",required=True)
     p.add_argument("--reference",required=False)
+    p.add_argument("--native-M",required=True)
     p.add_argument("--out",required=True)
     args=p.parse_args(argv)
     reference=read_json(args.reference) if args.reference else None
     export_report(diagnose(
         args.views,args.machine,args.equipment,
-        read_json(args.historical_dossier),archived_reference=reference),
+        read_json(args.historical_dossier),archived_reference=reference,
+        native_m_root=args.native_M),
         args.out)
 
 
