@@ -62,20 +62,22 @@ def native_m_stage_diagnostic(root,load,paid):
     checked=m.audit_csv(source,base)
     with source.open(encoding="utf-8",newline="") as stream:
         reader=csv.DictReader(stream)
-        need("espresso0.waiting" in (reader.fieldnames or []) and
-             "time" in (reader.fieldnames or []),
+        need({"espresso0.waiting","preparation0.waiting","time"}.issubset(
+             set(reader.fieldnames or [])),
              "M_NATIVE_ESPRESSO_STOCK_COLUMN_MISSING")
-        rows=[(float(x["time"]),float(x["espresso0.waiting"]))
-              for x in reader]
-    considered=[stock for t,stock in rows if
+        rows=[(float(x["time"]),float(x["espresso0.waiting"]),
+               float(x["preparation0.waiting"])) for x in reader]
+    considered=[(espresso,prep) for t,espresso,prep in rows if
                 0 <= t <= m.INPUT_HORIZON_MIN/60+1e-7]
     need(len(considered)>100 and
-         min(considered)>=-0.001 and all(
-             stock < 100000 for stock in considered),
+         min(min(v) for v in considered)>=-0.001 and all(
+             all(z < 100000 for z in v) for v in considered),
          "M_ESPRESSO_STOCK_NOT_PHYSICAL")
     response=m.ROLE_ASSUMPTIONS["espresso"]["responseTime"]
     cap=m.ROLE_ASSUMPTIONS["espresso"]["maxThroughput"]
-    theoretical_uncapped=max(considered)/response
+    theoretical_uncapped=max(x[0] for x in considered)/response
+    preparation_uncapped=max(x[1] for x in considered)/(
+        m.ROLE_ASSUMPTIONS["preparation"]["responseTime"])
     epsilon=0.001
     # The native model saturates when its stock/responseTime >= maxThroughput.
     # Here that is 1.5 abstract orders queued at espresso, NOT a physical
@@ -97,7 +99,13 @@ def native_m_stage_diagnostic(root,load,paid):
         "M_espresso_x2_delta_continuous_at_cut":delta,
         "M_preparation_limit_assumed_orders_per_hour":12,
         "M_espresso_limit_assumed_orders_per_hour":15,
-        "M_stage_max_stock_abstract_orders":round(max(considered),8),
+        "M_stage_max_stock_abstract_orders":round(
+            max(x[0] for x in considered),8),
+        "M_max_uncapped_preparation_release_per_hour":round(
+            preparation_uncapped,8),
+        "M_preparation_capacity_binding_in_sample":
+            preparation_uncapped >=
+            m.ROLE_ASSUMPTIONS["preparation"]["maxThroughput"]-epsilon,
         "M_max_uncapped_espresso_release_per_hour":round(
             theoretical_uncapped,8),
         "M_espresso_capacity_bound_active_in_sample":aggregate_capacity_binding,
@@ -166,11 +174,17 @@ def compare(view_dir,source_path,mroot,dossier):
         # Two model-local hypotheses. Do not claim they settle the cross-model
         # difference, because arrivals, recipes and units differ.
         conditions={
-            "H_AGGREGATE_PREPARATION_LIMITS_ESPRESSO":{
+            "H_AGGREGATE_ESPRESSO_CAPACITY_NOT_BINDING":{
                 "support":bool(agg["M_espresso_stage_cap_not_hit"] and
                               abs(agg["M_espresso_x2_delta_continuous_at_cut"])<1e-6),
-                "test":"M native espresso stock never reaches its own 15/hour "
-                       "cap while 12/hour upstream cap is unchanged",
+                "test":"M espresso native stock/responseTime remains below 15/h; "
+                       "doubling its cap changes no deliveries",
+            },
+            "H_AGGREGATE_PREPARATION_CAPACITY_BINDING":{
+                "support":bool(agg.get(
+                    "M_preparation_capacity_binding_in_sample",False)),
+                "test":"M native preparation stock/responseTime reaches 12/h "
+                       "within the 105-min pulse (not inferred from espresso alone)",
             },
             "H_REFERENCE_ESPRESSO_RESOURCE_CONGESTION":{
                 "support":bool(diag0["espresso_tasks_blocked_by_group_count"]>0
