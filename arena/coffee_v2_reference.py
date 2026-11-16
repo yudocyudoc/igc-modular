@@ -317,7 +317,7 @@ def _engine(positions, lines, dossier, horizon, *, support_busy_windows=(),
                     delay = t-created
                     stage = task["stage"]
                     waited_minutes[stage] += delay
-                    waited_in_peak[stage] += max(0.0,min(t,horizon)-created)
+                    waited_in_peak[stage] += max(0.0,min(t,horizon)-min(created,horizon))
                     if delay > 1e-9:
                         waited_tasks[stage] += 1
                 for r in req:
