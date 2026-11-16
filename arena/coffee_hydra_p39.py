@@ -26,7 +26,6 @@ from . import coffee_espresso_p38 as p38
 
 SCHEMA="arena.coffee.p39.hydra-model-consumption/1"
 CONFIG_SCHEMA="arena.coffee.p39.hydra-declared-configuration/1"
-INPUT_HORIZON_MIN=105.0
 SELECTED=("LOWER_PAID_INPUT_Q25","HIGHER_PAID_INPUT_Q75")
 
 
@@ -142,9 +141,12 @@ def diagnose(view_dir,machine_dir,cfg_path,historical_dossier,
         load=chosen["load_label"]
         case=inputs.select_case_day(
             view_dir,chosen["case_id"],chosen["day"])
-        need(case["partition"]=="CONSTRUCTION" and
-             abs(case["horizon"]-INPUT_HORIZON_MIN)<1e-6,
-             "NO_RESERVED_CASE_OR_DIFFERENT_HORIZON")
+        need(case["partition"]=="CONSTRUCTION","NO_RESERVED_CASE")
+        # P05 supplies the authoritative source horizon (not P08's
+        # 105-minute rectangular approximation). Never coerce it.
+        need(type(case["horizon"]) in (float,int) and
+             60 <= case["horizon"] <= 180,
+             "SOURCE_HORIZON_OUTSIDE_DECLARED_BOUND")
         snapshots=[]
         for tag,dossier in (("HISTORICAL_ONE_ENABLED",historical_dossier),
                             ("HYDRA_THREE_ENABLED_ASSUMED",new)):
@@ -196,6 +198,7 @@ def diagnose(view_dir,machine_dir,cfg_path,historical_dossier,
             if native_m_root is not None else None)
         outputs.append({
             "load_label":load,
+            "source_horizon_minutes":case["horizon"],
             "M_native_stage_cap_diagnostic":({
                 "prep_max_uncapped_orders_per_hour":
                     m_stage["M_max_uncapped_preparation_release_per_hour"],
