@@ -2,14 +2,22 @@
   "schema": "arena.coffee.p39.hydra-declared-configuration/1",
   "equipment": {
     "model": "Synesso MVP Hydra",
-    "installed_group_ids": ["G01", "G02", "G03"],
+    "installed_group_ids": [
+      "G01",
+      "G02",
+      "G03"
+    ],
     "installed_status": "USER_IDENTIFIED_WITH_VIDEO_GROUP_LABELS",
     "availability_by_group": {
       "G01": "NOT_INDEPENDENTLY_VERIFIED",
       "G02": "NOT_INDEPENDENTLY_VERIFIED",
       "G03": "NOT_INDEPENDENTLY_VERIFIED"
     },
-    "assumed_enabled_group_ids_in_scenario": ["G01", "G02", "G03"],
+    "assumed_enabled_group_ids_in_scenario": [
+      "G01",
+      "G02",
+      "G03"
+    ],
     "enabled_status": "SCENARIO_ASSUMPTION_NOT_OBSERVED_SIMULTANEOUS_AVAILABILITY"
   },
   "duration_policy": {
@@ -26,7 +34,21 @@
   "manual_resources": {
     "barista_count": "HISTORICAL_ONE_ASSUMED_NOT_EMPIRICALLY_VERIFIED",
     "steam_wand_count": "HISTORICAL_ONE_ASSUMED_NOT_EMPIRICALLY_VERIFIED",
-    "load_remove_activities_separately_identified": false
+    "load_remove_activities_separately_identified": false,
+    "operator_task_durations_min": {
+      "portafilter_load": {
+        "value": null,
+        "status": "UNKNOWN_NOT_OBSERVED_IN_TIMER_PAIRS"
+      },
+      "portafilter_remove": {
+        "value": null,
+        "status": "UNKNOWN_NOT_OBSERVED_IN_TIMER_PAIRS"
+      },
+      "group_clean_purge": {
+        "value": null,
+        "status": "UNKNOWN_NOT_OBSERVED_IN_TIMER_PAIRS"
+      }
+    }
   },
   "model_scope": "THREE_ENABLED_GROUPS_CONDITIONAL_SCENARIO_NOT_MEASURED_CAFETERIA",
   "preserve_historical_one_group_dossier": true,
