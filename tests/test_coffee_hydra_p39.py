@@ -128,6 +128,15 @@ class HydraTimerIntegrationTests(unittest.TestCase):
             with self.assertRaisesRegex(ArenaError,
                                         "PARTIAL_TIMER_CANNOT_CALIBRATE"):
                 hydra.prepare(tmp,p,base)
+            altered=read_json(EQUIPMENT)
+            altered["manual_resources"]["operator_task_durations_min"][
+                "portafilter_load"]={"value":0,
+                                    "status":"OBSERVED"}
+            p=Path(tmp)/"wrong_manual.json"
+            write_json(p,altered,exclusive=True)
+            with self.assertRaisesRegex(ArenaError,
+                                        "MANUAL_LOAD_REMOVE_CLEAN_MUST_REMAIN_UNKNOWN"):
+                hydra.prepare(tmp,p,base)
             result=read_json(Path(tmp)/"machine-timers.json")
             result["rows"]=[x for x in result["rows"]
                             if x["grupo"]!="G03"]
