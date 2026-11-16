@@ -1,0 +1,112 @@
+name: Coffee P39 — Hydra timer evidence into three-group model
+
+on:
+  pull_request:
+    paths:
+      - 'arena/coffee_hydra_timers_p39.py'
+      - 'arena/coffee_hydra_p39.py'
+      - 'arena/coffee_v2_reference_inputs.py'
+      - 'arena/coffee_espresso_p38.py'
+      - 'experiments/coffee_v2/HYDRA_THREE_GROUPS_DECLARED_P39.json'
+      - 'tests/test_coffee_hydra_p39.py'
+      - '.github/workflows/coffee-hydra-p39.yml'
+      - 'COFFEE_HYDRA_P39_DECISION.md'
+  workflow_dispatch:
+    inputs:
+      run_authentic_integration:
+        description: 'Authorize exactly 37 timer pairs + four existing-construction reference cases, no OMC'
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: coffee-p39-hydra-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  fixture-contracts:
+    name: P39 timer projection, group identities, no invented durations and stage-limit P2
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Validate new machine evidence and model-consumption tests
+        run: |
+          python -m unittest discover -s tests -p test_coffee_hydra_p39.py -v
+          python -m unittest discover -s tests -p test_coffee_espresso_p38.py -v
+      - name: Check unchanged original reference consumer with existing fixtures
+        run: python -m unittest discover -s tests -p test_coffee_v2_reference.py -v
+
+  real-historical-machine-view:
+    name: Authenticated historical timer pairs -> 3-group model -> 4 reference cases
+    needs: fixture-contracts
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.run_authentic_integration == true && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    environment: arena-custodian
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Custodian reads only pinned historical video2 consolidated member
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CT03_R2_BUCKET: ${{ vars.CT03_R2_BUCKET || 'igc-ct03-private-custody' }}
+          CT03_R2_ACCESS_KEY_ID: ${{ secrets.CT03_R2_ACCESS_KEY_ID }}
+          CT03_R2_SECRET_ACCESS_KEY: ${{ secrets.CT03_R2_SECRET_ACCESS_KEY }}
+        run: |
+          python -m arena.coffee_hydra_timers_p39 custodian-export \
+            --out "$RUNNER_TEMP/p39-machine"
+          test -f "$RUNNER_TEMP/p39-machine/machine-timers.json"
+      - name: Reuse previous authorized CONSTRUCTION producer views, unchanged
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CT03_R2_BUCKET: ${{ vars.CT03_R2_BUCKET || 'igc-ct03-private-custody' }}
+          CT03_R2_ACCESS_KEY_ID: ${{ secrets.CT03_R2_ACCESS_KEY_ID }}
+          CT03_R2_SECRET_ACCESS_KEY: ${{ secrets.CT03_R2_SECRET_ACCESS_KEY }}
+        run: |
+          python -m arena.coffee_s5_availability fetch-views \
+            --out "$RUNNER_TEMP/p39-views"
+      - name: Recover original reference result; compare historical one-group baseline unchanged
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 43697007653 \
+            --repo "$GITHUB_REPOSITORY" \
+            --name s5-support-decision-43697007653 \
+            --dir "$RUNNER_TEMP/p39-reference"
+      - name: Consume machine evidence and simulate four fixed reference cases only
+        run: |
+          python -m arena.coffee_hydra_p39 \
+            --views "$RUNNER_TEMP/p39-views" \
+            --machine "$RUNNER_TEMP/p39-machine" \
+            --equipment experiments/coffee_v2/HYDRA_THREE_GROUPS_DECLARED_P39.json \
+            --historical-dossier experiments/coffee_v2/EXAMPLE_REFERENCE_DOSSIER_ASSUMPTIONS_ONLY.json \
+            --reference "$RUNNER_TEMP/p39-reference/NEXT_ACTION.json" \
+            --out "$RUNNER_TEMP/p39-report"
+          cat "$RUNNER_TEMP/p39-report/DECISION.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish only aggregate diagnosis; timer row-level view stays custodian
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-hydra-p39-${{ github.run_id }}
+          path: ${{ runner.temp }}/p39-report/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Erase custodian views and temporary downloaded artifacts
+        if: always()
+        run: |
+          rm -rf "$RUNNER_TEMP/p39-machine" "$RUNNER_TEMP/p39-views" \
+                 "$RUNNER_TEMP/p39-reference"
+
+# This workflow NEVER runs scientific simulations on PR/push.
+# Authentic 37 source rows + exactly four reference construction scenarios
+# are opt-in ONLY via workflow_dispatch main, first attempt. No G3/OMC/POST.
