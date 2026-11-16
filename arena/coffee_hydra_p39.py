@@ -63,6 +63,15 @@ def prepare(machine_dir, config_path, historical_dossier):
          and cfg.get("preserve_historical_one_group_dossier") is True and
          cfg.get("not_an_equipment_purchase_or_intervention") is True,
          "PARTIAL_TIMER_CANNOT_CALIBRATE_AUTOMATIC_TIME")
+    manual=cfg.get("manual_resources",{}).get(
+        "operator_task_durations_min",{})
+    need(type(manual) is dict and
+         set(manual)=={"portafilter_load","portafilter_remove",
+                       "group_clean_purge"} and
+         all(v=={"value":None,
+                 "status":"UNKNOWN_NOT_OBSERVED_IN_TIMER_PAIRS"}
+             for v in manual.values()),
+         "MANUAL_LOAD_REMOVE_CLEAN_MUST_REMAIN_UNKNOWN")
     physical.config_gate(historical_dossier)
     need(historical_dossier["policy"]=="B0" and
          historical_dossier["resources"]["espresso_group"]["units"]==1 and
