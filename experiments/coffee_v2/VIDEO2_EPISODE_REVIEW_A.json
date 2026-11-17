@@ -1,0 +1,351 @@
+{
+  "schema": "arena.coffee.p43.episode-review-layer/1",
+  "scope": "KNOWN_CONSTRUCTION_VIDEO2_EPISODES_NOT_POS_LINKED",
+  "upstream_p39_schema": "arena.coffee.p39.hydra-timer-projection/1",
+  "historical_source_sha256": "4ff97ae4d8fe52a5c1d1701aa713fda09b6730ef63d9cbab23e6af30dfad2a5f",
+  "historical_timer_rows_unchanged": 37,
+  "historical_timer_group_counts": {
+    "G01": 17,
+    "G02": 13,
+    "G03": 7
+  },
+  "new_review_package_zip_sha256": "9aee39f3413c0ea7b5f4449b193beb4be375d11cbf65a9f2dfc2fe5b4a0b0275",
+  "manifest_member_sha256": "571367307ae3b55cf6834b0d4de7b9bdf460660cc7ce1a2f02c50f67e84fef9c",
+  "review_csv_sha256": "217c2bd2d3fd7664b935cfd4fe3e84793cc5d65f04a26d07a3a0d63ad062cc97",
+  "existing_operations_csv_sha256": "a6209a9d45a1c5f4b2453ef741bcdd6ae116bf3852111f30aa1bc5eea14da423",
+  "source_operation_rows": 36,
+  "selected_operations": [
+    {
+      "id": "E030",
+      "actor": "B02",
+      "type": "preparacion_visible",
+      "confidence": "observado",
+      "observed_window_video_seconds": [
+        48,
+        54
+      ],
+      "resources": [
+        "B02",
+        "puesto_izquierdo"
+      ],
+      "window_is_full_task_duration": false,
+      "order_id": null,
+      "source_row": "evidencia/operaciones_existentes.csv#E030"
+    },
+    {
+      "id": "E062",
+      "actor": "B01",
+      "type": "preparacion_visible",
+      "confidence": "observado",
+      "observed_window_video_seconds": [
+        48,
+        55.003
+      ],
+      "resources": [
+        "B01",
+        "puesto_derecho"
+      ],
+      "window_is_full_task_duration": false,
+      "order_id": null,
+      "source_row": "evidencia/operaciones_existentes.csv#E062"
+    },
+    {
+      "id": "E032",
+      "actor": "B02",
+      "type": "preparacion_visible",
+      "confidence": "observado",
+      "observed_window_video_seconds": [
+        103.004,
+        107.015
+      ],
+      "resources": [
+        "B02",
+        "puesto_izquierdo"
+      ],
+      "window_is_full_task_duration": false,
+      "order_id": null,
+      "source_row": "evidencia/operaciones_existentes.csv#E032"
+    },
+    {
+      "id": "E064",
+      "actor": "B01",
+      "type": "preparacion_visible",
+      "confidence": "observado",
+      "observed_window_video_seconds": [
+        100.012,
+        108.001
+      ],
+      "resources": [
+        "B01",
+        "puesto_derecho"
+      ],
+      "window_is_full_task_duration": false,
+      "order_id": null,
+      "source_row": "evidencia/operaciones_existentes.csv#E064"
+    },
+    {
+      "id": "E115",
+      "actor": "maquina",
+      "type": "extraccion_en_curso",
+      "confidence": "observado",
+      "observed_window_video_seconds": [
+        13.002,
+        41.014
+      ],
+      "resources": [
+        "G03"
+      ],
+      "window_is_full_task_duration": false,
+      "order_id": null,
+      "source_row": "evidencia/operaciones_existentes.csv#E115"
+    },
+    {
+      "id": "E149",
+      "actor": "B02",
+      "type": "tarea_auxiliar",
+      "confidence": "observado",
+      "observed_window_video_seconds": [
+        14.005,
+        24
+      ],
+      "resources": [
+        "B02"
+      ],
+      "window_is_full_task_duration": false,
+      "order_id": null,
+      "source_row": "evidencia/operaciones_existentes.csv#E149"
+    },
+    {
+      "id": "E116",
+      "actor": "maquina",
+      "type": "extraccion_en_curso",
+      "confidence": "observado",
+      "observed_window_video_seconds": [
+        91.003,
+        121.003
+      ],
+      "resources": [
+        "G03"
+      ],
+      "window_is_full_task_duration": false,
+      "order_id": null,
+      "source_row": "evidencia/operaciones_existentes.csv#E116"
+    },
+    {
+      "id": "E086",
+      "actor": "B01",
+      "type": "preparacion_visible",
+      "confidence": "observado",
+      "observed_window_video_seconds": [
+        623.001,
+        638.009
+      ],
+      "resources": [
+        "B01",
+        "puesto_derecho"
+      ],
+      "window_is_full_task_duration": false,
+      "order_id": null,
+      "source_row": "evidencia/operaciones_existentes.csv#E086"
+    },
+    {
+      "id": "E087",
+      "actor": "B01",
+      "type": "preparacion_visible",
+      "confidence": "observado",
+      "observed_window_video_seconds": [
+        643.006,
+        655.006
+      ],
+      "resources": [
+        "B01",
+        "puesto_derecho"
+      ],
+      "window_is_full_task_duration": false,
+      "order_id": null,
+      "source_row": "evidencia/operaciones_existentes.csv#E087"
+    },
+    {
+      "id": "E100",
+      "actor": "B01",
+      "type": "jarra_en_lanza",
+      "confidence": "observado",
+      "observed_window_video_seconds": [
+        114,
+        122.006
+      ],
+      "resources": [
+        "lanza_derecha"
+      ],
+      "window_is_full_task_duration": false,
+      "order_id": null,
+      "source_row": "evidencia/operaciones_existentes.csv#E100"
+    },
+    {
+      "id": "E112",
+      "actor": "B01",
+      "type": "vaporizado",
+      "confidence": "probable",
+      "observed_window_video_seconds": [
+        643.006,
+        661.007
+      ],
+      "resources": [
+        "lanza_derecha"
+      ],
+      "window_is_full_task_duration": false,
+      "order_id": null,
+      "source_row": "evidencia/operaciones_existentes.csv#E112"
+    },
+    {
+      "id": "E126",
+      "actor": "maquina",
+      "type": "extraccion_en_curso",
+      "confidence": "observado",
+      "observed_window_video_seconds": [
+        652.014,
+        657.012
+      ],
+      "resources": [
+        "G03"
+      ],
+      "window_is_full_task_duration": false,
+      "order_id": null,
+      "source_row": "evidencia/operaciones_existentes.csv#E126"
+    }
+  ],
+  "reviewed_episodes": [
+    {
+      "id": "T31",
+      "group": "G03",
+      "type": "extraction_to_cup",
+      "confidence": "estimated_from_counter_and_visual_context",
+      "counter_elapsed_seconds": 29,
+      "first_final_seen_video_s": 41.014,
+      "final_still_seen_video_s": 48,
+      "estimated_activation_start_video_s": 12,
+      "complete_service_seconds": null,
+      "group_released_video_s": null,
+      "linked_historic_timer_id": "TM-T31",
+      "linked_event_ids": [
+        "E115"
+      ],
+      "old_pair": {
+        "video_s": [
+          12,
+          40.011
+        ],
+        "counter_s": [
+          0,
+          28
+        ]
+      },
+      "evidence_refs": [
+        "T31.jpg",
+        "T31_limites.jpg"
+      ],
+      "visual_state_note": "portafilter_still_attached_after_counter_stops"
+    },
+    {
+      "id": "T33",
+      "group": "G03",
+      "type": "extraction_to_cup",
+      "confidence": "estimated_from_counter_and_visual_context",
+      "counter_elapsed_seconds": 32,
+      "first_final_seen_video_s": 122.006,
+      "final_still_seen_video_s": 126,
+      "estimated_activation_start_video_s": 90,
+      "complete_service_seconds": null,
+      "group_released_video_s": null,
+      "linked_historic_timer_id": "TM-T33",
+      "linked_event_ids": [
+        "E116",
+        "E100"
+      ],
+      "old_pair": {
+        "video_s": [
+          118.012,
+          122.006
+        ],
+        "counter_s": [
+          28,
+          32
+        ]
+      },
+      "evidence_refs": [
+        "T33.jpg",
+        "T33_limites.jpg",
+        "T33_contador.jpg"
+      ],
+      "visual_state_note": "counter_final_stable_not_group_release"
+    },
+    {
+      "id": "T12",
+      "group": "G01",
+      "type": "probable_extraction_to_cup",
+      "confidence": "estimated_with_occlusions",
+      "counter_elapsed_seconds": 31,
+      "first_final_seen_video_s": 670.015,
+      "final_still_seen_video_s": 684.004,
+      "estimated_activation_start_video_s": 638,
+      "complete_service_seconds": null,
+      "group_released_video_s": null,
+      "linked_historic_timer_id": "TM-T12",
+      "linked_event_ids": [
+        "E086",
+        "E087"
+      ],
+      "old_pair": {
+        "video_s": [
+          640.014,
+          668.01
+        ],
+        "counter_s": [
+          2,
+          30
+        ]
+      },
+      "evidence_refs": [
+        "T12.jpg",
+        "T12_limites.jpg"
+      ],
+      "visual_state_note": "flow_partially_occluded"
+    },
+    {
+      "id": "T28",
+      "group": "G02",
+      "type": "probable_purge",
+      "confidence": "probable_visual_without_portafilter_or_cup",
+      "counter_elapsed_seconds": null,
+      "first_final_seen_video_s": null,
+      "final_still_seen_video_s": null,
+      "estimated_activation_start_video_s": null,
+      "complete_service_seconds": null,
+      "group_released_video_s": null,
+      "linked_historic_timer_id": "TM-T28",
+      "linked_event_ids": [],
+      "old_pair": {
+        "video_s": [
+          642.003,
+          644.009
+        ],
+        "counter_s": [
+          0,
+          2
+        ]
+      },
+      "evidence_refs": [
+        "f_03210.jpg",
+        "T12.jpg"
+      ],
+      "visual_state_note": "no_portafilter_or_cup_at_sample"
+    }
+  ],
+  "source_reviewer": "Codex/Astra, 2026-11-17; visual review of pre-existing frames, not human independent audit",
+  "materialization": "REDACTED_NUMERIC_VIEW_NO_IMAGES_OR_RAW_NOTES",
+  "unknown_starting_backlog": true,
+  "operator_presence_beyond_sampled_windows_unknown": true,
+  "synthetic_order_joins": 0,
+  "manual_stage_durations_calibrated": 0,
+  "group_reuse_times_measured": 0
+}
