@@ -196,7 +196,7 @@ def diagnose_trace(result, trace, dossier, *, fixture_label,
         old_by={x["question"]:x["status"] for x in old["checks"]}
         new_by={x["question"]:x["status"] for x in new["checks"]}
         bridge={
-            "source":"KNOWN_AST RA_CONSTRUCTION_EPISODES".replace(" ",""),
+            "source":"KNOWN_ASTRA_CONSTRUCTION_EPISODES",
             "independent_validation":False,
             "historical_vs_B_status":{
                 k:{"historical":old_by[k],"physical_B":new_by[k]}
@@ -243,7 +243,8 @@ def diagnose_trace(result, trace, dossier, *, fixture_label,
                 for k,v in sorted(grouped_blocking.items())],
             "counting_rule":(
                 "Each eligible task interval counted once. Concurrent task "
-                "waits can overlap; multiple blocking routes and reasons "
+                "waits can overlap and are not real elapsed minutes; "
+                "multiple blocking routes and reasons "
                 "are evidence, not independently attributable minutes. "
                 "Precedence-pending time is not resource waiting."),
         },
@@ -298,7 +299,7 @@ def diagnose_trace(result, trace, dossier, *, fixture_label,
             "not_a_policy_effect":True,
             "not_an_empirical_bottleneck_measure":True,
             "not_a_real_minutes_saved_estimate":True,
-            "no_order_identity_exposed":True,
+            "no_payment_identifiers_exposed":True,
             "no_counter_as_group_release":True,
             "no_OMC_provider_R2_or_scientific_campaign":True,
         },
