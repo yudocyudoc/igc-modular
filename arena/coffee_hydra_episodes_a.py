@@ -281,7 +281,8 @@ def evaluate_cases(view, episodes, operations, caps, automatic_min, *,
         if len({a["actor"] for a in actors})>=2 and len({
              a["station"] for a in actors})>=2:
             reviewed.append(sample)
-    max_simultaneous=max((len(x["actors"]) for x in reviewed),default=None)
+    max_simultaneous=max((sum(a["activity"]=="preparacion_visible"
+                              for a in x["actors"]) for x in reviewed),default=None)
     manual_caps={r:units[r] for r in manual}
     manual_capacity=min(manual_caps.values())
     if max_simultaneous is None:
