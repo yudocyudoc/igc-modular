@@ -28,6 +28,36 @@ Dossier B: experiments/coffee_v2/HYDRA_TWO_OPERATORS_PHYSICAL_B_ASSUMPTIONS.json
 
 El puente A3 llama a evaluate_cases con capacidades derivadas del motor B; se espera que las muestras de dos trabajadores sean representables y que exista un estado posterior al contador. Esa factibilidad NO es validación independiente, pues las muestras motivaron el diseño. No se enlazan pedidos sintéticos al video.
 
+## Corrección tras la revisión de Astra — concurrencia en el evaluador
+
+El control de A3 para el modelo histórico se conserva sin cambios. En el puente B, contar
+`min(personas, puestos)` no era suficiente: podía producir `COMPATIBLE`
+aunque B02 careciera de la aptitud `prepare` o las ventanas asumidas
+de B01/B02 nunca se solaparan. La corrección utiliza las mismas aptitudes,
+puestos, duración no interrumpible y ventanas declaradas que consulta
+`_engine.choose()`. No altera ni el planificador ni sus escenarios.
+
+Para cada muestra visual de preparación simultánea, el puente comprueba
+identidades de operador y puesto, aptitud `prepare`, y existencia de
+un intervalo temporal común positivo en el que ambos operadores podrían
+estar ejecutando tareas completas dentro de sus ventanas. No presupone
+un inicio simultáneo: bastan tareas que puedan superponerse. Si no existe
+tal posibilidad, el resultado es `CONTRADICTED` para **ese dossier**.
+
+`COMPATIBLE` continúa significando **factibilidad existencial** bajo los
+supuestos de B, no validación del instante real. El reloj del video no está
+alineado al reloj del escenario; el subresultado
+`model.instant_specific_status` queda `INDETERMINATE` cuando la
+concurrencia sería posible en algún momento, y `CONTRADICTED` cuando
+es imposible bajo todo el calendario supuesto.
+
+Regresiones añadidas para la ausencia de `prepare` en B02, las ventanas
+disjuntas [0,20] frente a [21,240], intersección solo puntual, ventana
+insuficiente, falta de puesto y un control positivo cuyo horario común
+es posterior al tiempo aparente de las muestras de video.
+Son pruebas de software sobre escenarios supuestos, no nueva evidencia
+de clientes, tiempos reales, ni resultado científico de C/D.
+
 ## Casos de aceptación y alcance
 
 Los tests sintéticos deben demostrar: carga conjunta y exclusiva; dos trabajadores y dos puestos simultáneos, pero no dos trabajadores en un solo puesto; tiempo después del contador con grupo todavía ocupado; limpieza opcional; mismo grupo hasta la liberación; trabajo manual y automático en paralelo de bebidas diferentes; aptitud y disponibilidad declaradas; etapa leche después de liberar grupo; no publicar IDs de pedidos en informes agregados; resultados históricos reproducibles por la ruta anterior. Las pruebas regresivas P06/P39/P42 y A3 se ejecutan junto a las nuevas.
