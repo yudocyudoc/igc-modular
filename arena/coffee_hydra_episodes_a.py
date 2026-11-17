@@ -299,7 +299,7 @@ def evaluate_cases(view, episodes, operations, caps, automatic_min, *,
               + (f"Insufficient resources: {deficits}." if deficits else
                  "This requirement is representable, not a scheduling prediction."))
     results.append(outcome(
-        "two_operators_vs_single_global_barista",concurrency_status,
+        "manual_preparation_concurrency_vs_resource_capacity",concurrency_status,
         "max observed simultaneous independent preparations <= each required stage resource capacity",
         {"reviewed_samples":[{"id":x["id"],"video_s":x["video_s"],
              "actor_ids":[a["actor"] for a in x["actors"]],
@@ -333,7 +333,7 @@ def evaluate_cases(view, episodes, operations, caps, automatic_min, *,
         reason=("Under the counter-elapsed semantic hypothesis, the model "
                 "automatic duration is incompatible with T33's estimated final counter.")
     results.append(outcome(
-        "counter_90s_as_timer_elapsed",time_status,
+        "automatic_time_vs_displayed_counter",time_status,
         "compare held-out T33 elapsed counter estimate to model espresso_auto_min * 60 ONLY under declared semantic equivalence",
         {"episode":"T33","estimated_counter_elapsed_s":measured,
          "class":t33["type"],"context_episode":"T31",
