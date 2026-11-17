@@ -1,0 +1,81 @@
+name: Coffee P42 — original P39 artifact structural analysis only
+
+on:
+  pull_request:
+    paths:
+      - 'arena/coffee_hydra_p42.py'
+      - 'tests/test_coffee_hydra_p42.py'
+      - 'COFFEE_P42_TIMER_NEXT_EVIDENCE.md'
+      - '.github/workflows/coffee-hydra-p42.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: coffee-p42-report-only-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  archived-result-only:
+    name: Reuse P39 authentic JSON, no simulations, no R2, no new footage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate parser, negative cases and structural consistency
+        run: |
+          python -m unittest discover -s tests -p test_coffee_hydra_p42.py -v
+          python -m unittest discover -s tests -p test_coffee_hydra_p39.py -v
+      - name: Verify exact GitHub artifact identity from successful P39
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          id="$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/14275986824" --jq '.id')"
+          name="$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/14275986824" --jq '.name')"
+          run="$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/14275986824" --jq '.workflow_run.id')"
+          expired="$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/14275986824" --jq '.expired')"
+          test "$id" = '14275986824'
+          test "$name" = 'coffee-hydra-p39-43965403016'
+          test "$run" = '43965403016'
+          test "$expired" = 'false'
+          digest="$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/14275986824" --jq '.digest // empty')"
+          if [[ -n "$digest" ]]; then
+            test "$digest" = 'sha256:063f3b7b0f963c2ef8a89dd84c6e173431916b52460153c9fe527ade61864d81'
+          fi
+      - name: Download existing P39 aggregate artifact, NOT historical ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 43965403016 \
+            --repo "$GITHUB_REPOSITORY" \
+            --name coffee-hydra-p39-43965403016 \
+            --dir "$RUNNER_TEMP/p42-original"
+          test -f "$RUNNER_TEMP/p42-original/hydra-diagnosis.json"
+      - name: Explain already-known stage mechanics from P39, without running models
+        run: |
+          python -m arena.coffee_hydra_p42 \
+            --source "$RUNNER_TEMP/p42-original/hydra-diagnosis.json" \
+            --dossier experiments/coffee_v2/EXAMPLE_REFERENCE_DOSSIER_ASSUMPTIONS_ONLY.json \
+            --out "$RUNNER_TEMP/p42-report"
+          cat "$RUNNER_TEMP/p42-report/P42_MECHANISM_REVIEW.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish only aggregate reanalysis and censored video-review requests
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-p42-structural-review-${{ github.run_id }}
+          path: ${{ runner.temp }}/p42-report/
+          retention-days: 90
+          if-no-files-found: error
+      - name: Remove private workspace copies, although original P39 is aggregate-only
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/p42-original" "$RUNNER_TEMP/p42-report"
+
+# No push and no expensive dispatch; this workflow cannot read R2 or run OMC.
+# The original timers were already imported in P39. Video is not available.
