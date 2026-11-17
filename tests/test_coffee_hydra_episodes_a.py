@@ -39,9 +39,9 @@ class EpisodeA(unittest.TestCase):
         self.assertEqual({x["status"] for x in by.values()},
                          {"COMPATIBLE","CONTRADICTED","INDETERMINATE",
                           "NOT_REPRESENTED"})
-        self.assertEqual(by["two_operators_vs_single_global_barista"][
+        self.assertEqual(by["manual_preparation_concurrency_vs_resource_capacity"][
             "status"],"CONTRADICTED")
-        self.assertEqual(by["counter_90s_as_timer_elapsed"]["status"],
+        self.assertEqual(by["automatic_time_vs_displayed_counter"]["status"],
                          "CONTRADICTED")
         self.assertEqual(by["portafilter_remains_after_timer_stop"][
             "status"],"NOT_REPRESENTED")
@@ -119,7 +119,7 @@ class EpisodeA(unittest.TestCase):
         d=read_json(HIST)
         report=a.check(src,d)
         outcome=next(x for x in report["checks"]
-                     if x["question"]=="counter_90s_as_timer_elapsed")
+                     if x["question"]=="automatic_time_vs_displayed_counter")
         self.assertEqual(outcome["status"],"COMPATIBLE")
         self.assertEqual(outcome["observed"]["estimated_counter_elapsed_s"],90)
         self.assertIn("T33 90s",outcome["explanation"])
@@ -130,19 +130,19 @@ class EpisodeA(unittest.TestCase):
         source=self.data(); d=read_json(HIST)
         result=a.check(source,d,timer_semantics="not_established")
         item=next(x for x in result["checks"] if
-                  x["question"]=="counter_90s_as_timer_elapsed")
+                  x["question"]=="automatic_time_vs_displayed_counter")
         self.assertEqual(item["status"],"INDETERMINATE")
         self.assertIn("not_established",item["model"]["timer_semantics"])
         t33=next(x for x in source["reviewed_episodes"] if x["id"]=="T33")
         t33["counter_elapsed_seconds"]=87 # 3s from assumed 90s
         result=a.check(source,d)
         item=next(x for x in result["checks"] if
-                  x["question"]=="counter_90s_as_timer_elapsed")
+                  x["question"]=="automatic_time_vs_displayed_counter")
         self.assertEqual(item["status"],"INDETERMINATE")
         self.assertIn("guard",item["explanation"])
         t33["counter_elapsed_seconds"]=90
         self.assertEqual(next(x for x in a.check(source,d)["checks"]
-            if x["question"]=="counter_90s_as_timer_elapsed")["status"],
+            if x["question"]=="automatic_time_vs_displayed_counter")["status"],
             "COMPATIBLE")
 
     def test_explicit_sample_required_overlapping_windows_not_enough(self):
@@ -151,7 +151,7 @@ class EpisodeA(unittest.TestCase):
         source["operator_activity_samples"]=[]
         report=a.check(source,read_json(HIST))
         found=next(x for x in report["checks"]
-                   if x["question"]=="two_operators_vs_single_global_barista")
+                   if x["question"]=="manual_preparation_concurrency_vs_resource_capacity")
         self.assertEqual(found["status"],"INDETERMINATE")
         self.assertIsNone(found["observed"]["required_simultaneous_preparations"])
 
@@ -161,13 +161,13 @@ class EpisodeA(unittest.TestCase):
         alternative["resources"]["barista"]["units"]=2
         with_one_space=a.check(self.data(),alternative)
         verdict=next(x for x in with_one_space["checks"]
-                     if x["question"]=="two_operators_vs_single_global_barista")
+                     if x["question"]=="manual_preparation_concurrency_vs_resource_capacity")
         self.assertEqual(verdict["status"],"CONTRADICTED")
         self.assertEqual(verdict["model"]["capacities"]["prep_space"],1)
         alternative["resources"]["prep_space"]["units"]=2
         with_both=a.check(self.data(),alternative)
         verdict=next(x for x in with_both["checks"]
-                     if x["question"]=="two_operators_vs_single_global_barista")
+                     if x["question"]=="manual_preparation_concurrency_vs_resource_capacity")
         self.assertEqual(verdict["status"],"COMPATIBLE")
         self.assertEqual(verdict["model"]["concurrent_capacity"],2)
         self.assertEqual(alternative["policy"],"B0")
