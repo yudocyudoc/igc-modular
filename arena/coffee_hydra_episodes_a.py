@@ -28,8 +28,6 @@ HISTORIC = {"T31": ("G03", 12, 40.011, 0, 28),
             "T33": ("G03", 118.012, 122.006, 28, 32),
             "T12": ("G01", 640.014, 668.010, 2, 30)}
 REVIEW_IDS = {"T31", "T33", "T12", "T28"}
-OPERATOR_PAIRS = (("E030", "E062", 48.0),
-                  ("E032", "E064", 104.006))
 
 
 def need(ok, code):
@@ -114,17 +112,38 @@ def inspect(view):
              type(op.get("source_row")) is str and
              op["source_row"] == OPERATIONS + "#" + op["id"],
              "WINDOW_IS_NOT_TASK_DURATION_" + op["id"])
-    for left, right, t in OPERATOR_PAIRS:
-        a,b=operations[left],operations[right]
-        need(a["actor"]=="B02" and b["actor"]=="B01" and
-             a["type"]==b["type"]=="preparacion_visible" and
-             a["confidence"]==b["confidence"]=="observado" and
-             all(e["observed_window_video_seconds"][0]<=t<=
-                 e["observed_window_video_seconds"][1]
-                 for e in (a,b)) and
-             "puesto_izquierdo" in a["resources"] and
-             "puesto_derecho" in b["resources"],
-             "OPERATOR_SAMPLED_EVIDENCE_" + left + "_" + right)
+    # Reviewed point samples are evidence assertions separate from windows.
+    # The windows only bound where a sample is plausible; they DO NOT
+    # establish uninterrupted activity or sample simultaneity on their own.
+    samples=by_id(view.get("operator_activity_samples", []))
+    need(len(samples)<=12, "SAMPLE_COUNT")
+    for sample in samples.values():
+        instant=sample.get("video_s")
+        actors=sample.get("actors")
+        need(finite(instant) and 0<=instant<=900 and
+             type(sample.get("reviewer_observed_simultaneous_activity")) is bool and
+             sample.get("confidence")=="reviewer_visual_assertion" and
+             sample.get("full_continuous_intervals_observed") is False and
+             type(sample.get("visual_evidence_ref")) is str and
+             sample["visual_evidence_ref"].endswith(".jpg") and
+             type(sample.get("provenance")) is str and
+             "Astra" in sample["provenance"] and
+             type(actors) is list and 1<=len(actors)<=3,
+             "SAMPLE_PROVENANCE_OR_TYPE")
+        ids=[]
+        for observed in actors:
+            need(type(observed) is dict and
+                 observed.get("operation_id") in operations,
+                 "SAMPLE_UNREFERENCED_OPERATION")
+            op=operations[observed["operation_id"]]
+            window=op["observed_window_video_seconds"]
+            need(observed.get("actor")==op["actor"] and
+                 observed.get("activity")==op["type"] and
+                 observed.get("station") in op["resources"] and
+                 window[0]<=instant<=window[1],
+                 "SAMPLE_NOT_IN_DECLARED_WINDOW")
+            ids.append(observed["actor"])
+        need(len(ids)==len(set(ids)),"SAMPLE_DUPLICATE_ACTOR")
     need(operations["E115"]["type"]=="extraccion_en_curso" and
          operations["E115"]["resources"]==["G03"] and
          operations["E149"]["actor"]=="B02" and
