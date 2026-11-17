@@ -1,0 +1,56 @@
+name: Coffee P43 A — source-reviewed episode constraints only
+
+on:
+  pull_request:
+    paths:
+      - 'arena/coffee_hydra_episodes_a.py'
+      - 'experiments/coffee_v2/VIDEO2_EPISODE_REVIEW_A.json'
+      - 'tests/test_coffee_hydra_episodes_a.py'
+      - 'COFFEE_P43_A_EPISODE_DECISION.md'
+      - '.github/workflows/coffee-hydra-p43-a.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coffee-p43-a-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  known-construction-episodes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: P43 A fixtures and fail-closed tests
+        run: python -m unittest discover -s tests -p test_coffee_hydra_episodes_a.py -v
+      - name: Regress P39 and P42 without historical R2 or new experiments
+        run: |
+          python -m unittest discover -s tests -p test_coffee_hydra_p39.py -v
+          python -m unittest discover -s tests -p test_coffee_hydra_p42.py -v
+      - name: Produce constrained diagnosis from committed sanitized source projection
+        run: |
+          python -m arena.coffee_hydra_episodes_a \
+            --view experiments/coffee_v2/VIDEO2_EPISODE_REVIEW_A.json \
+            --historical-dossier experiments/coffee_v2/EXAMPLE_REFERENCE_DOSSIER_ASSUMPTIONS_ONLY.json \
+            --out "$RUNNER_TEMP/p43-a"
+          cat "$RUNNER_TEMP/p43-a/A_EPISODE_FINDINGS.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish ONLY numeric diagnosis (no images or raw annotations)
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-p43-a-episode-checks-${{ github.run_id }}
+          path: ${{ runner.temp }}/p43-a/
+          retention-days: 90
+          if-no-files-found: error
+      - name: Clear temporary outputs
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/p43-a"
+
+# This PR workflow DOES NOT open the private source ZIP or access R2.
+# Authentic ZIP byte-check is opt-in local --source-zip and never uploaded.
+# No synthetic reference calls, no OMC, no provider POST.
