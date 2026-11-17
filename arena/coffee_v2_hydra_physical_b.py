@@ -85,7 +85,7 @@ def validate(d):
          type(enabled) is list and 1<=len(enabled)<=3 and
          set(enabled)<=set(installed) and len(set(enabled))==len(enabled),
          "GROUP_IDENTITY_OR_AVAILABILITY")
-    actors=d.get("actors")
+    actors=d.get("operators")
     need(type(actors) is dict and set(actors)=={"B01","B02"},
          "OBSERVED_ACTOR_IDENTITIES")
     for aid, actor in actors.items():
@@ -149,7 +149,7 @@ def capabilities(d):
     validate(d)
     return {
         "resource_units":{
-            "barista":len(d["actors"]),
+            "barista":len(d["operators"]),
             "prep_space":len(d["prep_stations"]),
             "espresso_group":len(d["enabled_group_ids"]),
             "steam_wand":len(d["steam_wands"]),
@@ -188,7 +188,7 @@ def _engine(positions, lines, d, horizon):
     timing={stage:d["durations_min"][key]["value"]
             for stage,key in DURATION_KEYS.items()}
     resources={
-        "actor":tuple(d["actors"]),
+        "actor":tuple(d["operators"]),
         "station":tuple(d["prep_stations"]),
         "group":tuple(d["enabled_group_ids"]),
         "wand":tuple(d["steam_wands"]),
@@ -214,7 +214,7 @@ def _engine(positions, lines, d, horizon):
     for oid,order in paid.items():
         tick(order["time"],1,"arrival",oid)
     # Calendar START boundaries wake tasks; no invented actor availability.
-    for actor in d["actors"].values():
+    for actor in d["operators"].values():
         for start,end in actor["availability_windows_min"]:
             tick(start,2,"calendar",None)
             tick(end,2,"calendar",None)
@@ -250,7 +250,7 @@ def _engine(positions, lines, d, horizon):
                  group_state[g]=="LOADING",
                  "EXTRACTION_LOST_GROUP_AFTER_LOAD")
             return (),None,g
-        for actor_id,actor in d["actors"].items():
+        for actor_id,actor in d["operators"].items():
             if stage not in actor["skills"] or not actor_available(
                     actor,time,duration) or "A:"+actor_id in occupied:
                 continue
