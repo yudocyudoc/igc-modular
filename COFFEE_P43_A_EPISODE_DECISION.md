@@ -42,3 +42,75 @@ La entrega B puede corregir esas capacidades **manteniendo una ruta histórica i
 - Opcional desde entorno donde existe el ZIP original: `python -m arena.coffee_hydra_episodes_a --source-zip ruta/al/paquete.zip --view experiments/coffee_v2/VIDEO2_EPISODE_REVIEW_A.json --historical-dossier experiments/coffee_v2/EXAMPLE_REFERENCE_DOSSIER_ASSUMPTIONS_ONLY.json --out ruta/nueva`. No ejecutar con `--source-zip` como si ese fichero estuviera disponible en GitHub CI.
 - Cero R2, OMC, proveedor, nuevas referencias, mundos y enlaces con truth; sólo datos de construcción ya revisados.
 - No modificar ni recalibrar P39 o P42. No fusionar hasta revisión independiente de Astra.
+
+
+## Enmienda A3 — corrección tras revisión independiente de Astra
+
+La revisión de Astra del commit original `60c592c` detectó un defecto real:
+los seis resultados se asignaban como constantes. **El código de A3 se
+reemplazó por un evaluador de restricciones calculadas**, con
+`evaluate_cases()` separado del verificador de identidad `inspect()`
+y de la puerta `historical_baseline_gate()`. Una configuración válida
+candidata ya no se rechaza por cambiar los recursos o tiempos que el
+baseline histórico utilizaba. El baseline original sigue comprobable
+independientemente.
+
+### Lo que el código calcula realmente
+
+- **Concurrencia de operadores:** dos muestras visuales revisadas por
+  Astra, con tiempo, actores B01/B02, operaciones E030/E062 y E032/E064,
+  puestos y referencia a `operadores.jpg`, están codificadas aparte de
+  las ventanas de actividad. La muestra es una afirmación del revisor,
+  no una nueva comprobación independiente del fotograma ni una
+  ocupación continua. El evaluador calcula el máximo de preparaciones
+  simultáneas respaldadas por muestras y contrasta el mínimo de
+  capacidades de *todos* los recursos que requiere la etapa de
+  preparación. **Dos baristas con un solo espacio aún no bastan.** Sin
+  muestras, emite `INDETERMINATE`, aunque las ventanas se solapen.
+- **Tiempo automático frente a contador:** toma
+  `espresso_auto_min` del dossier, multiplica por 60 y compara con la
+  estimación de T33, condicionada a
+  `automatic_duration_equals_counter_elapsed`. Utiliza T31 sólo como
+  contexto del tipo de contador, no como medida de ajuste. Un cambio
+  hipotético de T33 a 90 s da `COMPATIBLE` y actualiza la explicación.
+  Si no se establece la equivalencia semántica, informa
+  `INDETERMINATE`. La política de incertidumbre está publicada como
+  una tolerancia operativa ilustrativa (≤2 s compatible, hasta 4 s
+  indeterminado, superior a 4 s incompatible), no como precisión de
+  un aparato calibrado.
+- **Recursos del motor:** `coffee_v2_reference.py` expone las mismas
+  constantes `STAGE_REQUIRED_RESOURCES` que ahora consume
+  `_engine.needed()`. El evaluador obtiene las capacidades del dossier
+  a través de `episode_model_capabilities()`; la función no cambia
+  cómo se programan tareas. El estado físico posterior a la parada
+  del contador sigue declarado como no representado. Una capacidad
+  hipotética inyectada *sólo en un fixture* permite verificar cómo
+  cambiaría el resultado, sin alegar que ya existe tal implementación.
+- **Extracción con tarea manual y purga:** comprueba intersección de
+  ventanas y recursos de etapas. La compatibilidad significa que el
+  motor permite la concurrencia, no que haya demostrado que ocurrió
+  cada instante; un conflicto entre recursos compartidos sin muestra
+  puntual queda indeterminado. La exclusión de purga se deriva de
+  la clasificación, no de un estado escrito en el resultado.
+- **Situación inicial:** continúa indeterminada si el backlog,
+  vínculos con pedidos o calendario del operador están ausentes.
+
+Todos los seis registros de salida ahora incluyen `rule`,
+`observed`, `model`, `uncertainty`, `status`,
+`explanation` y `evidence_refs`.
+
+### Pruebas contrafactuales de software (no ciencia nueva)
+
+Se añadieron fixtures para el contraejemplo **exacto** de Astra
+(T33=90 s con timer parcial previo sin modificar), un T33 cercano
+dentro de banda de incertidumbre, semántica del timer desconocida,
+ventanas sin muestra simultánea, barista=2 con puesto=1 y con puesto=2,
+etapa posterior al contador ausente/presente en descriptores de prueba
+y clasificación variable de T28. Se conservan las regresiones P39/P42.
+No hay nuevos datos, corrida de la referencia, campaña, OMC, R2 ni
+acceso a imágenes en el workflow.
+
+**Estado epistemológico:** evaluación de representabilidad y contraste
+de hipótesis sobre observaciones conocidas. No equivale a calibración
+de tiempos de servicio ni permite todavía elegir una política de la
+cafetería. Entrega B sigue fuera de este PR; pendiente revisión Astra.
