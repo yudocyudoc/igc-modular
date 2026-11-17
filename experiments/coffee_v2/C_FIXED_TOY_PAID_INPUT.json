@@ -1,0 +1,55 @@
+{
+  "schema": "arena.coffee.p45.causal-toy-input/1",
+  "scope": "SOFTWARE_TOY_ONLY",
+  "horizon_min": 10,
+  "source": "THREE_IMAGINARY_PAID_ORDERS_AT_MINUTE_ZERO_NO_VIDEO_JOIN",
+  "positions": [
+    {
+      "pos_event_id": "payCtoy0",
+      "order_id": "Ctoy0",
+      "time_min": 0,
+      "kind": "sale",
+      "beverage_count": 1
+    },
+    {
+      "pos_event_id": "payCtoy1",
+      "order_id": "Ctoy1",
+      "time_min": 0,
+      "kind": "sale",
+      "beverage_count": 1
+    },
+    {
+      "pos_event_id": "payCtoy2",
+      "order_id": "Ctoy2",
+      "time_min": 0,
+      "kind": "sale",
+      "beverage_count": 1
+    }
+  ],
+  "lines": [
+    {
+      "line_id": "lineCtoy0",
+      "pos_event_id": "payCtoy0",
+      "order_id": "Ctoy0",
+      "time_min": 0,
+      "archetype": "solo_extraccion",
+      "quantity": 1
+    },
+    {
+      "line_id": "lineCtoy1",
+      "pos_event_id": "payCtoy1",
+      "order_id": "Ctoy1",
+      "time_min": 0,
+      "archetype": "solo_extraccion",
+      "quantity": 1
+    },
+    {
+      "line_id": "lineCtoy2",
+      "pos_event_id": "payCtoy2",
+      "order_id": "Ctoy2",
+      "time_min": 0,
+      "archetype": "con_leche",
+      "quantity": 1
+    }
+  ]
+}
