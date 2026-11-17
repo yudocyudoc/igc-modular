@@ -1,0 +1,54 @@
+name: Coffee P44 B — physical group occupation and operator resources (fixtures)
+
+on:
+  pull_request:
+    paths:
+      - 'arena/coffee_v2_hydra_physical_b.py'
+      - 'experiments/coffee_v2/HYDRA_TWO_OPERATORS_PHYSICAL_B_ASSUMPTIONS.json'
+      - 'tests/test_coffee_v2_hydra_physical_b.py'
+      - '.github/workflows/coffee-hydra-p44-b.yml'
+      - 'COFFEE_P44_B_IMPLEMENTATION.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coffee-p44-b-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  conditional-physical-b:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: B fixtures (separate actors, stations, group held across automatic stop)
+        run: python -m unittest discover -s tests -p test_coffee_v2_hydra_physical_b.py -v
+      - name: Regress A3 and original physical engine
+        run: |
+          python -m unittest discover -s tests -p test_coffee_hydra_episodes_a.py -v
+          python -m unittest discover -s tests -p test_coffee_v2_reference.py -v
+          python -m unittest discover -s tests -p test_coffee_hydra_p39.py -v
+          python -m unittest discover -s tests -p test_coffee_hydra_p42.py -v
+      - name: Evaluate A3 observed known episodes against B stage capabilities
+        run: |
+          python -m arena.coffee_v2_hydra_physical_b \
+            --dossier experiments/coffee_v2/HYDRA_TWO_OPERATORS_PHYSICAL_B_ASSUMPTIONS.json \
+            --episode-view experiments/coffee_v2/VIDEO2_EPISODE_REVIEW_A.json \
+            --out "$RUNNER_TEMP/p44-b"
+          cat "$RUNNER_TEMP/p44-b/B_REPRESENTATION.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Export only aggregate B representation checks (no footage or raw video rows)
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-p44-b-representation-${{ github.run_id }}
+          path: ${{ runner.temp }}/p44-b/
+          retention-days: 90
+          if-no-files-found: error
+      - name: Clean temporary aggregate outputs
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/p44-b"
+
+# Only toy fixture execution; no provider, R2, original ZIP, OMC, or Q25/Q75.
