@@ -186,6 +186,70 @@ class PhysicalB(unittest.TestCase):
             text=(Path(tmp)/"report/B_REPRESENTATION.md").read_text()
             self.assertIn("COMPATIBLE",text)
 
+    def _concurrency(self,d):
+        bridge=b.episode_adapter(read_json(VIEW),d)
+        return next(row for row in bridge["checks"] if row["question"]==
+                    "manual_preparation_concurrency_vs_resource_capacity")
+
+    def test_astra_negative_b02_without_prepare_skill_not_compatible(self):
+        d=setup()
+        d["operators"]["B02"]["skills"].remove("prepare")
+        _,trace,_=run(2,d)
+        self.assertEqual([x["time"] for x in stages(trace,"prepare")],
+                         [0,0.5])
+        row=self._concurrency(d)
+        self.assertEqual(row["status"],"CONTRADICTED")
+        self.assertEqual(row["model"]["instant_specific_status"],
+                         "CONTRADICTED")
+        for sample in row["model"]["sample_feasibility"]:
+            self.assertEqual(sample["missing_prepare_skill"],["B02"])
+            self.assertFalse(sample["scenario_concurrency_feasible"])
+
+    def test_astra_negative_disjoint_operator_calendars_not_compatible(self):
+        d=setup()
+        d["operators"]["B01"]["availability_windows_min"]=[[0,20]]
+        d["operators"]["B02"]["availability_windows_min"]=[[21,240]]
+        _,trace,_=run(2,d)
+        self.assertEqual([x["time"] for x in stages(trace,"prepare")],
+                         [0,0.5])
+        row=self._concurrency(d)
+        self.assertEqual(row["status"],"CONTRADICTED")
+        for sample in row["model"]["sample_feasibility"]:
+            self.assertTrue(sample["structure_permits_simultaneous_prepare"])
+            self.assertEqual(sample["joint_feasible_calendar_windows_min"],[])
+            self.assertFalse(sample["scenario_concurrency_feasible"])
+
+    def test_positive_feasibility_does_not_align_video_to_scenario_clock(self):
+        d=setup()
+        # Video samples are at 48 s and 104 s, but those are NOT scenario
+        # minutes. A shifted yet jointly available shift remains feasible.
+        d["operators"]["B02"]["availability_windows_min"]=[[5,240]]
+        row=self._concurrency(d)
+        self.assertEqual(row["status"],"COMPATIBLE")
+        self.assertEqual(row["model"]["sample_instant_clock_alignment"],
+                         "NOT_ESTABLISHED")
+        self.assertEqual(row["model"]["instant_specific_status"],
+                         "INDETERMINATE")
+        self.assertTrue(all(x["scenario_concurrency_feasible"] for x in
+                            row["model"]["sample_feasibility"]))
+
+    def test_touching_windows_and_too_short_windows_do_not_overlap(self):
+        d=setup()
+        d["operators"]["B01"]["availability_windows_min"]=[[0,10]]
+        d["operators"]["B02"]["availability_windows_min"]=[[10,240]]
+        self.assertEqual(self._concurrency(d)["status"],"CONTRADICTED")
+        d=setup()
+        d["operators"]["B01"]["availability_windows_min"]=[[0,0.4]]
+        self.assertEqual(self._concurrency(d)["status"],"CONTRADICTED")
+
+    def test_missing_observed_station_not_hidden_by_worker_headcount(self):
+        d=setup()
+        d["prep_stations"]=["puesto_izquierdo"]
+        row=self._concurrency(d)
+        self.assertEqual(row["status"],"CONTRADICTED")
+        self.assertTrue(any(x["unavailable_prep_stations"] for x in
+                            row["model"]["sample_feasibility"]))
+
     def test_two_stations_only_if_two_people_both_needed(self):
         d=setup()
         d["prep_stations"]=["puesto_izquierdo","puesto_derecho"]
