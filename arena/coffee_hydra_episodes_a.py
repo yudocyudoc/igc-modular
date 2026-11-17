@@ -516,21 +516,25 @@ def export(report, out):
     for row in report["checks"]:
         lines += ["", "## "+row["question"], "",
                   "**"+row["status"]+"** — "+row["explanation"],
-                  "",
-                  "Condicionamiento: "+"; ".join(row["conditioning_evidence"])+".",
-                  "Regla/contraste: "+row["tested_observation_or_structural_rule"]+".",
-                  "Supuestos: "+"; ".join(row["fixed_assumptions"])+"."]
+                  "", "Regla: "+row["rule"],
+                  "Observado: "+json.dumps(row["observed"],
+                                            ensure_ascii=False,sort_keys=True),
+                  "Modelo: "+json.dumps(row["model"],
+                                         ensure_ascii=False,sort_keys=True),
+                  "Incertidumbre: "+row["uncertainty"],
+                  "Referencias: "+", ".join(row["evidence_refs"])]
     lines += ["",
-        "La incompatibilidad de dos operadores es ESTRUCTURAL en la",
-        "representación globalmente serial, no estimación de plantilla.",
-        "La incompatibilidad de 90 s aplica SÓLO a su interpretación",
-        "como segundos del contador; los tiempos de liberación del",
-        "grupo NO están medidos y no se han cambiado en el modelo.",
-        "COMPATIBLE significa posibilidad, nunca validación predictiva.",
-        "Las ventanas parciales NO son tiempos de trabajo continuo.",
-        "No se usaron los datos condicionantes para calificar una",
-        "predicción del mismo horario. Las revisiones son de construcción",
-        "conocida, no validación ciega ni independiente.",
+        "## Alcance y condición de falsabilidad", "",
+        "Los estados del informe se calculan de entradas de los episodios y",
+        "capacidades del motor, no de etiquetas estáticas de resultados.",
+        "Cambiar el dossier a dos baristas y dos espacios puede resolver",
+        "la incompatibilidad de concurrencia, sin validar la intervención.",
+        "La comparación del contador es condicional a semántica explícita.",
+        "La liberación del grupo permanece sin medición física.",
+        "COMPATIBLE sólo significa factibilidad bajo reglas y observaciones.",
+        "Ventanas superpuestas no certifican operación continua.",
+        "Las muestras son afirmaciones de revisión de Astra, no una nueva",
+        "auditoría visual ni validación externa independiente.",
     ]
     (out/"A_EPISODE_FINDINGS.md").write_text(
         "\n".join(lines)+"\n", encoding="utf-8")
@@ -544,13 +548,17 @@ def main(argv=None):
     p.add_argument("--view",required=True)
     p.add_argument("--historical-dossier",required=True)
     p.add_argument("--source-zip",help="Optional exact local Astra ZIP, read-only; never uploads images")
+    p.add_argument("--timer-semantics",choices=(COUNTER_HYPOTHESIS,"not_established"),
+                   default=COUNTER_HYPOTHESIS,
+                   help="Declared counter comparison hypothesis, not established empirical equivalence")
     p.add_argument("--out",required=True)
     args=p.parse_args(argv)
     view=read_json(args.view)
     inspect(view)
     verified=authenticate_original_zip(args.source_zip,view) if args.source_zip else False
     export(check(view,read_json(args.historical_dossier),
-                 source_bytes_verified=verified),args.out)
+                 source_bytes_verified=verified,
+                 timer_semantics=args.timer_semantics),args.out)
 
 
 if __name__=="__main__":
