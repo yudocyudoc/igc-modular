@@ -228,63 +228,239 @@ def authenticate_original_zip(path,view):
     return True
 
 
-def check(view, historical_dossier, *, source_bytes_verified=False):
-    episodes,operations=inspect(view)
-    reference.config_gate(historical_dossier)
-    d=historical_dossier
-    need(d["policy"]=="B0" and
-         d["resources"]["barista"]["units"]==1 and
-         d["resources"]["prep_space"]["units"]==1 and
-         d["durations"]["espresso_auto_min"]["value"]==1.5,
-         "EXPECTED_UNCHANGED_HISTORICAL_BASELINE")
-    def outcome(key,status,why,condition,held_out,refs,assumptions):
-        return {"question":key,"status":status,"explanation":why,
-                "conditioning_evidence":condition,
-                "tested_observation_or_structural_rule":held_out,
-                "evidence_refs":refs,
-                "fixed_assumptions":assumptions,
-                "independent_validation":False}
+# Explicit test policy, NOT a calibrated sensor-error model. Reporting a match
+# within two seconds does not imply sub-second measurement accuracy.
+COUNTER_COMPATIBLE_WITHIN_SECONDS = 2.0
+COUNTER_UNCERTAINTY_GUARD_SECONDS = 4.0
+COUNTER_HYPOTHESIS = "automatic_duration_equals_counter_elapsed"
 
-    reports=[
-        outcome("two_operators_vs_single_global_barista","CONTRADICTED",
-                "Two anonymized operators are visible working at sampled instants with different stations. One globally exclusive barista and one prep space cannot encode this. Windows do NOT prove continuous activity or permanent staffing.",
-                ["Astra reviewed image operadores.jpg: frames 48.000 and 104.006",
-                 "paired source windows hold these sample instants"],
-                "historical B0 one barista and one prep_space resource",
-                ["E030","E062","E032","E064","operadores.jpg"],
-                ["one globally serial manual prep resource in historical B0",
-                 "visual review samples, not uninterrupted work intervals"]),
-        outcome("counter_90s_as_timer_elapsed","CONTRADICTED",
-                "Conditional semantic test ONLY: if historical 90s espresso_auto is asserted to equal the displayed counter elapsed time for every drink, the independently reviewed 32s T33 is incompatible. It does NOT establish the real group busy/reuse duration.",
-                ["T31 establishes that timer display is an elapsed counter with estimated final 29s; it is NOT fitted as a new model parameter"],
-                "historical automatic counter-time hypothesis 90s versus held-out T33 estimated final 32s",
-                ["T31","T33","E115","E116"],
-                ["90s explicitly interpreted as counter elapsed time",
-                 "T33 visually reviewed estimate is not subsecond measurement"]),
-        outcome("machine_vs_operator_overlap","COMPATIBLE",
-                "An espresso-group task and an auxiliary B02 task can overlap under the existing resource separation. This is feasibility only: the observed schedule was not predicted, and the tasks are not tied to a synthetic order.",
-                ["E115 machine group G03 window 13.002–41.014",
-                 "E149 B02 observed auxiliary window 14.005–24.000"],
-                "existing model permits automatic espresso and independent operator tasks",
-                ["E115","E149"],["different resources","no same-drink identity"]),
-        outcome("probable_purge_exclusion","COMPATIBLE",
-                "Probable T28 purge is excluded from beverage extraction estimates; its true classification remains probabilistic. No extra drink or completed cycle is inferred.",
-                ["T28 reviewed G02 at 642.003 without portafilter/cup",
-                 "original timer pair G02 counter 0→2"],
-                "filter excludes probable purge from drink-extraction sample",
-                ["T28"],["purge classification probable, not certain"]),
-        outcome("portafilter_remains_after_timer_stop","NOT_REPRESENTED",
-                "T31 counter final persists to 48s with portafilter still attached after first final reading at 41.014s. Baseline has no separate mounted/release state: no group reuse time can be computed.",
-                ["T31 sampled portafilter state and counter-final readings"],
-                "group release after counter stop is a different observable, absent from baseline",
-                ["T31"],["presence does not prove every intervening second occupied"]),
-        outcome("initial_backlog_and_hidden_task_identity","INDETERMINATE",
-                "Observed clips may begin during unfinished work; no complete initial queue, order identity or operator calendars are supplied. Do not import the synthetic initial zero-backlog assumption.",
-                ["source operations are partial windows with no linked order"],
-                "real backlog or delay attribution at window start",
-                ["E030","E062","E032","E064"],
-                ["unknown observation state remains unknown"]),
-    ]
+
+def evaluate_cases(view, episodes, operations, caps, automatic_min, *,
+                   timer_semantics=COUNTER_HYPOTHESIS):
+    """Pure constraint evaluation; accepts alternative representation fixtures.
+
+    Source authentication and pinned historic pairs are separate from this
+    function. In particular a future B dossier can change resource units.
+    """
+    need(timer_semantics in (COUNTER_HYPOTHESIS, "not_established"),
+         "COUNTER_SEMANTICS_NOT_EXPLICIT")
+    need(finite(automatic_min) and automatic_min>0,
+         "MODEL_AUTOMATIC_DURATION_INVALID")
+    units=caps["resource_units"]
+    req=caps["stage_requirements"]
+    manual=req["manual_setup"]
+    auto=req["espresso_auto"]
+    need(set(manual) <= set(units) and set(auto) <= set(units) and
+         type(caps["post_counter_mounted_state_supported"]) is bool,
+         "CAPABILITIES_NOT_RESOLVED")
+
+    def outcome(key,status,rule,observed,modeled,uncertainty,why,refs):
+        return {
+            "question":key,
+            "status":status,
+            "rule":rule,
+            "observed":observed,
+            "model":modeled,
+            "uncertainty":uncertainty,
+            "explanation":why,
+            "evidence_refs":refs,
+            "conditioning_evidence":refs,
+            "tested_observation_or_structural_rule":rule,
+            "fixed_assumptions":[uncertainty],
+            "independent_validation":False,
+        }
+
+    results=[]
+    samples=view.get("operator_activity_samples", [])
+    reviewed=[]
+    for sample in samples:
+        if not sample["reviewer_observed_simultaneous_activity"]:
+            continue
+        actors=[x for x in sample["actors"]
+                if x["activity"]=="preparacion_visible"]
+        if len({a["actor"] for a in actors})>=2 and len({
+             a["station"] for a in actors})>=2:
+            reviewed.append(sample)
+    max_simultaneous=max((len(x["actors"]) for x in reviewed),default=None)
+    manual_caps={r:units[r] for r in manual}
+    manual_capacity=min(manual_caps.values())
+    if max_simultaneous is None:
+        concurrency_status="INDETERMINATE"
+        note=("No reviewer-verified simultaneous preparation sample is "
+              "available. Overlapping operation windows alone do not "
+              "establish concurrent work.")
+    else:
+        deficits={r:limit for r,limit in manual_caps.items()
+                  if max_simultaneous>limit}
+        concurrency_status=("CONTRADICTED" if deficits else "COMPATIBLE")
+        note=(f"Reviewed distinct-operator/station samples require "
+              f"{max_simultaneous} concurrent manual setups; model "
+              f"capacity is {manual_capacity} from {manual_caps}. "
+              + (f"Insufficient resources: {deficits}." if deficits else
+                 "This requirement is representable, not a scheduling prediction."))
+    results.append(outcome(
+        "two_operators_vs_single_global_barista",concurrency_status,
+        "max observed simultaneous independent preparations <= each required stage resource capacity",
+        {"reviewed_samples":[{"id":x["id"],"video_s":x["video_s"],
+             "actor_ids":[a["actor"] for a in x["actors"]],
+             "stations":[a["station"] for a in x["actors"]]}
+             for x in reviewed],
+         "required_simultaneous_preparations":max_simultaneous},
+        {"stage":"manual_setup","required_resources":manual,
+         "capacities":manual_caps,"concurrent_capacity":manual_capacity},
+        "Two still-frame assertions from Astra; not continuously tracked intervals or permanent staffing.",
+        note,[x["id"] for x in reviewed]+
+             [a["operation_id"] for x in reviewed for a in x["actors"]]))
+
+    # T31 supplies independent semantic context; T33 is the held-out
+    # observable. Neither is a complete group-occupation duration.
+    t33=episodes["T33"]
+    measured=t33["counter_elapsed_seconds"]
+    predicted=automatic_min*60.0
+    diff=abs(predicted-measured)
+    if timer_semantics=="not_established":
+        time_status="INDETERMINATE"
+        reason="Automatic model duration has not been mapped to displayed counter elapsed time."
+    elif diff<=COUNTER_COMPATIBLE_WITHIN_SECONDS:
+        time_status="COMPATIBLE"
+        reason=("Counter interpretation is not contradicted at the declared "
+                "whole-second tolerance; this does not prove real group occupancy.")
+    elif diff<=COUNTER_UNCERTAINTY_GUARD_SECONDS:
+        time_status="INDETERMINATE"
+        reason="Difference lies in the explicit uncertainty guard band."
+    else:
+        time_status="CONTRADICTED"
+        reason=("Under the counter-elapsed semantic hypothesis, the model "
+                "automatic duration is incompatible with T33's estimated final counter.")
+    results.append(outcome(
+        "counter_90s_as_timer_elapsed",time_status,
+        "compare held-out T33 elapsed counter estimate to model espresso_auto_min * 60 ONLY under declared semantic equivalence",
+        {"episode":"T33","estimated_counter_elapsed_s":measured,
+         "class":t33["type"],"context_episode":"T31",
+         "absolute_difference_s":round(diff,6)},
+        {"espresso_auto_min":automatic_min,"seconds":predicted,
+         "timer_semantics":timer_semantics},
+        f"Estimates rounded to seconds; compatible ≤{COUNTER_COMPATIBLE_WITHIN_SECONDS}s, "
+        f"undetermined up to {COUNTER_UNCERTAINTY_GUARD_SECONDS}s, otherwise incompatible. "
+        "These are operational guard bands, NOT calibrated sensor precision.",
+        f"{reason} Model {predicted:g}s vs T33 {measured:g}s "
+        f"(difference {diff:g}s); mapping={timer_semantics}.",
+        ["T31","T33"]))
+
+    machine=operations["E115"]
+    auxiliary=operations["E149"]
+    win1=machine["observed_window_video_seconds"]
+    win2=auxiliary["observed_window_video_seconds"]
+    potential=(max(win1[0],win2[0])<=min(win1[1],win2[1]))
+    shared=sorted(set(auto)&set(manual))
+    if not potential:
+        machine_status="INDETERMINATE"
+        reason="The annotated windows do not overlap, so they do not test concurrency."
+    elif shared:
+        machine_status="INDETERMINATE"
+        reason=("A shared model resource could block simultaneous actions, "
+                "but partial windows alone do not prove a common active instant.")
+    else:
+        machine_status="COMPATIBLE"
+        reason=("The model permits automatic extraction and a separate "
+                "manual action to overlap; this is possible resource "
+                "compatibility, NOT proof they occurred continuously together.")
+    results.append(outcome(
+        "machine_vs_operator_overlap",machine_status,
+        "potentially simultaneous stages are permitted when their required resource sets are disjoint",
+        {"operations":["E115","E149"],
+         "windows_video_s":[win1,win2],
+         "window_intersection_possible":potential},
+        {"auto_stage_required_resources":auto,
+         "manual_stage_required_resources":manual,
+         "shared_resources":shared},
+        "Partial annotated windows, no certified same-instant machine/operator identity or paid-order join.",
+        reason,["E115","E149"]))
+
+    purge=episodes["T28"]
+    excluded=[x["id"] for x in episodes.values()
+              if x["type"]=="probable_purge"]
+    purge_status=("COMPATIBLE" if purge["id"] in excluded else
+                  "INDETERMINATE")
+    results.append(outcome(
+        "probable_purge_exclusion",purge_status,
+        "a probable purge is excluded from beverage counter-duration examples",
+        {"T28_type":purge["type"],"T28_confidence":purge["confidence"],
+         "excluded_as_probable_purge":excluded},
+        {"drink_counter_sample_ids":[rid for rid,e in episodes.items()
+              if e["type"] in ("extraction_to_cup",
+                               "probable_extraction_to_cup")]},
+        "Probable, not a confirmed purge; excluded only from drink-extraction estimation.",
+        ("The classification of T28 is reflected in the exclusion set."
+         if purge_status=="COMPATIBLE" else
+         "T28 does not provide a usable probable-purge exclusion."),
+        ["T28"]))
+
+    t31=episodes["T31"]
+    has_sample=(t31.get("visual_state_note")==
+                "portafilter_still_attached_after_counter_stops" and
+                finite(t31.get("first_final_seen_video_s")) and
+                finite(t31.get("final_still_seen_video_s")) and
+                t31["final_still_seen_video_s"]>
+                t31["first_final_seen_video_s"])
+    supported=caps["post_counter_mounted_state_supported"]
+    post_status=("INDETERMINATE" if not has_sample else
+                 "COMPATIBLE" if supported else "NOT_REPRESENTED")
+    results.append(outcome(
+        "portafilter_remains_after_timer_stop",post_status,
+        "representation must have an explicit post-counter group-mounted/release state to express the observed state",
+        {"episode":"T31","post_counter_state_sample_exists":has_sample,
+         "first_counter_final_visible_s":t31.get("first_final_seen_video_s"),
+         "counter_final_persists_s":t31.get("final_still_seen_video_s"),
+         "portafilter_note":t31.get("visual_state_note")},
+        {"post_counter_mounted_state_supported":supported,
+         "model_capabilities_from":caps.get("stage_source")},
+        "Portafilter in still images does NOT prove continuously occupied time or a release timestamp.",
+        ("No confirmed after-counter mounted-state sample to test." if not has_sample
+         else "The model can express a post-counter mounted state (not its duration)." if supported
+         else "The model releases the group after the automatic stage; it cannot express post-counter mounted state."),
+        ["T31"]))
+
+    unknown_backlog=view.get("unknown_starting_backlog") is True
+    unlinked=all(x.get("order_id") is None for x in operations.values())
+    missing_calendar=view.get(
+        "operator_presence_beyond_sampled_windows_unknown") is True
+    backlog_status=("INDETERMINATE" if
+                    unknown_backlog or unlinked or missing_calendar
+                    else "COMPATIBLE")
+    results.append(outcome(
+        "initial_backlog_and_hidden_task_identity",backlog_status,
+        "real initial pending work and task-to-order relationships require independently observed state, not synthetic assumptions",
+        {"initial_backlog_unknown":unknown_backlog,
+         "no_order_links":unlinked,
+         "operator_calendar_unknown":missing_calendar},
+        {"initial_open_orders":None,
+         "real_backlog_fitted":False},
+        "No real initial state or continuous operator calendar was measured.",
+        ("Observed source lacks one or more required fields for backlog "
+         "or delay attribution." if backlog_status=="INDETERMINATE"
+         else "Observed state/links are declared known; requires separate factual audit."),
+        ["E030","E062","E032","E064"]))
+    return results
+
+
+def historical_baseline_gate(dossier):
+    """Identity check for the ORIGINAL historical report, not for candidates."""
+    reference.config_gate(dossier)
+    need(dossier["policy"]=="B0" and
+         dossier["resources"]["barista"]["units"]==1 and
+         dossier["resources"]["prep_space"]["units"]==1 and
+         dossier["durations"]["espresso_auto_min"]["value"]==1.5,
+         "EXPECTED_UNCHANGED_HISTORICAL_BASELINE")
+
+
+def check(view, dossier, *, source_bytes_verified=False,
+          timer_semantics=COUNTER_HYPOTHESIS):
+    episodes,operations=inspect(view)
+    capabilities=reference.episode_model_capabilities(dossier)
+    results=evaluate_cases(view,episodes,operations,capabilities,
+                           dossier["durations"]["espresso_auto_min"]["value"],
+                           timer_semantics=timer_semantics)
     return {
         "schema":REPORT_SCHEMA,
         "scope":"OBSERVED_EPISODE_FEASIBILITY_AND_REPRESENTATION_ONLY",
@@ -298,11 +474,17 @@ def check(view, historical_dossier, *, source_bytes_verified=False):
         "reviewed_estimated_counter_seconds":{
             k:episodes[k]["counter_elapsed_seconds"] for k in
             ("T31","T33","T12")},
-        "possible_purges_excluded_from_extraction":["T28"],
+        "possible_purges_excluded_from_extraction":[
+            e["id"] for e in episodes.values()
+            if e["type"]=="probable_purge"],
+        "model_capabilities":capabilities,
+        "model_counter_semantic_hypothesis":timer_semantics,
+        "model_automatic_extraction_seconds":
+            dossier["durations"]["espresso_auto_min"]["value"]*60,
         "real_order_id_links":0,
         "full_service_durations_measured":0,
         "group_release_times_measured":0,
-        "checks":reports,
+        "checks":results,
         "no_model_parameter_changes":True,
         "no_new_reference_simulations":True,
         "no_OMC_or_provider":True,
