@@ -1,0 +1,61 @@
+name: Coffee P45 C — causal wait accounting (software only)
+
+on:
+  pull_request:
+    paths:
+      - 'arena/coffee_v2_hydra_causes_c.py'
+      - 'arena/coffee_v2_hydra_physical_b.py'
+      - 'tests/test_coffee_v2_hydra_causes_c.py'
+      - 'experiments/coffee_v2/C_FIXED_TOY_PAID_INPUT.json'
+      - 'COFFEE_P45_C_DIAGNOSTIC_AND_ASTRA_REVIEW.md'
+      - '.github/workflows/coffee-hydra-p45-c.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coffee-p45-c-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  causal-diagnostic-c:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: C causal-wait fixtures and negative cases
+        run: python -m unittest discover -s tests -p test_coffee_v2_hydra_causes_c.py -v
+      - name: Regression B physical and A3 episode evaluation
+        run: |
+          python -m unittest discover -s tests -p test_coffee_v2_hydra_physical_b.py -v
+          python -m unittest discover -s tests -p test_coffee_hydra_episodes_a.py -v
+      - name: Regression historical physical engine
+        run: |
+          python -m unittest discover -s tests -p test_coffee_v2_reference.py -v
+          python -m unittest discover -s tests -p test_coffee_hydra_p39.py -v
+          python -m unittest discover -s tests -p test_coffee_hydra_p42.py -v
+      - name: Generate conditional C diagnosis from a fixed TOY fixture
+        run: |
+          python -m arena.coffee_v2_hydra_causes_c \
+            --dossier experiments/coffee_v2/HYDRA_TWO_OPERATORS_PHYSICAL_B_ASSUMPTIONS.json \
+            --toy-input experiments/coffee_v2/C_FIXED_TOY_PAID_INPUT.json \
+            --episode-view experiments/coffee_v2/VIDEO2_EPISODE_REVIEW_A.json \
+            --historical-dossier experiments/coffee_v2/EXAMPLE_REFERENCE_DOSSIER_ASSUMPTIONS_ONLY.json \
+            --out "$RUNNER_TEMP/p45-c"
+          cat "$RUNNER_TEMP/p45-c/C_CAUSAL_DIAGNOSIS.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload aggregate diagnostic only (no raw trace or imagery)
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-p45-c-conditional-diagnostic-${{ github.run_id }}
+          path: ${{ runner.temp }}/p45-c/
+          retention-days: 90
+          if-no-files-found: error
+      - name: Remove temporary aggregate output
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/p45-c"
+
+# CI runs three fictional POS orders and A/B construction metadata.
+# No video frames, R2, OMC, LLM, Q25/Q75 or policy D campaign.
