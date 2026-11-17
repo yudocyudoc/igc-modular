@@ -21,7 +21,7 @@ La pequeña proyección legible `experiments/coffee_v2/VIDEO2_EPISODE_REVIEW_A.j
 | Pregunta | Veredicto | Qué prueba y qué no |
 |---|---|---|
 | Dos operadores en muestras simultáneas frente a un único barista/puesto global | `CONTRADICTED` | E030/E062 con muestra 48.000 y E032/E064 con muestra 104.006; invalida la exclusividad global de la representación B0 en esos instantes; no demuestra dos baristas siempre disponibles |
-| Si los 90 s se interpretan como tiempo transcurrido del contador en *todas* las extracciones | `CONTRADICTED` | T31 da el contexto del contador; T33, otro episodio, tiene lectura estimada final 32 s; **sólo** contradice la interpretación igualada a contador, **no** 90 s de ocupación/reutilización física |
+| Si los 90 s se interpretan como tiempo transcurrido del contador en *todas* las extracciones | `INDETERMINATE` por defecto; `CONTRADICTED` sólo si se activa la hipótesis de equivalencia | T31 da el contexto del contador; T33, otro episodio, tiene lectura estimada final 32 s; **sólo** contradice la interpretación igualada a contador, **no** 90 s de ocupación/reutilización física |
 | Máquina en extracción y B02 haciendo otra tarea | `COMPATIBLE` | E115/E149, recursos distintos; factibilidad de solapamiento, no predicción acertada de horarios |
 | Clasificación probable de purga T28 y exclusión de bebida | `COMPATIBLE` | No cuenta T28 como extracción de bebida; no certifica visualmente purga con certeza |
 | Portafiltro montado después del fin del contador | `NOT_REPRESENTED` | T31 final visto 41.014 y estabilizado hasta 48.000; falta estado posterior y liberación del grupo, sin afirmar ocupación continua |
@@ -70,7 +70,7 @@ independientemente.
 - **Tiempo automático frente a contador:** toma
   `espresso_auto_min` del dossier, multiplica por 60 y compara con la
   estimación de T33, condicionada a
-  `automatic_duration_equals_counter_elapsed`. Utiliza T31 sólo como
+  `automatic_duration_equals_counter_elapsed` **sólo cuando se solicita explícitamente**. Sin ese mapeo el veredicto por defecto es `INDETERMINATE`. Utiliza T31 sólo como
   contexto del tipo de contador, no como medida de ajuste. Un cambio
   hipotético de T33 a 90 s da `COMPATIBLE` y actualiza la explicación.
   Si no se establece la equivalencia semántica, informa
