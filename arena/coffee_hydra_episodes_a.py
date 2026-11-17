@@ -236,7 +236,7 @@ COUNTER_HYPOTHESIS = "automatic_duration_equals_counter_elapsed"
 
 
 def evaluate_cases(view, episodes, operations, caps, automatic_min, *,
-                   timer_semantics=COUNTER_HYPOTHESIS):
+                   timer_semantics="not_established"):
     """Pure constraint evaluation; accepts alternative representation fixtures.
 
     Source authentication and pinned historic pairs are separate from this
@@ -456,7 +456,7 @@ def historical_baseline_gate(dossier):
 
 
 def check(view, dossier, *, source_bytes_verified=False,
-          timer_semantics=COUNTER_HYPOTHESIS):
+          timer_semantics="not_established"):
     episodes,operations=inspect(view)
     capabilities=reference.episode_model_capabilities(dossier)
     results=evaluate_cases(view,episodes,operations,capabilities,
@@ -550,8 +550,8 @@ def main(argv=None):
     p.add_argument("--historical-dossier",required=True)
     p.add_argument("--source-zip",help="Optional exact local Astra ZIP, read-only; never uploads images")
     p.add_argument("--timer-semantics",choices=(COUNTER_HYPOTHESIS,"not_established"),
-                   default=COUNTER_HYPOTHESIS,
-                   help="Declared counter comparison hypothesis, not established empirical equivalence")
+                   default="not_established",
+                   help="Not established by default; opt in to counter-equivalence as a test hypothesis")
     p.add_argument("--out",required=True)
     args=p.parse_args(argv)
     view=read_json(args.view)
