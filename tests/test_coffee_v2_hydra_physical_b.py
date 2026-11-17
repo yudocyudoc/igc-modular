@@ -218,7 +218,8 @@ class PhysicalB(unittest.TestCase):
         self.assertEqual(result["stage_counts"]["clean"],0)
         self.assertEqual(result["stage_counts"]["prepare"],1)
         self.assertEqual(result["stage_counts"]["handoff"],1)
-        self.assertGreater(len(trace),len(result))
+        self.assertGreater(len(trace),8)
+        self.assertTrue(any(x["event"]=="group_state" for x in trace))
 
     def test_old_reference_engine_results_unmodified_by_b_import(self):
         hist=read_json(HIST)
