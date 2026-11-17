@@ -243,41 +243,54 @@ def _engine(positions, lines, d, horizon):
     def choose(task,time):
         job,stage=task["job"],task["stage"]
         duration=timing[stage]
+        required=STAGE_CLASSES[stage]
         if stage=="extract_auto":
+            need(required==("espresso_group",),"AUTO_STAGE_CONTRACT_DRIFT")
             need(job in held,"EXTRACTION_NO_LOCKED_GROUP")
             g=held[job]
             need(occupied.get("G:"+g)==job and
                  group_state[g]=="LOADING",
                  "EXTRACTION_LOST_GROUP_AFTER_LOAD")
             return (),None,g
+        need(len(required)==2 and required[0]=="barista",
+             "MANUAL_STAGE_RESOURCE_CONTRACT_DRIFT")
+        extra=required[1]
         for actor_id,actor in d["operators"].items():
             if stage not in actor["skills"] or not actor_available(
                     actor,time,duration) or "A:"+actor_id in occupied:
                 continue
-            pools=[()]
-            if stage=="prepare":
+            held_group=None
+            if extra=="prep_space":
                 pools=[("S:"+x,) for x in resources["station"]]
-            elif stage=="load":
-                pools=[("G:"+x,) for x in resources["group"]
-                       if group_state[x]=="FREE"]
-            elif stage=="milk":
+            elif extra=="espresso_group":
+                if stage=="load":
+                    pools=[("G:"+x,) for x in resources["group"]
+                           if group_state[x]=="FREE"]
+                else:
+                    need(stage in ("remove","clean"),
+                         "GROUP_STAGE_REQUIRES_HELD_OR_FREE")
+                    if job not in held:
+                        continue
+                    held_group=held[job]
+                    expected=("AWAITING_REMOVAL" if stage=="remove"
+                              else "AWAITING_CLEAN")
+                    need(group_state[held_group]==expected and
+                         occupied.get("G:"+held_group)==job,
+                         "RESUMED_WRONG_GROUP_OR_STATE")
+                    pools=[()]  # Locked group retained by SAME job.
+            elif extra=="steam_wand":
                 pools=[("W:"+x,) for x in resources["wand"]]
-            elif stage=="handoff":
+            elif extra=="pickup_pass":
                 pools=[("P:"+x,) for x in resources["pass"]]
-            elif stage in ("remove","clean"):
-                if job not in held:
-                    continue
-                g=held[job]
-                expected="AWAITING_REMOVAL" if stage=="remove" else "AWAITING_CLEAN"
-                need(group_state[g]==expected and
-                     occupied.get("G:"+g)==job,
-                     "RESUMED_WRONG_GROUP_OR_STATE")
+            else:
+                need(False,"UNKNOWN_STAGE_RESOURCE_CLASS")
             for pool in pools:
                 tokens=("A:"+actor_id,)+pool
                 if all(tok not in occupied for tok in tokens):
-                    return tokens,actor_id,(held.get(job) if stage in
-                            ("remove","clean") else
-                            pool[0][2:] if stage=="load" else None)
+                    selected_group=(
+                        held_group if held_group is not None else
+                        pool[0][2:] if stage=="load" else None)
+                    return tokens,actor_id,selected_group
         return None
 
     def start(task,choice,time):
