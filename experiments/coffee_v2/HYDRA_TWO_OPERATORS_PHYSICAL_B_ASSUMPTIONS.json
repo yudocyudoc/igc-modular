@@ -1,0 +1,118 @@
+{
+  "schema": "arena.coffee.p44.hydra-physical-b/1",
+  "scope": "ASSUMED_CONDITIONAL_PHYSICAL_MODEL_NOT_CALIBRATED",
+  "source_reconciliation": "A3_VISUAL_B01_B02_SAMPLED_AT_TWO_INSTANTS_NOT_FULL_SHIFT",
+  "historical_dossier_preserved": "experiments/coffee_v2/EXAMPLE_REFERENCE_DOSSIER_ASSUMPTIONS_ONLY.json",
+  "installed_group_ids": [
+    "G01",
+    "G02",
+    "G03"
+  ],
+  "enabled_group_ids": [
+    "G01",
+    "G02",
+    "G03"
+  ],
+  "group_availability_status": "ASSUMED_FULL_SCENARIO_NOT_EMPIRICALLY_VERIFIED",
+  "operator_calendar_status": "ASSUMED_WINDOWS_NOT_INFERRED_FROM_VIDEO",
+  "operator_skill_status": "DECLARED_ASSUMPTIONS_NOT_VISUALLY_IDENTIFIED",
+  "operators": {
+    "B01": {
+      "skills": [
+        "prepare",
+        "load",
+        "remove",
+        "clean",
+        "milk",
+        "handoff"
+      ],
+      "availability_windows_min": [
+        [
+          0,
+          240
+        ]
+      ],
+      "status": "ASSUMED_NOT_OBSERVED_FULL_SHIFT"
+    },
+    "B02": {
+      "skills": [
+        "prepare",
+        "load",
+        "remove",
+        "clean",
+        "milk",
+        "handoff"
+      ],
+      "availability_windows_min": [
+        [
+          0,
+          240
+        ]
+      ],
+      "status": "ASSUMED_NOT_OBSERVED_FULL_SHIFT"
+    }
+  },
+  "prep_stations": [
+    "puesto_izquierdo",
+    "puesto_derecho"
+  ],
+  "operator_stations_assignment": "DYNAMIC_FCFS_DIFFERENT_STATIONS_NOT_PERMANENT_STAFF_POSITIONS",
+  "steam_wands": [
+    "W01"
+  ],
+  "pickup_passes": [
+    "PASS01"
+  ],
+  "durations_min": {
+    "prepare_off_group_min": {
+      "value": 0.5,
+      "status": "ASSUMED_NOT_CALIBRATED",
+      "evidence": "NEW_B_SCENARIO_ONLY_NO_FULL_TASK_DURATION_OBSERVED"
+    },
+    "load_min": {
+      "value": 0.1,
+      "status": "ASSUMED_NOT_CALIBRATED",
+      "evidence": "NEW_B_SCENARIO_ONLY_NO_FULL_TASK_DURATION_OBSERVED"
+    },
+    "espresso_auto_min": {
+      "value": 1.5,
+      "status": "ASSUMED_NOT_CALIBRATED",
+      "evidence": "UNCHANGED_HISTORICAL_90S_ILLUSTRATION_NOT_COUNTER_MEASUREMENT"
+    },
+    "remove_min": {
+      "value": 0.15,
+      "status": "ASSUMED_NOT_CALIBRATED",
+      "evidence": "NEW_B_SCENARIO_ONLY_NO_FULL_TASK_DURATION_OBSERVED"
+    },
+    "clean_min": {
+      "value": 0.15,
+      "status": "ASSUMED_NOT_CALIBRATED",
+      "evidence": "NEW_B_SCENARIO_ONLY_NO_FULL_TASK_DURATION_OBSERVED"
+    },
+    "milk_finish_min": {
+      "value": 0.75,
+      "status": "ASSUMED_NOT_CALIBRATED",
+      "evidence": "NEW_B_SCENARIO_ONLY_NO_FULL_TASK_DURATION_OBSERVED"
+    },
+    "handoff_min": {
+      "value": 0.2,
+      "status": "ASSUMED_NOT_CALIBRATED",
+      "evidence": "NEW_B_SCENARIO_ONLY_NO_FULL_TASK_DURATION_OBSERVED"
+    }
+  },
+  "clean_after_every_beverage_assumed": false,
+  "cleaning_policy_explanation": "Base case does NOT assume a separate cleaning action after every beverage. Flip to true only in an explicitly new scenario; never infer it from timer pairs.",
+  "milk_precedence": "AFTER_GROUP_RELEASE_ASSUMED",
+  "dispatch_policy": "FCFS_READY_ASSUMED",
+  "initial_open_orders_assumed": 0,
+  "uncertainty_register": {
+    "B01_B02_full_time_availability": "UNKNOWN_OBSERVED_ONLY_SAMPLED_TIMES",
+    "B01_B02_skills": "UNKNOWN",
+    "simultaneous_G01_G02_G03_availability": "UNKNOWN_INSTALLED_NOT_EQUAL_READY",
+    "group_load_remove_clean_times": "UNKNOWN_MERE_SCENARIO_VALUES",
+    "espresso_auto_duration": "UNKNOWN_90S_OLD_SCENARIO_NOT_T31_T33_T12",
+    "milk_same_drink_precedence": "UNKNOWN_ASSUMED_AFTER_RELEASE",
+    "initial_real_backlog": "UNKNOWN_SYNTHETIC_ZERO_ONLY",
+    "no_real_order_identity_reconstructed": true
+  }
+}
