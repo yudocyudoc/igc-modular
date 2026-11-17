@@ -347,5 +347,54 @@
   "operator_presence_beyond_sampled_windows_unknown": true,
   "synthetic_order_joins": 0,
   "manual_stage_durations_calibrated": 0,
-  "group_reuse_times_measured": 0
+  "group_reuse_times_measured": 0,
+  "operator_activity_samples": [
+    {
+      "id": "VISUAL-S48",
+      "video_s": 48,
+      "reviewer_observed_simultaneous_activity": true,
+      "actors": [
+        {
+          "actor": "B02",
+          "operation_id": "E030",
+          "station": "puesto_izquierdo",
+          "activity": "preparacion_visible"
+        },
+        {
+          "actor": "B01",
+          "operation_id": "E062",
+          "station": "puesto_derecho",
+          "activity": "preparacion_visible"
+        }
+      ],
+      "confidence": "reviewer_visual_assertion",
+      "visual_evidence_ref": "operadores.jpg",
+      "provenance": "Astra original reviewed montage and narrative; not encoded as a row in source operations CSV",
+      "full_continuous_intervals_observed": false
+    },
+    {
+      "id": "VISUAL-S104",
+      "video_s": 104.006,
+      "reviewer_observed_simultaneous_activity": true,
+      "actors": [
+        {
+          "actor": "B02",
+          "operation_id": "E032",
+          "station": "puesto_izquierdo",
+          "activity": "preparacion_visible"
+        },
+        {
+          "actor": "B01",
+          "operation_id": "E064",
+          "station": "puesto_derecho",
+          "activity": "preparacion_visible"
+        }
+      ],
+      "confidence": "reviewer_visual_assertion",
+      "visual_evidence_ref": "operadores.jpg",
+      "provenance": "Astra original reviewed montage and narrative; not encoded as a row in source operations CSV",
+      "full_continuous_intervals_observed": false
+    }
+  ],
+  "review_note_on_samples": "These are two previously reviewed image instants, not independently revalidated by gpt-web and not continuous activity windows. If removed, temporal overlap alone must not prove concurrent work."
 }
