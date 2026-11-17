@@ -162,6 +162,18 @@ def capabilities(d):
             "remove":list(STAGE_CLASSES["remove"]),
             "milk_finish":list(STAGE_CLASSES["milk"]),
         },
+        "preparation_constraints":{
+            # Identical skills, stations, durations and calendars to _engine.choose.
+            "stage":"prepare",
+            "operator_skills":{aid:list(actor["skills"])
+                               for aid,actor in d["operators"].items()},
+            "operator_windows_min":{
+                aid:[list(w) for w in actor["availability_windows_min"]]
+                for aid,actor in d["operators"].items()},
+            "prep_station_ids":list(d["prep_stations"]),
+            "duration_min":d["durations_min"]["prepare_off_group_min"]["value"],
+            "video_to_scenario_clock_alignment":"NOT_ESTABLISHED",
+        },
         "post_counter_mounted_state_supported":True,
         "stage_source":"coffee_v2_hydra_physical_b.STAGE_CLASSES",
         "time_source":"coffee_v2_hydra_physical_b.DURATION_KEYS",
@@ -441,6 +453,96 @@ def _engine(positions, lines, d, horizon):
     return result,trace,completed
 
 
+def _reconcile_manual_preparation(row, caps):
+    """Check actual B skills and calendars, not only unit counts.
+
+    A3's generic headcount rule remains untouched for the historical model.
+    Video seconds are not aligned to the assumed scenario minute clock.
+    """
+    rules=caps["preparation_constraints"]
+    skills=rules["operator_skills"]
+    windows=rules["operator_windows_min"]
+    stations=set(rules["prep_station_ids"])
+    duration=rules["duration_min"]
+    samples=row["observed"]["reviewed_samples"]
+    if not samples:
+        return row
+
+    details=[]
+    for sample in samples:
+        actors=sample["actor_ids"]
+        places=sample["stations"]
+        distinct=(len(actors)>=2 and len(set(actors))==len(actors) and
+                  len(set(places))==len(places))
+        missing_skill=[aid for aid in actors
+                       if aid not in skills or "prepare" not in skills[aid]]
+        missing_station=[p for p in places if p not in stations]
+        structural=(distinct and len(places)==len(actors) and
+                    not missing_skill and not missing_station)
+
+        # Concurrent activity need not start at an identical instant.
+        # Each nonpreemptive task must fit in its own availability window;
+        # those eligible windows must have a positive common intersection.
+        joint=[]
+        if structural:
+            eligible=[
+                [(lo,hi) for lo,hi in windows[aid]
+                 if hi-lo+1e-10>=duration]
+                for aid in actors]
+            for combination in itertools.product(*eligible):
+                lo=max(w[0] for w in combination)
+                hi=min(w[1] for w in combination)
+                if hi-lo>1e-10:
+                    joint.append([lo,hi])
+        feasible=bool(structural and joint)
+        details.append({
+            "sample_id":sample["id"],
+            "actors":actors,
+            "stations":places,
+            "missing_prepare_skill":missing_skill,
+            "unavailable_prep_stations":missing_station,
+            "distinct_actors_and_stations":distinct,
+            "structure_permits_simultaneous_prepare":bool(structural),
+            "joint_feasible_calendar_windows_min":joint,
+            "scenario_concurrency_feasible":feasible,
+            "instant_specific_status":(
+                "INDETERMINATE" if feasible else "CONTRADICTED"),
+        })
+
+    all_possible=all(x["scenario_concurrency_feasible"] for x in details)
+    row["status"]="COMPATIBLE" if all_possible else "CONTRADICTED"
+    row["rule"]=(
+        "Each reviewed sample requires distinct operators with prepare skill "
+        "and distinct declared stations, plus feasible concurrent actor "
+        "calendar windows; video instants require clock alignment.")
+    row["model"].update({
+        "preparation_constraints":rules,
+        "sample_feasibility":details,
+        "all_reviewed_samples_feasible_somewhere_in_scenario":all_possible,
+        "sample_instant_clock_alignment":"NOT_ESTABLISHED",
+        "instant_specific_status":(
+            "INDETERMINATE" if all_possible else "CONTRADICTED"),
+    })
+    row["uncertainty"]+=(
+        " Video seconds are not scenario minutes; skills, calendars and "
+        "preparation durations are assumed.")
+    if all_possible:
+        row["explanation"]=(
+            "Simultaneous preparations are feasible somewhere under the "
+            "assumed B constraints. COMPATIBLE means existential feasibility "
+            "only; compatibility at the observed video instants remains "
+            "INDETERMINATE because the clocks are not aligned.")
+    else:
+        failures=[x["sample_id"] for x in details
+                  if not x["scenario_concurrency_feasible"]]
+        row["explanation"]=(
+            "CONTRADICTED for the assumed B scenario: required actors, "
+            "prepare skills, stations or overlapping eligible calendar "
+            "windows cannot support concurrency for "+", ".join(failures)+
+            ". Unknown clock alignment cannot restore impossible overlap.")
+    return row
+
+
 def episode_adapter(view,dossier):
     """A3 evaluates same observed samples against B's actual stage classes."""
     episodes,operations=episodes_a.inspect(view)
@@ -449,6 +551,9 @@ def episode_adapter(view,dossier):
         view,episodes,operations,caps,
         dossier["durations_min"]["espresso_auto_min"]["value"],
         timer_semantics="not_established")
+    for row in rows:
+        if row["question"]=="manual_preparation_concurrency_vs_resource_capacity":
+            _reconcile_manual_preparation(row,caps)
     return {"schema":"arena.coffee.p44.a3-b-representation-bridge/1",
             "source":"P43_REVIEWED_EXPLORATORY_EPISODES_NOT_INDEPENDENT",
             "model_capabilities":caps,
