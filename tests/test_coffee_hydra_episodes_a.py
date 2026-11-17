@@ -33,7 +33,8 @@ class EpisodeA(unittest.TestCase):
         self.assertIsNone(reviews["T28"]["counter_elapsed_seconds"])
 
     def test_all_four_outcome_types_and_source_boundaries(self):
-        report=a.check(self.data(),read_json(HIST))
+        report=a.check(self.data(),read_json(HIST),
+                       timer_semantics=a.COUNTER_HYPOTHESIS)
         by={x["question"]:x for x in report["checks"]}
         self.assertEqual(len(by),6)
         self.assertEqual({x["status"] for x in by.values()},
@@ -117,7 +118,7 @@ class EpisodeA(unittest.TestCase):
         # fixture is not offered as historical ZIP validation.
         episodes,ops=a.inspect(src)
         d=read_json(HIST)
-        report=a.check(src,d)
+        report=a.check(src,d,timer_semantics=a.COUNTER_HYPOTHESIS)
         outcome=next(x for x in report["checks"]
                      if x["question"]=="automatic_time_vs_displayed_counter")
         self.assertEqual(outcome["status"],"COMPATIBLE")
@@ -127,6 +128,12 @@ class EpisodeA(unittest.TestCase):
         self.assertEqual(episodes["T33"]["old_pair"]["counter_s"],[28,32])
 
     def test_counter_semantic_unresolved_and_uncertainty_band(self):
+        default=a.check(self.data(),read_json(HIST))
+        out=next(x for x in default["checks"] if
+                 x["question"]=="automatic_time_vs_displayed_counter")
+        self.assertEqual(out["status"],"INDETERMINATE")
+        self.assertEqual(default["model_counter_semantic_hypothesis"],
+                         "not_established")
         source=self.data(); d=read_json(HIST)
         result=a.check(source,d,timer_semantics="not_established")
         item=next(x for x in result["checks"] if
@@ -135,13 +142,13 @@ class EpisodeA(unittest.TestCase):
         self.assertIn("not_established",item["model"]["timer_semantics"])
         t33=next(x for x in source["reviewed_episodes"] if x["id"]=="T33")
         t33["counter_elapsed_seconds"]=87 # 3s from assumed 90s
-        result=a.check(source,d)
+        result=a.check(source,d,timer_semantics=a.COUNTER_HYPOTHESIS)
         item=next(x for x in result["checks"] if
                   x["question"]=="automatic_time_vs_displayed_counter")
         self.assertEqual(item["status"],"INDETERMINATE")
         self.assertIn("guard",item["explanation"])
         t33["counter_elapsed_seconds"]=90
-        self.assertEqual(next(x for x in a.check(source,d)["checks"]
+        self.assertEqual(next(x for x in a.check(source,d,timer_semantics=a.COUNTER_HYPOTHESIS)["checks"]
             if x["question"]=="automatic_time_vs_displayed_counter")["status"],
             "COMPATIBLE")
 
