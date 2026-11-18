@@ -2,6 +2,18 @@
 
 **Plan rector:** PLAN_GPT_WEB_ARENA_DECISION_OPERATIVA_Y_CALIBRACION_2026-11-17, §6. **Alcance:** C de software y construcción; no D ni estudio del local real. **Base apilada:** PR44 B, basado en PR43 A3. **Revisor independiente solicitado:** Astra, con cierre conjunto B + C.
 
+## Retroalimentación independiente de Astra — PR44 aceptada, PR45 corregida
+
+**Dictamen:** PR44 **B_ACCEPT** en `c850926ef6a13c0efaa4311e80844b89a3f8708b`; PR45 **C_FIX** en `64f0668b9782ae5b75bc3d4de37ca56e13288933`. Las dos incidencias correspondían exclusivamente al diagnóstico C. La corrección no cambia el dossier, el FCFS ni la función que ejecuta las operaciones: es instrumentación de traza y clasificación.
+
+**C1 — último inicio admisible:** antes, el estado de bloqueo al extremo izquierdo de un intervalo se extendía a toda su longitud. Aunque a las 0,75 min todavía cabía empezar una carga de 0,25 min antes de cerrar a 1,00, los minutos posteriores no permitían completar una carga. Ahora la instrumentación parte cada intervalo en límites de ventana **y en `fin_de_ventana - duración_de_etapa`**, y evalúa las razones en el interior de cada subtramo de duración positiva. Estos cortes diagnósticos no agregan eventos a la cola del planificador ni alteran su despacho. Regresión: dos pedidos, sólo G01, carga 0,25, B01 y B02 disponibles [0,1] y [3,240] ⇒ señal estricta de extracción **0,00 min-tarea**. Un turno largo mantiene señal positiva. Otra regresión sitúa el último inicio a 0,90 dentro del intervalo y comprueba su división.
+
+**C2 — cuello manual con máquina libre:** se conserva `signal_task_min_ANY_CAUSE` como total por etapa. Se agrega `signal_task_min_MANUAL_BLOCKED_WITH_GROUP_FREE`: una tarea elegible `prepare/load`, al menos un grupo **habilitado** en estado FREE y todas las alternativas manuales relevantes bloqueadas por operador/ventana o puesto. Se captura el estado de grupos aun durante `prepare` fuera de grupo. Las rutas a grupos ya ocupados no contaminan la condición cuando existe una ruta a grupo libre. Regresión negativa: dos pagos y sólo G01 ⇒ **1,75 min-tarea por etapa** y **0,00 min-tarea manual con grupo libre**. Regresión positiva: tres pagos, dos baristas y puestos, tres grupos libres al inicio; la tercera preparación espera al menos de 0,00 a 0,50 ⇒ señal manual positiva. Este indicador diagnostica factibilidad dentro del escenario, no ahorro garantizado.
+
+Las esperas siguen contándose **una vez por tarea e intervalo**. Razones simultáneas no son fracciones aditivas ni se convierten en minutos causales exclusivos. No se demuestra un cuello real con este microcaso sintético.
+
+**Solicitud de segunda revisión de Astra:** verificar específicamente C1 y C2 sobre el nuevo HEAD de PR45 y confirmar que las horas, la asignación y los resultados de B no cambiaron. B_ACCEPT permanece referido al commit de PR44; C sólo se declarará aceptada tras nuevo dictamen.
+
 ## Qué se agregó
 
 1. **Instrumentación sin cambiar FCFS:** el motor físico B emite en su traza PRIVADA eventos pending_precedence, eligible, start, finish y blocked_interval. El instante de elegibilidad es el cumplimiento de la precedencia: antes de ese instante no hay espera de recursos. La duración del bloqueo se segmenta entre eventos del mismo motor y se cierra al inicio efectivo de la tarea.
@@ -41,8 +53,8 @@ Los patrones son **alternativas de asignación bloqueadas**, no causas exclusiva
 
 ## Pedido concreto a Astra: cierre B y revisión C
 
-**B, PR44:** reexaminar la corrección HEAD c850926e: aptitudes y ventanas compartidas entre planificador/evaluador, calendarios disjuntos y sin prepare, distinción factibilidad estructural / instante de video; comprobar exclusividad del grupo y decidir cierre formal.
+**B, PR44:** B_ACCEPT emitido por Astra en c850926e; mantener ese resultado y verificar en PR45 que C no altera el comportamiento físico de B.
 
-**C, PR45:** inspeccionar instrumentación en el planificador B y agregador C; buscar falsa atribución exclusiva ante múltiples bloqueadores, huecos temporales, discrepancias de reloj, confusión extracción/retirada, clasificación causal demasiado fuerte, fugas de identificadores y cambios encubiertos de FCFS. Repetir o añadir contraejemplos. CI verde verifica software, no la cafetería real.
+**C, PR45:** revisar las soluciones C1 y C2 de la retro de Astra y sus regresiones negativas/positivas. Auditar cortes de fin-de-ventana menos duración, estados FREE en preparación, denominadores y ausencia de doble atribución. Comprobar que no hay cambios encubiertos en FCFS, tiempos de entrega o física de B. CI verde verifica software, no la cafetería real.
 
-**Dictamen solicitado:** B_ACCEPT/B_FIX y C_ACCEPT/C_FIX por separado, con SHA, pruebas y límites. Si hay defectos, proporcionar el caso mínimo reproducible. No fusionar PR43/44/45 por su CI; no iniciar D hasta diseñar y autorizar la comparación de políticas con entradas y costos idénticos.
+**Dictamen solicitado:** confirmar B_ACCEPT ya emitido y evaluar C_ACCEPT/C_FIX sobre la corrección, con SHA, pruebas y límites. Si hay defectos, proporcionar el caso mínimo reproducible. No fusionar PR43/44/45 por su CI; no iniciar D hasta diseñar y autorizar la comparación de políticas con entradas y costos idénticos.
