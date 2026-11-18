@@ -132,6 +132,53 @@ class DPolicies(unittest.TestCase):
             self.assertEqual(arm["orders_handoff_later"],0)
             self.assertEqual(arm["delta_p90_min_positive_is_worse"],0)
 
+    def _competition_at_group_release(self,first_archetype):
+        # Prior paid beverage reaches release at t=2.25; three fictional
+        # payments at 2.24 leave older preparation waiting while B01 removes
+        # a portafilter and B02 starts a new preparation. Neither a new
+        # operator nor a video order association is introduced.
+        arrivals=[("first",0,first_archetype),
+                  ("late1",2.24,"solo_extraccion"),
+                  ("late2",2.24,"solo_extraccion"),
+                  ("late3",2.24,"solo_extraccion")]
+        return {
+            "positions":[paid(oid,time=time) for oid,time,_ in arrivals],
+            "lines":[item(oid,typ,time=time) for oid,time,typ in arrivals],
+            "horizon_min":10,
+        }
+
+    def test_milk_priority_actually_displaces_earlier_runnable_preparation(self):
+        x=self._competition_at_group_release("con_leche")
+        report=compare_toy(x)
+        arm=next(a for a in report["policies"] if
+                 a["policy"]=="PRIORITIZE_MILK_READY")
+        self.assertGreater(arm["rule_changed_assignment_count"],0)
+        self.assertTrue(any(
+            event["first_runnable_under_fcfs"]["stage"]=="prepare" and
+            event["selected_instead"]["stage"]=="milk"
+            for event in arm["override_events_pseudonymous"]))
+        self.assertTrue(any(task["stage"]=="prepare" and
+                            task["direction"]=="LATER" for task in
+                            arm["task_start_or_assignment_changes"]))
+        self.assertTrue(all(event["selected_actor"] in ("B01","B02") for
+                            event in arm["override_events_pseudonymous"]))
+
+    def test_handoff_priority_displaces_preparation_using_existing_barista(self):
+        x=self._competition_at_group_release("solo_extraccion")
+        report=compare_toy(x)
+        arm=next(a for a in report["policies"] if
+                 a["policy"]=="PRIORITIZE_HANDOFF_READY")
+        self.assertGreater(arm["rule_changed_assignment_count"],0)
+        self.assertTrue(any(
+            event["first_runnable_under_fcfs"]["stage"]=="prepare" and
+            event["selected_instead"]["stage"]=="handoff"
+            for event in arm["override_events_pseudonymous"]))
+        self.assertTrue(any(task["stage"]=="prepare" and
+                            task["direction"]=="LATER" for task in
+                            arm["task_start_or_assignment_changes"]))
+        self.assertTrue(all(event["selected_actor"] in ("B01","B02") for
+                            event in arm["override_events_pseudonymous"]))
+
     def test_milk_and_handoff_use_existing_staff_not_historical_s5_support(self):
         x=fixture()
         conf=dossier()
