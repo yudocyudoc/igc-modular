@@ -40,6 +40,126 @@ def events(trace,name,stage=None):
 
 
 class CausalWaitTests(unittest.TestCase):
+    def test_astra_c1_last_valid_start_at_turn_end_has_zero_extraction_signal(self):
+        d=initial()
+        d["enabled_group_ids"]=["G01"]
+        d["durations_min"]["load_min"]["value"]=0.25
+        for actor in d["operators"].values():
+            actor["availability_windows_min"]=[[0,1],[3,240]]
+        result,trace,completed,report=scene(2,d)
+        limit=report["hypotheses"]["extraction_limits"]
+        self.assertEqual(limit["signal_task_min"],0)
+        self.assertEqual(limit["status"],"NOT_ESTABLISHED_BY_THIS_MODEL_TRACE")
+        extraction=events(trace,"start","extract_auto")[0]
+        self.assertAlmostEqual(extraction["time"],0.75)
+        ends=events(trace,"finish","extract_auto")
+        self.assertAlmostEqual(ends[0]["time"],2.25)
+        self.assertAlmostEqual(events(trace,"start","remove")[0]["time"],3)
+        self.assertAlmostEqual(next(x["time"] for x in trace
+                                    if x["event"]=="group_state" and
+                                    x["to"]=="FREE"),3.15)
+        self.assertAlmostEqual(events(trace,"start","load")[1]["time"],3.15)
+        # State at 0.75 alone cannot certify a positive-duration actor slot.
+        during=[x for x in events(trace,"blocked_interval","load")
+                if x["start_time"]>=0.75-1e-9 and
+                x["end_time"]<=1+1e-9]
+        self.assertTrue(during)
+        self.assertTrue(all(
+            all("ACTOR_OUTSIDE_ELIGIBLE_WINDOW" in r["blockers"]
+                for r in span["blocking"]["alternative_routes"])
+            for span in during))
+        self.assertEqual(result["modeled_handoffs_before_cut"],2)
+        self.assertEqual(len(completed),2)
+
+    def test_astra_c1_long_shift_keeps_extraction_signal_positive(self):
+        d=initial()
+        d["enabled_group_ids"]=["G01"]
+        d["durations_min"]["load_min"]["value"]=0.25
+        _,trace,_,report=scene(2,d)
+        self.assertGreater(report["hypotheses"]["extraction_limits"][
+            "signal_task_min"],0)
+        self.assertTrue(any(x["start_time"]>=0.75-1e-9 and
+                            all("ACTOR_OUTSIDE_ELIGIBLE_WINDOW"
+                                not in route["blockers"] for route in
+                                x["blocking"]["alternative_routes"])
+                            for x in events(trace,"blocked_interval","load")
+                            if all(route["group_state"]=="EXTRACTING" for
+                                   route in x["blocking"]["alternative_routes"])))
+
+    def test_astra_c1_split_at_last_admissible_start_inside_event_gap(self):
+        d=initial()
+        d["enabled_group_ids"]=["G01"]
+        d["durations_min"]["load_min"]["value"]=0.25
+        for actor in d["operators"].values():
+            actor["availability_windows_min"]=[[0,1.15],[3,240]]
+        _,trace,_,report=scene(2,d)
+        spans=[x for x in events(trace,"blocked_interval","load")
+               if 0.75-1e-9<=x["start_time"] and
+               x["end_time"]<=1.15+1e-9 and
+               all(route["group_state"]=="EXTRACTING" for route in
+                   x["blocking"]["alternative_routes"])]
+        self.assertTrue(any(abs(x["end_time"]-0.9)<1e-8 for x in spans))
+        self.assertTrue(any(abs(x["start_time"]-0.9)<1e-8 for x in spans))
+        self.assertAlmostEqual(report["hypotheses"]["extraction_limits"][
+            "signal_task_min"],0.15)
+        self.assertAlmostEqual(
+            sum(x["minutes"] for x in spans),0.4)
+
+    def test_astra_c2_group_occupied_is_not_manual_blockage(self):
+        d=initial()
+        d["enabled_group_ids"]=["G01"]
+        _,trace,_,report=scene(2,d)
+        mechanism=report["hypotheses"]["preparation_or_loading_limits"]
+        self.assertAlmostEqual(
+            mechanism["signal_task_min_ANY_CAUSE"],1.75)
+        self.assertEqual(
+            mechanism["signal_task_min_MANUAL_BLOCKED_WITH_GROUP_FREE"],0)
+        self.assertEqual(
+            mechanism["manual_signal_status"],
+            "NO_MANUAL_WITH_FREE_GROUP_SIGNAL")
+        # Both baristas prepare immediately, so waiting occurs after prep.
+        self.assertEqual([x["time"] for x in
+                          events(trace,"start","prepare")],[0,0])
+        self.assertAlmostEqual(report["causal_accounting"][
+            "stage_breakdown"]["load"]["resource_wait_task_min"],1.75)
+
+    def test_astra_c2_free_groups_with_busy_baristas_is_positive(self):
+        d=initial()
+        _,trace,_,report=scene(3,d)
+        mechanism=report["hypotheses"]["preparation_or_loading_limits"]
+        self.assertGreaterEqual(
+            mechanism["signal_task_min_MANUAL_BLOCKED_WITH_GROUP_FREE"],0.5)
+        self.assertEqual(
+            mechanism["manual_signal_status"],"SIGNAL_IN_ASSUMED_MODEL")
+        spans=[x for x in events(trace,"blocked_interval","prepare")
+               if x["start_time"]<0.5+1e-9 and
+               x["end_time"]<=0.5+1e-9]
+        self.assertTrue(spans)
+        self.assertAlmostEqual(sum(x["minutes"] for x in spans),0.5)
+        self.assertTrue(all(all(state=="FREE" for state in
+                                x["blocking"]["enabled_group_states"].values())
+                            for x in spans))
+        self.assertTrue(all(all(any(reason.startswith("ACTOR_") or
+                                    reason=="RESOURCE_BUSY_PREP_SPACE"
+                                    for reason in route["blockers"])
+                                for route in x["blocking"]["alternative_routes"])
+                            for x in spans))
+
+    def test_astra_c2_load_with_free_group_but_operator_busy(self):
+        d=initial()
+        d["prep_stations"]=["puesto_izquierdo","puesto_derecho"]
+        _,trace,_,report=scene(3,d)
+        # The strict manual metric cannot exceed stage waiting or the
+        # combined total, despite multiple blocked routes.
+        strict=report["hypotheses"]["preparation_or_loading_limits"][
+            "signal_task_min_MANUAL_BLOCKED_WITH_GROUP_FREE"]
+        by_stage=report["hypotheses"]["preparation_or_loading_limits"][
+            "signal_task_min_ANY_CAUSE"]
+        self.assertGreater(strict,0)
+        self.assertLessEqual(strict,by_stage+1e-9)
+        self.assertLessEqual(by_stage,report["causal_accounting"][
+            "total_resource_wait_task_min"]+1e-9)
+
     def test_fixed_toy_input_is_explicitly_synthetic_and_versioned(self):
         toy=read_json(TOY)
         self.assertEqual(toy["schema"],c.FIXTURE_SCHEMA)
