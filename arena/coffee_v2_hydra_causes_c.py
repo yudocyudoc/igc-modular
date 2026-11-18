@@ -21,6 +21,9 @@ from . import coffee_hydra_episodes_a as a
 SCHEMA="arena.coffee.p45.causal-wait-diagnosis/1"
 FIXTURE_SCHEMA="arena.coffee.p45.causal-toy-input/1"
 EPS=1e-7
+# Internal adapter capability. This is an API misuse guard, not a security
+# substitute for authenticated private producer views and selection receipts.
+_VERIFIED_CONSTRUCTION_ADAPTER=object()
 
 
 def require(ok, code):
@@ -38,7 +41,7 @@ def _keys(trace, kind):
 
 def diagnose_trace(result, trace, dossier, *, fixture_label,
                    episode_view=None, historical_dossier=None,
-                   dispatch_policy=None):
+                   dispatch_policy=None, _construction_capability=None):
     """Aggregate authenticated model trace, never publish private job IDs.
 
     Every blocked interval is counted ONCE per waiting task. Summing
@@ -56,8 +59,26 @@ def diagnose_trace(result, trace, dossier, *, fixture_label,
             fixture_label.startswith("SOFTWARE_TOY_") or
             fixture_label in allowed_construction),
             "REQUIRES_EXPLICIT_TOY_SCOPE")
-    require(dispatch_policy is None or dispatch_policy in
-            b.D_DISPATCH_STAGE,"UNDECLARED_DIAGNOSTIC_POLICY")
+    if fixture_label in allowed_construction:
+        require(_construction_capability is
+                _VERIFIED_CONSTRUCTION_ADAPTER,
+                "CONSTRUCTION_REQUIRES_VERIFIED_ADAPTER")
+    # A nonbase priority writes a private identity event at the moment the
+    # engine is invoked, independent of whether any priority override occurs.
+    identity=[x for x in trace if x["event"]=="dispatch_policy_identity"]
+    require(len(identity)<=1 and (
+            not identity or (trace and trace[0] is identity[0] and
+                              identity[0]["policy"] in b.D_DISPATCH_STAGE
+                              and identity[0]["policy"]!="FCFS_READY_ASSUMED")),
+            "MALFORMED_EXECUTED_POLICY_IDENTITY")
+    executed=(identity[0]["policy"] if identity else
+              "FCFS_READY_ASSUMED")
+    require(dispatch_policy is None or dispatch_policy==executed,
+            "DIAGNOSIS_POLICY_NOT_EXECUTED_ENGINE_POLICY")
+    overrides=[x for x in trace if x["event"]=="dispatch_override"]
+    require(all(x["policy"]==executed for x in overrides) and
+            (executed!="FCFS_READY_ASSUMED" or not overrides),
+            "UNMATCHED_POLICY_OVERRIDES")
 
     eligible={}
     starts={}
@@ -248,9 +269,10 @@ def diagnose_trace(result, trace, dossier, *, fixture_label,
                  "SOFTWARE_TOY_SIMULATION_DIAGNOSTIC_NOT_REAL_CAFE"),
         "fixture_label":fixture_label,
         "engine_schema":b.RESULT_SCHEMA,
-        "dispatch_policy":(
-            dispatch_policy if dispatch_policy is not None
-            else dossier["dispatch_policy"]),
+        "dispatch_policy":executed,
+        "dispatch_policy_identity_source":(
+            "ENGINE_TRACE_VARIANT_IDENTITY" if identity else
+            "ACCEPTED_B_FCFS_BASELINE_NO_IDENTITY_EVENT"),
         "source_contract":{
             "synthetic_paid_gate":True,
             "dossier_schema":dossier["schema"],
