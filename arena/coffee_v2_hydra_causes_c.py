@@ -73,6 +73,9 @@ def diagnose_trace(result, trace, dossier, *, fixture_label,
             "MALFORMED_EXECUTED_POLICY_IDENTITY")
     executed=(identity[0]["policy"] if identity else
               "FCFS_READY_ASSUMED")
+    require(result.get("executed_dispatch_policy",
+                       "FCFS_READY_ASSUMED")==executed,
+            "ENGINE_RESULT_TRACE_POLICY_IDENTITY_MISMATCH")
     require(dispatch_policy is None or dispatch_policy==executed,
             "DIAGNOSIS_POLICY_NOT_EXECUTED_ENGINE_POLICY")
     overrides=[x for x in trace if x["event"]=="dispatch_override"]
