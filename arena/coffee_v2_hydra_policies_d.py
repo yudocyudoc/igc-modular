@@ -488,10 +488,19 @@ def _public_construction_summary(case_set, execution_receipt=None):
                     "P11_P39_CONSTRUCTION_SELECT_CASE_DAY" and
                 load["source_provenance"]["selected_load_label"]==
                     load["load_label"],"UNVERIFIED_CASE_IN_SET")
+        # Every arm within a paid-input load must represent the same
+        # orders and beverage units; never hide cohort size on export.
+        size=(load["policies"][0]["paid_orders"],
+              load["policies"][0]["synthetic_beverages"])
+        require(all((p["paid_orders"],p["synthetic_beverages"])==size
+                    for p in load["policies"]),
+                "CONSTRUCTION_LOAD_SIZE_CHANGED_ACROSS_POLICIES")
         arm_rows=[]
         for p in load["policies"]:
             arm_rows.append({
                 "policy":p["policy"],
+                "paid_orders":p["paid_orders"],
+                "synthetic_beverages":p["synthetic_beverages"],
                 "rule_changed_assignment_count":
                     p["rule_changed_assignment_count"],
                 "handoffs_before_source_cut":p["handoffs_before_source_cut"],
@@ -522,6 +531,8 @@ def _public_construction_summary(case_set, execution_receipt=None):
             })
         results.append({
             "load_label":load["load_label"],
+            "paid_orders":size[0],
+            "synthetic_beverages":size[1],
             "source_provenance":load["source_provenance"],
             "source_horizon_min":load["source_horizon_min"],
             "scenario_input_sha256":load["scenario_input_sha256"],
@@ -598,6 +609,25 @@ def _public_construction_summary(case_set, execution_receipt=None):
     }
 
 
+def _global_stage_shift_rows(load_label,arm):
+    """One count per changed task start, NOT one count per operator.
+
+    Stage shifts include autonomous extract_auto, which has no operator.
+    Therefore their counts are published *only once* in a stage-level CSV.
+    Operator rows report ONLY work done by that person (tasks, occupied
+    minutes, minute changes versus FCFS), never a duplicated stage total.
+    """
+    return [{
+        "load_label":load_label,
+        "policy":arm["policy"],
+        "stage":stage,
+        "earlier_task_starts":values["earlier_tasks"],
+        "later_task_starts":values["later_tasks"],
+        "earlier_start_minutes":values["earlier_start_minutes"],
+        "later_start_minutes":values["later_start_minutes"],
+    } for stage,values in arm["start_shift_by_stage"].items()]
+
+
 def _export_case_set(case_set,output_dir, *, execution_receipt=None):
     aggregate=_public_construction_summary(case_set,execution_receipt)
     target=Path(output_dir)
@@ -605,12 +635,15 @@ def _export_case_set(case_set,output_dir, *, execution_receipt=None):
     target.mkdir(mode=0o700,parents=True)
     write_json(target/"D_Q25_Q75_AGGREGATE.json",aggregate,exclusive=True)
     rows=[]
-    stage_rows=[]
+    operator_rows=[]
+    stage_shift_rows=[]
     for load in aggregate["results"]:
         for arm in load["arms"]:
             rows.append({
                 "load_label":load["load_label"],
                 "policy":arm["policy"],
+                "paid_orders":arm["paid_orders"],
+                "synthetic_beverages":arm["synthetic_beverages"],
                 "priority_interventions":
                     arm["rule_changed_assignment_count"],
                 "handoffs_before_source_cut":arm["handoffs_before_source_cut"],
@@ -624,9 +657,11 @@ def _export_case_set(case_set,output_dir, *, execution_receipt=None):
                 "orders_later":arm["orders_handoff_later"],
                 "classification":arm["classification"],
             })
+            stage_shift_rows.extend(
+                _global_stage_shift_rows(load["load_label"],arm))
             for actor,details in arm["work_assigned_by_actor"].items():
                 for stage,minutes in details["stage_busy_manual_min"].items():
-                    stage_rows.append({
+                    operator_rows.append({
                         "load_label":load["load_label"],
                         "policy":arm["policy"],
                         "operator":actor,
@@ -636,14 +671,11 @@ def _export_case_set(case_set,output_dir, *, execution_receipt=None):
                         "delta_busy_manual_min":arm[
                             "work_assignment_delta_from_base"][actor][
                                 "stage_busy_manual_min_change"][stage],
-                        "earlier_task_starts":arm["start_shift_by_stage"][
-                            stage]["earlier_tasks"],
-                        "later_task_starts":arm["start_shift_by_stage"][
-                            stage]["later_tasks"],
                     })
     for name,records in (
             ("D_Q25_Q75_PAIRED.csv",rows),
-            ("D_Q25_Q75_OPERATOR_STAGE.csv",stage_rows)):
+            ("D_Q25_Q75_OPERATOR_STAGE.csv",operator_rows),
+            ("D_Q25_Q75_STAGE_SHIFTS.csv",stage_shift_rows)):
         require(records,"EMPTY_CONSTRUCTION_AGGREGATE")
         with (target/name).open("x",encoding="utf-8",newline="") as stream:
             writer=csv.DictWriter(stream,fieldnames=list(records[0]))
@@ -664,12 +696,15 @@ def _export_case_set(case_set,output_dir, *, execution_receipt=None):
                 "R2_billing_cost","UNKNOWN")),
         "**Selección verificada:** "+aggregate["source_selection_sha256"],
         "",
-        "| Carga | Política | Cambios de decisión | Entregas antes corte | "
-        "Pendientes | P50 | P90 | ΔP90 | Adelantados/Demorados | Lectura |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---|---|",
+        "| Carga | Política | Pedidos | Bebidas | Cambios de decisión | "
+        "Entregas antes corte | Pendientes | P50 | P90 | ΔP90 | "
+        "Adelantados/Demorados | Lectura |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|",
     ]
     for row in rows:
         lines.append("| "+row["load_label"]+" | "+row["policy"]+" | "+
+                     str(row["paid_orders"])+" | "+
+                     str(row["synthetic_beverages"])+" | "+
                      str(row["priority_interventions"])+" | "+
                      str(row["handoffs_before_source_cut"])+" | "+
                      str(row["pending_at_source_cut"])+" | "+
@@ -686,9 +721,13 @@ def _export_case_set(case_set,output_dir, *, execution_receipt=None):
         "",
         "## Trabajo desplazado",
         "",
-        "La tabla separada D_Q25_Q75_OPERATOR_STAGE.csv informa minutos "
-        "manuales B01/B02 por etapa y cambios relativos a la base; "
-        "las cuentas de inicios adelantados/demorados son por etapa.",
+        "D_Q25_Q75_OPERATOR_STAGE.csv informa tareas manuales y minutos "
+        "ocupados por B01/B02 y etapa, más delta de minutos frente a FCFS. "
+        "NO contiene conteos de inicios adelantados o demorados.",
+        "D_Q25_Q75_STAGE_SHIFTS.csv contiene una fila por política y etapa: "
+        "cada inicio movido se cuenta UNA sola vez, no por operador. "
+        "Incluye extract_auto, que carece de actor humano. Por tanto, "
+        "no deben sumarse los totales de etapa por persona.",
         "",
         "## Límites",
         "",
