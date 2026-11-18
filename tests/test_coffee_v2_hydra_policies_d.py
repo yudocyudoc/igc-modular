@@ -1,0 +1,241 @@
+"""P46 D software acceptance: single dispatch priority, paired conservation.
+
+All input rows are invented toy payments. No new synthetic corpus, R2,
+private producer views, solver, science campaign, or model calibration.
+"""
+from __future__ import annotations
+
+import copy
+import csv
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
+import unittest
+
+from arena.common import ArenaError, read_json
+from arena import coffee_v2_hydra_physical_b as b
+from arena import coffee_v2_hydra_causes_c as c
+from arena import coffee_v2_hydra_policies_d as d
+from test_coffee_v2_reference import paid,item
+
+ROOT=Path(__file__).resolve().parents[1]
+DOSSIER=ROOT/"experiments/coffee_v2/HYDRA_TWO_OPERATORS_PHYSICAL_B_ASSUMPTIONS.json"
+TOY=ROOT/"experiments/coffee_v2/C_FIXED_TOY_PAID_INPUT.json"
+
+
+def dossier():
+    return read_json(DOSSIER)
+
+
+def fixture():
+    return read_json(TOY)
+
+
+def compare_toy(x=None,conf=None):
+    x=x or fixture()
+    return d.compare(x["positions"],x["lines"],conf or dossier(),
+                     x["horizon_min"])
+
+
+class DPolicies(unittest.TestCase):
+    def test_baseline_reproduces_accepted_B_exact_result_trace_and_orders(self):
+        x=fixture()
+        inputs=(x["positions"],x["lines"],dossier(),x["horizon_min"])
+        accepted=b._engine(*inputs)
+        selected=b._engine(*inputs,dispatch_policy="FCFS_READY_ASSUMED")
+        self.assertEqual(accepted,selected)
+        r=compare_toy()
+        p=r["policies"][0]
+        self.assertEqual(p["policy"],"FCFS_READY_ASSUMED")
+        self.assertEqual(p["rule_changed_assignment_count"],0)
+        self.assertEqual(p["task_start_or_assignment_changes"],[])
+        self.assertEqual(p["orders_handoff_unchanged"],3)
+        self.assertEqual(p["p90_paid_to_handoff_full_drain_min"],
+                         accepted[0]["modeled_paid_to_handoff_p90_full_drain_min"])
+        self.assertEqual(p["handoffs_before_source_cut"],
+                         accepted[0]["modeled_handoffs_before_cut"])
+
+    def test_four_arms_use_identical_physics_while_one_rule_changes(self):
+        x=fixture()
+        before=copy.deepcopy(x)
+        conf=dossier()
+        backup=copy.deepcopy(conf)
+        r=compare_toy(x,conf)
+        self.assertEqual(r["schema"],d.SCHEMA)
+        self.assertEqual(tuple(x["policy"] for x in r["policies"]),
+                         tuple(b.D_DISPATCH_STAGE))
+        self.assertEqual(len(r["policies"]),4)
+        self.assertEqual(len(r["per_order_pseudonymous"]),12)
+        self.assertEqual(x,before)
+        self.assertEqual(conf,backup)
+        for arm in r["policies"]:
+            self.assertEqual(arm["paid_orders"],3)
+            self.assertEqual(arm["synthetic_beverages"],3)
+            self.assertEqual(arm["handoffs_before_source_cut"]+
+                             arm["orders_pending_at_source_cut"],3)
+            self.assertEqual(set(arm["work_assigned_by_actor"]),
+                             {"B01","B02"})
+            self.assertTrue(arm["not_a_real_intervention"])
+        self.assertTrue(r["same_inputs_dossier_durations_windows_and_precedence"])
+        self.assertTrue(r["limits"]["no_new_staff_or_historical_S5_support_assignment"])
+
+    def test_load_priority_intervenes_with_free_group_at_half_minute(self):
+        report=compare_toy()
+        row=next(x for x in report["policies"] if x["policy"]==
+                 "PRIORITIZE_LOAD_READY_WITH_FREE_GROUP")
+        self.assertGreaterEqual(row["rule_changed_assignment_count"],1)
+        self.assertTrue(any(
+            abs(e["minute"]-0.5)<1e-8 and
+            e["first_runnable_under_fcfs"]["stage"]=="prepare" and
+            e["selected_instead"]["stage"]=="load"
+            for e in row["override_events_pseudonymous"]))
+        self.assertTrue(any(x["direction"]=="LATER" for x in
+                            row["task_start_or_assignment_changes"]))
+        self.assertEqual(row["rule_changed_assignment_count"],
+                         len(row["override_events_pseudonymous"]))
+        self.assertEqual(row["p90_paid_to_handoff_full_drain_min"]-
+                         report["policies"][0][
+                             "p90_paid_to_handoff_full_drain_min"],
+                         row["delta_p90_min_positive_is_worse"])
+
+    def test_policy_overrides_are_atomic_resource_feasible_and_nonpreemptive(self):
+        x=fixture()
+        conf=dossier()
+        reference,_,_=b._engine(x["positions"],x["lines"],conf,
+                               x["horizon_min"])
+        for policy in d.POLICIES[1:]:
+            res,trace,completed=b._engine(
+                x["positions"],x["lines"],conf,x["horizon_min"],
+                dispatch_policy=policy)
+            self.assertEqual(res["stage_counts"],reference["stage_counts"])
+            self.assertEqual(res["max_simultaneous_group_reservations"]<=3,
+                             True)
+            self.assertEqual(set(completed),
+                             {"Ctoy0","Ctoy1","Ctoy2"})
+            alloc=[x for x in trace if x["event"]=="dispatch_override"]
+            self.assertTrue(all(x["selected_stage"]==
+                                b.D_DISPATCH_STAGE[policy] for x in alloc))
+            self.assertFalse(any(x["selected_actor"] not in
+                                 {"B01","B02"} for x in alloc))
+            self.assertTrue(all(x["work_displaced_is_not_cancelled"]
+                                for x in alloc))
+            self.assertTrue(res["group_release_follows_remove_or_optional_clean"])
+
+    def test_no_priority_needed_reports_no_intervention_not_improvement(self):
+        x={"positions":[paid("solo")],
+           "lines":[item("solo")],"horizon_min":10}
+        report=compare_toy(x)
+        for arm in report["policies"][1:]:
+            self.assertEqual(arm["rule_changed_assignment_count"],0)
+            self.assertEqual(arm["classification"],"NO_RULE_INTERVENTION")
+            self.assertEqual(arm["orders_handoff_earlier"],0)
+            self.assertEqual(arm["orders_handoff_later"],0)
+            self.assertEqual(arm["delta_p90_min_positive_is_worse"],0)
+
+    def test_milk_and_handoff_use_existing_staff_not_historical_s5_support(self):
+        x=fixture()
+        conf=dossier()
+        for policy in ("PRIORITIZE_MILK_READY",
+                       "PRIORITIZE_HANDOFF_READY"):
+            result,trace,_=b._engine(
+                x["positions"],x["lines"],conf,x["horizon_min"],
+                dispatch_policy=policy)
+            starts=[row for row in trace if row["event"]=="start" and
+                    row["stage"] in ("milk","handoff")]
+            self.assertTrue(starts)
+            self.assertTrue(all(row["actor"] in ("B01","B02") for row in starts))
+            self.assertFalse(any("existing_support" in json.dumps(row)
+                                 for row in starts))
+            self.assertTrue(result["operator_exclusive_across_all_manual_stages"])
+
+    def test_per_order_tradeoffs_and_shifted_task_starts_are_visible(self):
+        r=compare_toy()
+        for arm in r["policies"]:
+            rows=[x for x in r["per_order_pseudonymous"]
+                  if x["policy"]==arm["policy"]]
+            self.assertEqual(len(rows),3)
+            self.assertEqual(arm["orders_handoff_earlier"]+
+                             arm["orders_handoff_later"]+
+                             arm["orders_handoff_unchanged"],3)
+            for row in rows:
+                self.assertAlmostEqual(
+                    row["policy_handoff_min"]-row["baseline_handoff_min"],
+                    row["handoff_delta_min_positive_is_later"])
+                self.assertTrue(row["paid_case_label"].startswith("P"))
+            self.assertTrue(all("stage" in task for task in
+                                arm["task_start_or_assignment_changes"]))
+            self.assertEqual(set(arm["work_assignment_delta_from_base"]),
+                             {"B01","B02"})
+
+    def test_export_reports_hashes_pseudonyms_and_no_raw_order_ids(self):
+        report=compare_toy()
+        serialized=json.dumps(report)
+        for secret in ("Ctoy0","Ctoy1","Ctoy2","payCtoy","order_id"):
+            self.assertNotIn(secret,serialized)
+        self.assertNotIn("operadores.jpg",serialized)
+        with TemporaryDirectory() as tmp:
+            path=Path(tmp)/"d"
+            d.export(report,path)
+            self.assertEqual(
+                set(x.name for x in path.iterdir()),{
+                    "D_PAIRED_POLICY_COMPARISON.json",
+                    "D_PAIRED_POLICY_COMPARISON.md",
+                    "D_ORDER_OUTCOMES_PSEUDONYMOUS.csv"})
+            md=(path/"D_PAIRED_POLICY_COMPARISON.md").read_text()
+            self.assertIn("PRIORITIZE_LOAD_READY_WITH_FREE_GROUP",md)
+            self.assertIn("P90",md)
+            self.assertIn("Trabajo reasignado",md)
+            with (path/"D_ORDER_OUTCOMES_PSEUDONYMOUS.csv").open(
+                    encoding="utf-8",newline="") as inp:
+                rows=list(csv.DictReader(inp))
+            self.assertEqual(len(rows),12)
+            with self.assertRaisesRegex(ArenaError,"OUTPUT_ALREADY_EXISTS"):
+                d.export(report,path)
+
+    def test_private_q25_q75_adapter_requires_authorization_before_any_reads(self):
+        with self.assertRaisesRegex(ArenaError,
+               "Q25_Q75_REQUIRES_EXPLICIT_EXPERIMENTAL_AUTHORIZATION"):
+            d.compare_existing_construction_q25_q75(
+                "/nonexistent/private/views",dossier())
+
+    def test_q25_q75_are_only_admitted_with_matching_source_labels(self):
+        x=fixture()
+        for scope,load in (
+                ("CONSTRUCTION_SYNTHETIC_Q25","HIGHER_PAID_INPUT_Q75"),
+                ("CONSTRUCTION_SYNTHETIC_Q75","LOWER_PAID_INPUT_Q25")):
+            with self.assertRaisesRegex(ArenaError,"LABEL_MISMATCH"):
+                d.compare(x["positions"],x["lines"],dossier(),
+                          x["horizon_min"],source_label=scope,
+                          load_label=load)
+
+    def test_no_invalid_policy_or_silent_dossier_policy_mutation(self):
+        x=fixture()
+        conf=dossier()
+        with self.assertRaisesRegex(ArenaError,"UNDECLARED_D_DISPATCH_POLICY"):
+            b._engine(x["positions"],x["lines"],conf,x["horizon_min"],
+                      dispatch_policy="HIRE_SUPPORT")
+        conf["dispatch_policy"]="PRIORITIZE_MILK_READY"
+        with self.assertRaisesRegex(ArenaError,
+               "UNDECLARED_POLICY_OR_ASSUMED_STATE"):
+            d.compare(x["positions"],x["lines"],conf,x["horizon_min"])
+
+    def test_c_diagnostic_labels_each_actual_policy_and_retains_toy_guard(self):
+        x=fixture()
+        conf=dossier()
+        policy="PRIORITIZE_LOAD_READY_WITH_FREE_GROUP"
+        result,trace,_=b._engine(
+            x["positions"],x["lines"],conf,x["horizon_min"],
+            dispatch_policy=policy)
+        diag=c.diagnose_trace(result,trace,conf,
+                              fixture_label="SOFTWARE_TOY_D_FIXED",
+                              dispatch_policy=policy)
+        self.assertEqual(diag["dispatch_policy"],policy)
+        self.assertTrue(diag["limits"]["not_an_empirical_bottleneck_measure"])
+        with self.assertRaisesRegex(ArenaError,"REQUIRES_EXPLICIT_TOY_SCOPE"):
+            c.diagnose_trace(result,trace,conf,
+                             fixture_label="PRODUCTION_SHOP_DATA",
+                             dispatch_policy=policy)
+
+
+if __name__=="__main__":
+    unittest.main()
