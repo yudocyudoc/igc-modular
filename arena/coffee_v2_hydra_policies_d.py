@@ -13,7 +13,9 @@ from __future__ import annotations
 import argparse
 from collections import Counter, defaultdict
 import csv
+import os
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from .common import ArenaError, digest, read_json, write_json
 from . import coffee_v2_hydra_physical_b as b
@@ -26,6 +28,8 @@ CASE_SET_SCHEMA="arena.coffee.p46.q25-q75-paired-comparisons/1"
 POLICIES=tuple(b.D_DISPATCH_STAGE)
 ALLOWED_CONSTRUCTION=("LOWER_PAID_INPUT_Q25","HIGHER_PAID_INPUT_Q75")
 EPS=1e-8
+_VERIFIED_SELECTION_CAPABILITY=object()
+SOURCE_RUN_ID=43684660729
 
 
 def require(ok,code):
@@ -59,7 +63,9 @@ def actor_work(trace,dossier):
     result={name:{"completed_manual_tasks":0,
                   "busy_manual_minutes":0.0,
                   "stage_counts":{s:0 for s in b.STAGES if
-                                  s!="extract_auto"}}
+                                  s!="extract_auto"},
+                  "stage_busy_manual_min":{s:0.0 for s in b.STAGES if
+                                           s!="extract_auto"}}
             for name in dossier["operators"]}
     for event in trace:
         if event["event"]!="start" or event["actor"] is None:
@@ -70,8 +76,11 @@ def actor_work(trace,dossier):
         record["completed_manual_tasks"]+=1
         record["busy_manual_minutes"]+=duration[event["stage"]]
         record["stage_counts"][event["stage"]]+=1
+        record["stage_busy_manual_min"][event["stage"]]+=duration[event["stage"]]
     for rec in result.values():
         rec["busy_manual_minutes"]=round9(rec["busy_manual_minutes"])
+        rec["stage_busy_manual_min"]={
+            k:round9(v) for k,v in rec["stage_busy_manual_min"].items()}
     return result
 
 
@@ -85,7 +94,9 @@ def _public_task(key,pseudonym):
 
 def compare(positions,lines,dossier,horizon, *,
             source_label="SOFTWARE_TOY_D_FIXED",
-            load_label="SOFTWARE_TOY_FIXED"):
+            load_label="SOFTWARE_TOY_FIXED",
+            _verified_selection_capability=None,
+            _source_provenance=None):
     """Four deterministic paired runs; no policy is declared a real winner."""
     b.validate(dossier)
     require(type(positions) is list and type(lines) is list,
@@ -100,6 +111,18 @@ def compare(positions,lines,dossier,horizon, *,
         require(load_label==ALLOWED_CONSTRUCTION[1],"Q75_LABEL_MISMATCH")
     else:
         require(load_label=="SOFTWARE_TOY_FIXED","TOY_LABEL_MISMATCH")
+    construction=source_label!="SOFTWARE_TOY_D_FIXED"
+    if construction:
+        require(_verified_selection_capability is
+                _VERIFIED_SELECTION_CAPABILITY and
+                isinstance(_source_provenance,dict) and
+                _source_provenance.get("selected_load_label")==load_label and
+                _source_provenance.get("verified_adapter")==
+                    "P11_P39_CONSTRUCTION_SELECT_CASE_DAY",
+                "CONSTRUCTION_REQUIRES_VERIFIED_SELECTION")
+    else:
+        require(_verified_selection_capability is None and
+                _source_provenance is None,"TOY_CANNOT_IMPERSONATE_CONSTRUCTION")
     paid,refunds,beverages=b.historical.paid_gate(
         positions,lines,horizon)
     paid_ids=sorted(paid,key=lambda oid:(paid[oid]["time"],
@@ -120,7 +143,9 @@ def compare(positions,lines,dossier,horizon, *,
                 "MASS_BALANCE_DIFFERS_BETWEEN_POLICIES")
         diagnostic=c.diagnose_trace(
             result,trace,dossier,fixture_label=source_label,
-            dispatch_policy=policy)
+            dispatch_policy=policy,
+            _construction_capability=(
+                c._VERIFIED_CONSTRUCTION_ADAPTER if construction else None))
         require(diagnostic["dispatch_policy"]==policy,
                 "DIAGNOSTIC_POLICY_MISMATCH")
         snapshots[policy]=(result,trace,completed,diagnostic)
@@ -200,6 +225,10 @@ def compare(positions,lines,dossier,horizon, *,
                     s:work[actor]["stage_counts"][s]-
                     base_actors[actor]["stage_counts"][s]
                     for s in work[actor]["stage_counts"]},
+                "stage_busy_manual_min_change":{
+                    s:round9(work[actor]["stage_busy_manual_min"][s]-
+                             base_actors[actor]["stage_busy_manual_min"][s])
+                    for s in work[actor]["stage_busy_manual_min"]},
             } for actor in work}
         override_rows=[]
         for event in overrides:
@@ -226,12 +255,58 @@ def compare(positions,lines,dossier,horizon, *,
         has_service_delta=(handoff_advanced>0 or handoff_later>0 or
             result["modeled_handoffs_before_cut"]!=
             base_result["modeled_handoffs_before_cut"])
-        classification=(
-            "ASSUMED_BASE_NOT_REAL_SHOP_DISPATCH" if policy==POLICIES[0]
-            else "NO_RULE_INTERVENTION" if not overrides
-            else "RULE_INTERVENED_NO_SERVICE_DELTA_DEMONSTRATED"
-                 if not has_service_delta
-            else "MODEL_TRADEOFF_REQUIRES_OPERATIONAL_TEST")
+        dp90=(p90-bp90 if p90 is not None and bp90 is not None
+               else None)
+        before_delta=(result["modeled_handoffs_before_cut"]-
+                      base_result["modeled_handoffs_before_cut"])
+        if policy==POLICIES[0]:
+            classification="ASSUMED_BASE_NOT_REAL_SHOP_DISPATCH"
+        elif not overrides:
+            classification="NO_RULE_INTERVENTION"
+        elif not has_service_delta and (dp90 is None or abs(dp90)<=EPS):
+            classification="RULE_INTERVENED_NO_SERVICE_DELTA_DEMONSTRATED"
+        elif dp90 is None:
+            classification="SERVICE_EFFECT_UNCLASSIFIED_MISSING_P90"
+        elif dp90>EPS:
+            classification=("MODEL_P90_WORSE_WITH_MIXED_ORDER_EFFECTS"
+                            if handoff_advanced else
+                            "MODEL_P90_WORSE_NO_ORDER_ADVANCED")
+        elif dp90<-EPS:
+            classification=("MODEL_P90_BETTER_WITH_LATE_ORDERS"
+                            if handoff_later else
+                            "MODEL_P90_BETTER_NO_LATE_ORDERS")
+        else:
+            classification=("MODEL_P90_TIE_WITH_ORDER_TRADEOFF"
+                            if handoff_advanced or handoff_later else
+                            "MODEL_P90_TIE_WITH_CUT_DIFFERENCE"
+                            if before_delta else
+                            "RULE_INTERVENED_NO_SERVICE_DELTA_DEMONSTRATED")
+        decision_note=(
+            "No priority intervention; no service effect attributable "
+            "to this rule in this input." if not overrides else
+            "P90 worsens and no order advances; do not call this a gain."
+            if classification=="MODEL_P90_WORSE_NO_ORDER_ADVANCED" else
+            "P90 improves but some orders finish later; report losers."
+            if classification=="MODEL_P90_BETTER_WITH_LATE_ORDERS" else
+            "P90 ties despite order-level changes; aggregate tie is not "
+            "operational equivalence."
+            if classification=="MODEL_P90_TIE_WITH_ORDER_TRADEOFF" else
+            "Conditional scenario result, not a measured shop outcome.")
+        start_by_stage={
+            stage:{
+                "earlier_tasks":sum(x["direction"]=="EARLIER" and
+                                    x["stage"]==stage for x in affected_tasks),
+                "later_tasks":sum(x["direction"]=="LATER" and
+                                  x["stage"]==stage for x in affected_tasks),
+                "earlier_start_minutes":round9(sum(
+                    -x["start_delta_min_positive_is_later"]
+                    for x in affected_tasks if x["stage"]==stage and
+                    x["direction"]=="EARLIER")),
+                "later_start_minutes":round9(sum(
+                    x["start_delta_min_positive_is_later"]
+                    for x in affected_tasks if x["stage"]==stage and
+                    x["direction"]=="LATER")),
+            } for stage in b.STAGES}
         policies.append({
             "policy":policy,
             "one_rule_changed":(
@@ -280,13 +355,19 @@ def compare(positions,lines,dossier,horizon, *,
                         "signal_task_min_MANUAL_BLOCKED_WITH_GROUP_FREE"],
             },
             "classification":classification,
+            "decision_note":decision_note,
+            "start_shift_by_stage":start_by_stage,
             "not_a_real_intervention":True,
         })
     require(len(policies)==4 and len(order_csv)==4*len(paid),
             "EXACTLY_FOUR_PAIRED_SCENARIOS")
     report={
         "schema":SCHEMA,
-        "source":"EXISTING_SYNTHETIC_INPUT_NOT_REAL_CAFE",
+        "source":("VERIFIED_EXISTING_CONSTRUCTION_SYNTHETIC_VIEWS" if
+                  construction else "SOFTWARE_TOY_ONLY_NOT_REAL_CAFE"),
+        "source_provenance":_source_provenance if construction else {
+            "verified_adapter":"FIXED_SOFTWARE_TOY_NOT_CONSTRUCTION",
+            "selected_load_label":load_label},
         "load_label":load_label,
         "source_label":source_label,
         "source_horizon_min":horizon,
@@ -307,7 +388,9 @@ def compare(positions,lines,dossier,horizon, *,
             "not_a_new_synthetic_world":True,
             "no_video_P_O_S_join":True,
             "not_robust_beyond_examined_scenarios":True,
-            "no_OMC_provider_R2_or_scientific_campaign":True,
+            "simulated_policy_comparisons_only":True,
+            "no_new_synthetic_corpus_or_OMC_or_provider":True,
+            "R2_reads_are_recorded_by_execution_receipt_if_used":True,
         },
     }
     return report
