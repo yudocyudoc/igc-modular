@@ -717,10 +717,14 @@ ORDER_FIELDS=("paid_case_label","paid_time_min","beverages","policy",
               "outcome","changed_stage_count")
 
 
-def export(report,output_dir):
+def export(report,output_dir, *, execution_receipt=None):
+    require(isinstance(report,dict),"INVALID_EXPORT_REPORT")
+    if report.get("schema")==CASE_SET_SCHEMA:
+        return _export_case_set(
+            report,output_dir,execution_receipt=execution_receipt)
     target=Path(output_dir)
     require(not target.exists(),"OUTPUT_ALREADY_EXISTS")
-    require(report["schema"]==SCHEMA,"WRONG_REPORT_FOR_EXPORT")
+    require(report.get("schema")==SCHEMA,"WRONG_REPORT_FOR_EXPORT")
     target.mkdir(parents=True)
     write_json(target/"D_PAIRED_POLICY_COMPARISON.json",
                report,exclusive=True)
@@ -733,8 +737,11 @@ def export(report,output_dir):
     md=[
         "# Entrega D — comparación condicionada de prioridades",
         "",
-        "**Fuente:** "+report["load_label"]+" (sintética de construcción, "
-        "nunca observación de pedidos reales).",
+        "**Fuente:** "+report["load_label"]+" ("+(
+            "microfixture de software ficticio" if
+            report["source_label"]=="SOFTWARE_TOY_D_FIXED" else
+            "carga sintética de construcción verificada por P11")+
+            "; nunca pedidos observados de la cafetería).",
         "**Dossier:** "+report["physical_dossier_sha256"],
         "**Identidad de entradas:** "+report["scenario_input_sha256"],
         "**Horizonte de corte de la fuente:** "+
@@ -775,8 +782,18 @@ def export(report,output_dir):
             "**Espera por recursos (C):** "+
                 str(row["waits_from_C_diagnosis"][
                     "total_resource_wait_task_min"])+" min-tarea",
-            "**Trabajo reasignado entre B01/B02:** ver JSON y CSV. "
-                "Los tiempos de ocupación no representan contratación.",
+            "**Lectura direccional:** "+row["decision_note"],
+            "**Inicios cambiados por etapa:** "+
+                ", ".join(stage+":"+
+                    str(summary["earlier_tasks"])+"/"+
+                    str(summary["later_tasks"]) for stage,summary in
+                    row["start_shift_by_stage"].items()),
+            "**Minutos por operador y etapa:** "+
+                ", ".join(actor+"="+
+                    ", ".join(stage+":"+str(minutes) for stage,minutes in
+                    record["stage_busy_manual_min"].items()) for actor,record
+                    in row["work_assigned_by_actor"].items())+
+                " (min, recursos existentes; deltas en JSON).",
         ])
     md.extend([
         "",
@@ -797,22 +814,123 @@ def export(report,output_dir):
         "\n".join(md)+"\n",encoding="utf-8")
 
 
+
+def _verified_github_manual_execution():
+    from . import coffee_e2e as e2e
+    require(os.environ.get("GITHUB_EVENT_NAME")=="workflow_dispatch",
+            "ONLY_EXPLICIT_WORKFLOW_DISPATCH")
+    require(os.environ.get("GITHUB_WORKFLOW_REF","").endswith(
+            "/.github/workflows/coffee-hydra-p46-d-manual.yml@refs/heads/main"),
+            "WRONG_MANUAL_WORKFLOW_OR_NONMAIN_REF")
+    run_id,sha=e2e.execution_identity()
+    return run_id,sha
+
+
 def main(argv=None):
     parser=argparse.ArgumentParser()
-    parser.add_argument("--toy-input",required=True)
-    parser.add_argument("--dossier",required=True)
+    parser.add_argument("--mode",choices=("toy","fetch-private-views",
+                                           "construction"),default="toy")
+    parser.add_argument("--toy-input")
+    parser.add_argument("--dossier")
     parser.add_argument("--out",required=True)
+    parser.add_argument("--source-receipt")
+    parser.add_argument("--construction-views")
+    parser.add_argument("--source-run-id",type=int)
+    parser.add_argument("--authorize-eight-scenarios",action="store_true")
     args=parser.parse_args(argv)
-    fixture=read_json(args.toy_input)
-    require(fixture.get("schema")==c.FIXTURE_SCHEMA and
-            fixture.get("scope")=="SOFTWARE_TOY_ONLY",
-            "CLI_ONLY_PREEXISTING_SOFTWARE_TOY")
-    report=compare(
-        fixture["positions"],fixture["lines"],
-        read_json(args.dossier),fixture["horizon_min"])
-    export(report,args.out)
-    print("P46_D_SOFTWARE_FIXTURE",len(report["policies"]),
-          "NEW_SCIENTIFIC_RUNS",0)
+    if args.mode=="toy":
+        require(args.toy_input and args.dossier and
+                not args.construction_views and
+                not args.authorize_eight_scenarios and
+                args.source_run_id is None and
+                args.source_receipt is None,
+                "TOY_ARGUMENTS_ONLY")
+        fixture=read_json(args.toy_input)
+        require(fixture.get("schema")==c.FIXTURE_SCHEMA and
+                fixture.get("scope")=="SOFTWARE_TOY_ONLY",
+                "CLI_ONLY_PREEXISTING_SOFTWARE_TOY")
+        report=compare(fixture["positions"],fixture["lines"],
+                       read_json(args.dossier),fixture["horizon_min"])
+        export(report,args.out)
+        print("P46_D_SOFTWARE_FIXTURE",len(report["policies"]),
+              "NEW_SCIENTIFIC_RUNS",0)
+        return
+    require(args.authorize_eight_scenarios and
+            args.source_run_id==SOURCE_RUN_ID and
+            args.source_receipt and not args.toy_input,
+            "PRIVATE_CONSTRUCTION_REQUIRES_EXACT_AUTHORIZATION")
+    run_id,sha=_verified_github_manual_execution()
+    receipt_path=Path(args.source_receipt)
+    if args.mode=="fetch-private-views":
+        require(not receipt_path.exists() and
+                not Path(args.out).exists() and
+                not args.dossier and not args.construction_views,
+                "PRIVATE_SOURCE_RECEIPT_OUTPUTS_ALREADY_EXIST")
+        from . import coffee_s5_availability as s5
+        initial={
+            "status":"R2_READ_ATTEMPT_STARTED_OUTCOME_UNKNOWN",
+            "github_run_id":run_id,
+            "github_commit_sha":sha,
+            "read_only_source_run_id":SOURCE_RUN_ID,
+            "R2_read_attempts":"UNKNOWN_IF_PARTIAL_FAILURE",
+            "R2_billing_cost":"UNKNOWN_NO_PROVIDER_RECEIPT",
+            "new_solver_and_provider_attempts":0,
+            "no_new_corpus":True,
+        }
+        write_json(receipt_path,initial,exclusive=True)
+        # If an R2 GET fails, the attempt receipt remains and CI fails;
+        # never assert a zero cost or assume all view objects were retrieved.
+        source=s5.fetch_existing_construction_views(args.out)
+        require(source["read_only_source_run_id"]==SOURCE_RUN_ID,
+                "SOURCE_RUN_MISMATCH")
+        from . import coffee_e2e as e2e
+        final=dict(initial,**source)
+        final.update({
+            "github_run_id":run_id,
+            "github_commit_sha":sha,
+            "R2_read_attempts":len(e2e.VIEW_FILES),
+            "R2_views_successfully_retrieved":len(e2e.VIEW_FILES),
+            "R2_billing_cost":"UNKNOWN_NO_PROVIDER_RECEIPT",
+        })
+        write_json(receipt_path,final)
+        print("P46_D_SOURCE_VERIFIED",SOURCE_RUN_ID,
+              "VIEW_GET_ATTEMPTS",len(e2e.VIEW_FILES),
+              "R2_BILLING_COST_UNKNOWN",True)
+        return
+    require(args.mode=="construction" and args.dossier and
+            args.construction_views and
+            Path(args.construction_views).is_dir() and
+            not Path(args.out).exists() and
+            Path(args.source_receipt).is_file(),
+            "CONSTRUCTION_ARGS_OR_MISSING_SOURCE_RECEIPT")
+    receipt=read_json(args.source_receipt)
+    require(receipt.get("status")==
+                "EXISTING_CONSTRUCTION_VIEWS_VERIFIED_NO_NEW_CORPUS" and
+            receipt.get("read_only_source_run_id")==SOURCE_RUN_ID and
+            receipt.get("github_run_id")==run_id and
+            receipt.get("github_commit_sha")==sha,
+            "PRIVATE_VIEW_RECEIPT_NOT_FROM_THIS_RUN")
+    report=compare_existing_construction_q25_q75(
+        args.construction_views,
+        read_json(args.dossier),dispatch_authorized=True,
+        source_receipt=receipt)
+    execution_receipt={
+        "status":"GITHUB_MANUAL_EIGHT_ARM_DISPATCH",
+        "github_run_id":run_id,
+        "github_commit_sha":sha,
+        "source_view_run_id":SOURCE_RUN_ID,
+        "R2_read_attempts":receipt["R2_read_attempts"],
+        "R2_views_successfully_retrieved":receipt.get(
+            "R2_views_successfully_retrieved"),
+        "R2_billing_cost":"UNKNOWN_NO_PROVIDER_RECEIPT",
+        "new_solver_and_provider_attempts":0,
+        "new_synthetic_worlds":0,
+        "new_corpus":False,
+    }
+    export(report,args.out,execution_receipt=execution_receipt)
+    print("P46_D_VERIFIED_CONSTRUCTION",report["scenario_count"],
+          "SOURCE_RUN_ID",SOURCE_RUN_ID,"GITHUB_RUN_ID",run_id,
+          "R2_BILLING_COST_UNKNOWN",True)
 
 
 if __name__=="__main__":
