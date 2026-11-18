@@ -10,6 +10,7 @@ import csv
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 import unittest
 
 from arena.common import ArenaError, read_json
@@ -81,6 +82,65 @@ class DPolicies(unittest.TestCase):
                 "D_Q25_Q75_DECISION.md").read_text())
             with self.assertRaisesRegex(ArenaError,"OUTPUT_ALREADY_EXISTS"):
                 d.export(comparison,target)
+
+    def test_astra_manual_cli_selection_to_export_and_run_receipt_offline(self):
+        # Exercise the *manual construction CLI* with P11-validated fake
+        # views, using simulated Actions metadata; NEVER connect to R2.
+        with TemporaryDirectory() as tmp:
+            view,_=make_view(tmp)
+            out=Path(tmp)/"manual-eight"
+            receipt=Path(tmp)/"fake-source-receipt.json"
+            sha="a"*40
+            receipt.write_text(json.dumps({
+                "status":"EXISTING_CONSTRUCTION_VIEWS_VERIFIED_NO_NEW_CORPUS",
+                "read_only_source_run_id":d.SOURCE_RUN_ID,
+                "github_run_id":777333,
+                "github_commit_sha":sha,
+                "R2_read_attempts":8,
+                "R2_views_successfully_retrieved":8,
+                "R2_billing_cost":"UNKNOWN_NO_PROVIDER_RECEIPT",
+            }))
+            env={
+                "GITHUB_REPOSITORY":"yudocyudoc/igc-modular",
+                "GITHUB_REF":"refs/heads/main",
+                "GITHUB_RUN_ATTEMPT":"1",
+                "GITHUB_RUN_ID":"777333",
+                "GITHUB_SHA":sha,
+                "GITHUB_EVENT_NAME":"workflow_dispatch",
+                "GITHUB_WORKFLOW_REF":
+                    "yudocyudoc/igc-modular/.github/workflows/"
+                    "coffee-hydra-p46-d-manual.yml@refs/heads/main",
+            }
+            command=[
+                "--mode","construction",
+                "--source-run-id",str(d.SOURCE_RUN_ID),
+                "--authorize-eight-scenarios",
+                "--source-receipt",str(receipt),
+                "--construction-views",str(view),
+                "--dossier",str(DOSSIER),
+                "--out",str(out),
+            ]
+            with patch.dict("os.environ",env,clear=False):
+                d.main(command)
+            public=read_json(out/"D_Q25_Q75_AGGREGATE.json")
+            self.assertEqual(public["scenario_count"],8)
+            self.assertEqual(public["execution_and_consumption"][
+                "github_run_id"],777333)
+            self.assertEqual(public["execution_and_consumption"][
+                "github_commit_sha"],sha)
+            self.assertEqual(public["execution_and_consumption"][
+                "source_view_run_id"],d.SOURCE_RUN_ID)
+            self.assertEqual(public["execution_and_consumption"][
+                "R2_billing_cost"],"UNKNOWN_NO_PROVIDER_RECEIPT")
+            self.assertEqual(len(list(csv.DictReader(
+                (out/"D_Q25_Q75_PAIRED.csv").open(
+                    encoding="utf-8",newline="")))),8)
+            with patch.dict("os.environ",dict(env,GITHUB_REF=
+                                "refs/heads/feat/unsafe"),clear=False):
+                with self.assertRaisesRegex(ArenaError,
+                                           "MAIN_FIRST_ATTEMPT_REQUIRED"):
+                    d.main([*command[:-2],"--out",str(
+                        Path(tmp)/"blocked")])
 
     def test_astra_construction_label_requires_p11_verified_selection(self):
         x=fixture()
