@@ -526,9 +526,9 @@ def _engine(positions, lines, d, horizon):
                         for actor in d["operators"].values():
                             if stage not in actor["skills"]:
                                 continue
-                            for start,end in actor["availability_windows_min"]:
-                                last_start=end-duration
-                                for threshold in (start,last_start,end):
+                            for window_start,window_end in actor["availability_windows_min"]:
+                                last_start=window_end-duration
+                                for threshold in (window_start,last_start,window_end):
                                     if time+1e-10<threshold<next_time-1e-10:
                                         cuts.add(threshold)
                     boundaries=sorted(cuts)
