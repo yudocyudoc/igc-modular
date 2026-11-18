@@ -16,6 +16,14 @@
 
 **Aceptación requerida tras la corrección:** Astra debe verificar ambos caminos de D: microfixture de tres pagos y microfixture de vistas CONSTRUCTION de `make_view`, cotejando exportación del conjunto, recibos de run/commit/consumo, rechazo de etiquetas/cross-policy incorrectas, y resultados direccionales del P90. El conjunto privado queda sin ejecutar. Dictamen solicitado `D_ACCEPT / D_FIX` sobre el HEAD actualizado.
 
+## Segunda retro de Astra — D_FIX en 93ecb906, dos correcciones localizadas
+
+**D4-custodia:** El workflow manual `.github/workflows/coffee-hydra-p46-d-manual.yml` declara ahora **`environment: arena-custodian`** directamente en el job de ocho escenarios, igual que el precedente P39. Es el entorno donde el repositorio documenta las credenciales S3 de R2; las variables secretas siguen apareciendo únicamente en el paso de lectura, no en el paso separado de comparación. Existe una prueba estática de YAML que compara ese requisito con el precedente sin contactar R2. No implica que se hayan leído o comprobado los valores de los secretos ni la disponibilidad actual de las vistas.
+
+**D4-unidades y cargas:** Los cambios de comienzo de tareas son totales **globales por etapa, una vez por tarea**, incluyendo extracción automática sin operador. El nuevo archivo **`D_Q25_Q75_STAGE_SHIFTS.csv`** tiene una sola fila por carga×política×etapa y contiene los conteos y minutos globales adelantados/demorados. **`D_Q25_Q75_OPERATOR_STAGE.csv`** sigue mostrando exclusivamente trabajo realmente asignado a cada operador: conteos de tareas manuales, minutos ocupados y delta de minutos por etapa frente a FCFS; no se duplican allí los cambios globales de inicio. La agregación pública conserva ahora `paid_orders` y `synthetic_beverages` por carga y política, también en la tabla pareada y Markdown. El caso específico de Astra —**un pedido, tres bebidas, una preparación demorada**— está fijado como regresión. Las pruebas del conjunto de ocho brazos validan que cada fila de la tabla global coincide con el JSON y que no existen columnas de inicios globales en el CSV por operador.
+
+**Dictamen pendiente:** solicitar a Astra `D_ACCEPT / D_FIX` sobre el nuevo HEAD; el CI de PR solo ejecuta pruebas de software con vistas ficticias. **No se ejecutó** el workflow manual, ningún GET R2, ni las ocho comparaciones privadas.
+
 ## Reglas de despacho: exactamente cuatro brazos
 
 El motor conserva **dos operadores B01/B02**, el número de grupos habilitados del dossier (tres en el nominal), puestos, vapor, pase, aptitudes, calendario asumido, duraciones, recetas, horizonte de la fuente y precedencias. Cada tarea ocupa su operador, recurso y grupo con la misma atomicidad y liberación de B.
