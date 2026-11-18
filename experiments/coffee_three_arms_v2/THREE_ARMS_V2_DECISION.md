@@ -71,15 +71,43 @@ equivalen a habilitar un grupo físico o disputar trabajo manual.
 - FCFS H1 señal `1.4952` min-tarea; H2 señal `2.1114` min-tarea. Son esperas de tareas, **no tiempo de reloj sumable**.
 - H3 es estado representado en el motor B; el agregado publicado no permite atribuir un episodio real ni cuantificar su duración en barra.
 
+## Alcance exacto: modelos archivados, no productores completos
+
+Esta reconstrucción **NO ejecutó de nuevo D/M/B** ni les formuló H1/H2/H3.
+El veredicto de la tabla habla exclusivamente de la representación nativa archivada:
+NO codificar una variable no demuestra incapacidad del método para construirla.
+
+**D B0:** gramática determinista `generic-conservative-chain-search/0.1`,
+seis cadenas de 1–3 stocks con/sin pérdida y parámetros supuestos.
+La ruta de cafetería invocó primitivas de topología, no una nueva búsqueda
+ajustada a observaciones de tareas. Su MAE sintético de retiros acumulados
+no identifica qué recurso originó una espera.
+
+**M B0:** seis grafos enumerados del registro específico de cafetería
+con cuatro clases distintas: accepted-source, bounded-queue, delivery-counter, first-order-report-filter.
+Las alternativas varían tránsito y filtrado de reporte, no operadores
+ni reservas de grupos físicos. **M P08:** una sola topología
+`AcceptedSource → BoundedQueue preparación → BoundedQueue espresso →
+BoundedQueue despacho → DeliveryCounter` en seis casos de parámetros.
+No se probaron otras moléculas, catálogos alternativos o archivos Vensim .mdl.
+
+**Buffalo:** B0→R1 es una revisión real y su modelo sellado,
+pero de una pregunta sobre retiros acumulados. El nativo R1 no codifica
+operadores ni grupos identificados. **PR1 no hizo un nuevo POST Cloudflare**
+ni probó si Buffalo puede generar ese detalle bajo otra consigna.
+
 ## Capacidad de distinguir H1 / H2 / H3
 
 **Unidad de análisis:** una oportunidad de carga sobre grupo concreto, no el contador acumulado de pedidos.
+Los códigos `NOT_ENCODED_IN_ARCHIVED_NATIVE` describen el modelo
+publicado; `full_method_H123_capacity_tested=false` impide extrapolarlos
+a la capacidad de construcción del método completo.
 
 | Método (versión) | H1 | H2 | H3 | ¿Se le preguntó históricamente? |
 |---|---|---|---|---|
-| gramática D (original B0 6-candidate stock-flow family) | NOT_DISTINGUISHED | NOT_DISTINGUISHED | NOT_DISTINGUISHED | NO |
-| moléculas M (Short E1 original B0) | NOT_DISTINGUISHED | NOT_DISTINGUISHED | NOT_DISTINGUISHED | NO |
-| Buffalo (original B0→R1 currentModel) | NOT_DISTINGUISHED | NOT_DISTINGUISHED | NOT_DISTINGUISHED | NO |
+| gramática D (original B0 6-candidate stock-flow family) | NOT_ENCODED_IN_ARCHIVED_NATIVE | NOT_ENCODED_IN_ARCHIVED_NATIVE | NOT_ENCODED_IN_ARCHIVED_NATIVE | NO |
+| moléculas M (Short E1 original B0) | NOT_ENCODED_IN_ARCHIVED_NATIVE | NOT_ENCODED_IN_ARCHIVED_NATIVE | NOT_ENCODED_IN_ARCHIVED_NATIVE | NO |
+| Buffalo (original B0→R1 currentModel) | NOT_ENCODED_IN_ARCHIVED_NATIVE | NOT_ENCODED_IN_ARCHIVED_NATIVE | NOT_ENCODED_IN_ARCHIVED_NATIVE | NO |
 | gramática D (P08 3-stage capacity extension) | AGGREGATE_ESPRESSO_PROXY_NOT_GROUP | NO_SHARED_OPERATOR | NO_RETAINED_GROUP | NO |
 | moléculas M (P08 versioned BoundedQueue espresso role) | AGGREGATE_ESPRESSO_PROXY_NOT_GROUP | NO_SHARED_OPERATOR | NO_RETAINED_GROUP | NO |
 | referencia Hydra (B physical + C diagnostics + policies D) | MODEL_SIGNAL_EXTRACTION_BUSY | MODEL_SIGNAL_MANUAL_BLOCK | STATE_RETAINED_AFTER_EXTRACTION_NO_OBSERVED_LOCAL_DURATION | PARTIALLY |
