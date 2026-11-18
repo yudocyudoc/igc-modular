@@ -1,0 +1,81 @@
+name: Coffee P46 D — authorized construction Q25/Q75 (8 paired policies)
+
+on:
+  workflow_dispatch:
+    inputs:
+      authorize_eight_scenarios:
+        description: "I authorize exactly Q25 and Q75 construction views, four dispatch policies each; no new corpus, solver or provider"
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coffee-p46-d-one-construction-dispatch
+  cancel-in-progress: false
+
+jobs:
+  manual-eight-policy-comparisons:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Main-only, first-attempt, operator authorization gate
+        env:
+          AUTHORIZE_EIGHT: ${{ inputs.authorize_eight_scenarios }}
+        run: |
+          test "$AUTHORIZE_EIGHT" = "true"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_RUN_ATTEMPT" = "1"
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+      - name: Fetch only existing private CONSTRUCTION views from pinned source run
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CT03_R2_BUCKET: ${{ vars.CT03_R2_BUCKET || 'igc-ct03-private-custody' }}
+          CT03_R2_ACCESS_KEY_ID: ${{ secrets.CT03_R2_ACCESS_KEY_ID }}
+          CT03_R2_SECRET_ACCESS_KEY: ${{ secrets.CT03_R2_SECRET_ACCESS_KEY }}
+        run: |
+          python -m arena.coffee_v2_hydra_policies_d \
+            --mode fetch-private-views \
+            --source-run-id 43684660729 \
+            --authorize-eight-scenarios \
+            --source-receipt "$RUNNER_TEMP/p46-d-source-receipt.json" \
+            --out "$RUNNER_TEMP/p46-d-private-views"
+      - name: Compare 2 verified construction loads x 4 policies without R2 credentials
+        run: |
+          python -m arena.coffee_v2_hydra_policies_d \
+            --mode construction \
+            --source-run-id 43684660729 \
+            --authorize-eight-scenarios \
+            --source-receipt "$RUNNER_TEMP/p46-d-source-receipt.json" \
+            --construction-views "$RUNNER_TEMP/p46-d-private-views" \
+            --dossier experiments/coffee_v2/HYDRA_TWO_OPERATORS_PHYSICAL_B_ASSUMPTIONS.json \
+            --out "$RUNNER_TEMP/p46-d-public"
+          cat "$RUNNER_TEMP/p46-d-public/D_Q25_Q75_DECISION.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish only aggregate Q25/Q75 policy artifact, no private order rows
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-p46-d-verified-q25-q75-${{ github.run_id }}
+          path: ${{ runner.temp }}/p46-d-public/
+          retention-days: 90
+          if-no-files-found: error
+      - name: Publish run, source and accounting receipt even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-p46-d-read-attempt-${{ github.run_id }}
+          path: ${{ runner.temp }}/p46-d-source-receipt.json
+          retention-days: 90
+          if-no-files-found: warn
+      - name: Delete private source views and temporary outputs
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/p46-d-private-views" "$RUNNER_TEMP/p46-d-public" "$RUNNER_TEMP/p46-d-source-receipt.json"
+
+# This manual workflow is unavailable from PR until merged on main.
+# Exactly the source R2 run 43684660729 is read; no OMC/provider dispatch.
