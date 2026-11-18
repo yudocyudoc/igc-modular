@@ -1,0 +1,39 @@
+name: Coffee P47 E1 — Q75 extraction sensitivity (offline fixture only)
+
+on:
+  pull_request:
+    paths:
+      - "arena/coffee_v2_hydra_sensitivity_e1.py"
+      - "tests/test_coffee_v2_hydra_sensitivity_e1.py"
+      - ".github/workflows/coffee-hydra-p47-e1.yml"
+      - ".github/workflows/coffee-hydra-p47-e1-manual.yml"
+      - "COFFEE_P47_E1_EXTRACTION_SENSITIVITY.md"
+  push:
+    branches: [main]
+    paths:
+      - "arena/coffee_v2_hydra_sensitivity_e1.py"
+      - "tests/test_coffee_v2_hydra_sensitivity_e1.py"
+      - ".github/workflows/coffee-hydra-p47-e1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  e1-software-fixtures:
+    name: E1 only 2 new 30s arms; provenance and no real data
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: E1 offline regressions with fake P11 views
+        run: |
+          python -m unittest discover -s tests -p test_coffee_v2_hydra_sensitivity_e1.py -v
+          echo "P47_E1_SOFTWARE_FIXTURE_ONLY NEW_SCIENTIFIC_RUNS 0 R2_GETS 0"
+      - name: Recheck accepted physical B and policy D regression contracts
+        run: |
+          python -m unittest discover -s tests -p test_coffee_v2_hydra_physical_b.py -v
+          python -m unittest discover -s tests -p test_coffee_v2_hydra_causes_c.py -v
+          python -m unittest discover -s tests -p test_coffee_v2_hydra_policies_d.py -v
