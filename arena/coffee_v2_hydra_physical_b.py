@@ -52,6 +52,17 @@ DURATION_KEYS={
 PRECEDENCE=("prepare","load","extract_auto","remove","clean","milk")
 GROUP_STATES=("FREE","LOADING","EXTRACTING","AWAITING_REMOVAL",
               "REMOVING","AWAITING_CLEAN","CLEANING")
+# Stage becomes eligible AFTER its declared predecessor. Time before
+# eligibility is not a resource wait, and is never added to wait metrics.
+STAGE_PREDECESSOR={
+    "prepare":"PAID_ORDER_ARRIVAL",
+    "load":"PREPARE_FINISHED",
+    "extract_auto":"LOAD_FINISHED",
+    "remove":"EXTRACTION_AUTO_FINISHED",
+    "clean":"REMOVE_FINISHED_IF_CLEAN_POLICY_ENABLED",
+    "milk":"GROUP_RELEASED_IF_MILK_RECIPE",
+    "handoff":"ALL_BEVERAGES_COMPLETED",
+}
 
 
 def need(condition,code):
@@ -222,7 +233,11 @@ def _engine(positions, lines, d, horizon):
     def tick(time,priority,kind,obj):
         heapq.heappush(events,(time,priority,next(order_counter),kind,obj))
     def enqueue(job,stage,time):
+        need(stage in STAGE_PREDECESSOR,"UNKNOWN_PRECEDENCE_STAGE")
         ready.append({"job":job,"stage":stage,"eligible_at":time})
+        trace.append({"event":"eligible","time":time,"job":job,
+                      "stage":stage,"predecessor":STAGE_PREDECESSOR[stage],
+                      "required_classes":list(STAGE_CLASSES[stage])})
     for oid,order in paid.items():
         tick(order["time"],1,"arrival",oid)
     # Calendar START boundaries wake tasks; no invented actor availability.
@@ -305,6 +320,71 @@ def _engine(positions, lines, d, horizon):
                     return tokens,actor_id,selected_group
         return None
 
+    def blocking_routes(task,time):
+        """Explain *all* alternative manual allocations at a fixed instant.
+
+        This is instrumentation, not a dispatcher or an optimizer. A task
+        can have multiple simultaneous blockers, or different blockers on
+        distinct candidate routes; none is assigned an exclusive duration.
+        """
+        job,stage=task["job"],task["stage"]
+        need(stage!="extract_auto","AUTOMATIC_STAGE_CANNOT_WAIT_FOR_ACTOR")
+        extra=STAGE_CLASSES[stage][1]
+        unskilled=[]
+        routes=[]
+        for actor_id,actor in d["operators"].items():
+            if stage not in actor["skills"]:
+                unskilled.append(actor_id)
+                continue
+            actor_blockers=[]
+            if not actor_available(actor,time,timing[stage]):
+                actor_blockers.append("ACTOR_OUTSIDE_ELIGIBLE_WINDOW")
+            if "A:"+actor_id in occupied:
+                actor_blockers.append("ACTOR_BUSY")
+            if extra=="prep_space":
+                units=[("S:"+p,"prep_space",None)
+                       for p in resources["station"]]
+            elif extra=="espresso_group":
+                if stage=="load":
+                    units=[("G:"+g,"espresso_group",group_state[g])
+                           for g in resources["group"]]
+                else:
+                    need(job in held,"DIAGNOSIS_MISSING_HELD_GROUP")
+                    g=held[job]
+                    units=[("G:"+g,"espresso_group",group_state[g])]
+            elif extra=="steam_wand":
+                units=[("W:"+w,"steam_wand",None)
+                       for w in resources["wand"]]
+            else:
+                need(extra=="pickup_pass","DIAGNOSIS_UNKNOWN_RESOURCE")
+                units=[("P:"+p,"pickup_pass",None)
+                       for p in resources["pass"]]
+            for token,kind,state in units:
+                blockers=list(actor_blockers)
+                if stage=="load":
+                    if state!="FREE" or token in occupied:
+                        blockers.append("GROUP_OCCUPIED_"+str(state))
+                elif stage in ("remove","clean"):
+                    need(occupied.get(token)==job,
+                         "DIAGNOSIS_MUST_USE_OWN_HELD_GROUP")
+                    expected=("AWAITING_REMOVAL" if stage=="remove"
+                              else "AWAITING_CLEAN")
+                    need(state==expected,"DIAGNOSIS_HELD_GROUP_BAD_STATE")
+                elif token in occupied:
+                    blockers.append("RESOURCE_BUSY_"+kind.upper())
+                routes.append({"actor":actor_id,"resource":token,
+                               "resource_class":kind,"group_state":state,
+                               "blockers":blockers})
+        need(routes and all(x["blockers"] for x in routes),
+             "DIAGNOSIS_HAS_RUNNABLE_ROUTE")
+        return {"required_classes":list(STAGE_CLASSES[stage]),
+                "unskilled_actors":unskilled,
+                "alternative_routes":routes,
+                # Capture enabled groups for ALL stages. Preparation happens
+                # off-group, but its diagnosis still needs group availability.
+                "enabled_group_states":dict(group_state),
+                "all_routes_blocked":True}
+
     def start(task,choice,time):
         nonlocal max_group_occupied
         job,stage=task["job"],task["stage"]
@@ -330,7 +410,11 @@ def _engine(positions, lines, d, horizon):
              "SAME_GROUP_DOUBLE_OCCUPIED")
         trace.append({"event":"start","time":time,"job":job,
                       "stage":stage,"actor":actor_id,"group":group,
-                      "tokens":list(tokens)})
+                      "tokens":list(tokens),
+                      "eligible_at":task["eligible_at"],
+                      "resource_wait_min":max(0.0,time-task["eligible_at"]),
+                      "required_classes":list(STAGE_CLASSES[stage]),
+                      "precedence_satisfied":True})
         tick(time+timing[stage],0,"finish",
              (job,stage,tokens,time,actor_id,group))
 
@@ -390,8 +474,23 @@ def _engine(positions, lines, d, horizon):
             processed+=1
             need(processed<=150000,"EVENT_LIMIT")
             if kind=="arrival":
-                for i,_ in enumerate(paid[obj]["items"]):
-                    enqueue((obj,i),"prepare",time)
+                for i,typ in enumerate(paid[obj]["items"]):
+                    job=(obj,i)
+                    pending=["load","extract_auto","remove"]
+                    if d["clean_after_every_beverage_assumed"]:
+                        pending.append("clean")
+                    if typ=="con_leche":
+                        pending.append("milk")
+                    for stage in pending:
+                        trace.append({"event":"pending_precedence",
+                                      "time":time,"job":job,"stage":stage,
+                                      "predecessor":STAGE_PREDECESSOR[stage],
+                                      "eligible":False})
+                    enqueue(job,"prepare",time)
+                trace.append({"event":"pending_precedence",
+                              "time":time,"job":(obj,-1),"stage":"handoff",
+                              "predecessor":"ALL_BEVERAGES_COMPLETED",
+                              "eligible":False})
             elif kind=="finish":
                 finish(obj,time)
             else:
@@ -409,6 +508,43 @@ def _engine(positions, lines, d, horizon):
                     progress=True
                     break
         need(len(occupied)==len(set(occupied)),"DUPLICATE_TOKEN_MAP")
+        # Each waiting task contributes exactly once to each inter-event
+        # interval. Concurrent tasks' task-minutes may overlap in clock time.
+        # Do not allocate the full interval separately to each blocker.
+        if ready and events:
+            next_time=events[0][0]
+            if next_time>time:
+                for task in ready:
+                    # At end-duration the actor loses the ability to START
+                    # and FINISH a nonpreemptive task within the window, even
+                    # before the calendar END event. These diagnostic cuts
+                    # do NOT wake, reorder or modify the FCFS dispatcher.
+                    stage=task["stage"]
+                    cuts={time,next_time}
+                    if stage!="extract_auto":
+                        duration=timing[stage]
+                        for actor in d["operators"].values():
+                            if stage not in actor["skills"]:
+                                continue
+                            for window_start,window_end in actor["availability_windows_min"]:
+                                last_start=window_end-duration
+                                for threshold in (window_start,last_start,window_end):
+                                    if time+1e-10<threshold<next_time-1e-10:
+                                        cuts.add(threshold)
+                    boundaries=sorted(cuts)
+                    for left,right in zip(boundaries,boundaries[1:]):
+                        if right-left<=1e-10:
+                            continue
+                        # Sample INSIDE positive-duration interval: a start
+                        # feasible only at the LEFT boundary has zero signal
+                        # time. Resource occupancy is constant between events.
+                        diagnosis=blocking_routes(task,(left+right)/2)
+                        trace.append({"event":"blocked_interval",
+                                      "start_time":left,"end_time":right,
+                                      "minutes":right-left,
+                                      "job":task["job"],"stage":stage,
+                                      "eligible_at":task["eligible_at"],
+                                      "blocking":diagnosis})
     need(not held and not occupied and
          all(state=="FREE" for state in group_state.values()) and
          len(completed)==len(paid) and
