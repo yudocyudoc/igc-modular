@@ -300,8 +300,12 @@ class CausalWaitTests(unittest.TestCase):
             out=Path(tmp)/"report"
             c.export(report,out)
             self.assertTrue((out/"C_CAUSAL_DIAGNOSIS.json").exists())
-            self.assertIn("task-min",(out/"C_CAUSAL_DIAGNOSIS.md"
-                                     ).read_text(encoding="utf-8"))
+            markdown=(out/"C_CAUSAL_DIAGNOSIS.md").read_text(
+                encoding="utf-8")
+            self.assertIn("task-min",markdown)
+            self.assertIn("Señal estricta extracción:",markdown)
+            self.assertIn("Señal manual estricta con grupo habilitado FREE:",
+                          markdown)
             with self.assertRaisesRegex(ArenaError,
                                         "OUTPUT_ALREADY_EXISTS"):
                 c.export(report,out)
