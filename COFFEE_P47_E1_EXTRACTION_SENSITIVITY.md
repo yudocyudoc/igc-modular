@@ -2,6 +2,15 @@
 
 **Estado:** implementación propuesta en PR, sin despacho privado. **Revisor independiente:** Astra. **Aceptación pendiente:** \`E1_ACCEPT\` / \`E1_FIX\`, por SHA. **No fusionar ni ejecutar el workflow privado por CI verde.**
 
+## Primera revisión adversarial — Astra E1_FIX sobre 84ab0902
+
+Astra confirmó que el cálculo de cuatro celdas, la retención física del grupo y exactamente dos llamadas nuevas B a 30s son correctos. Encontró **dos defectos de procedencia**. Se corrigen en el mismo PR, sin ejecutar E1 privado:
+
+1. **Huella canónica externa del histórico:** el digest de `D_Q25_Q75_AGGREGATE.json`, computado con `arena.common.canonical` (JSON con claves ordenadas), debe ser exactamente `sha256:197ee046eb4030371ce4049c674c701781fe7aeaeb175adc107e7b2d4b55a215`, verificada contra el ZIP agregado original de D run `44234407455`. Antes se generaba una huella de lo recibido sin cotejar su valor canónico; ahora se rechaza el archivo si difiere **ANTES** de cualquier GET R2. El recibo posterior sigue anclado a ese archivo validado. Regresión negativa reproduce el ataque de Astra: `+0.5` minutos al P90 de leche del histórico, incluso con metadatos de run aparentemente válidos; el resultado debe ser `HISTORICAL_AGGREGATE_SHA256_MISMATCH` y no puede producir efectos históricos falsos.
+2. **Etiquetas explícitas en modo de prueba:** si `allow_fixture_for_tests=True`, los dos brazos ficticios de 90s dicen `SOFTWARE_FIXTURE_D_90S_INVENTED_NOT_GITHUB_RUN` y los dos de 30s dicen `SOFTWARE_FIXTURE_E1_30S_INVENTED_NOT_PRIVATE_RUN`. Esa etiqueta se conserva en el JSON, CSV de cuatro celdas y Markdown. Sólo una ejecución privada autenticada puede usar `ARCHIVED_ACCEPTED_D_RUN_44234407455_NOT_RERUN`. Regresión comprueba que ningún informe de prueba atribuya a D números inventados.
+
+La huella SHA-256 canónica del JSON **no es** la huella de la descarga ZIP; su algoritmo está fijado por `arena.common.digest`. La compuerta verifica contenido y procedencia declarada, no prueba que GitHub nunca haya mostrado otro estado. No modifica los resultados D archivados, el motor B/C/D, sus contratos ni la selección P11. **Solicitar nuevo `E1_ACCEPT / E1_FIX` sobre HEAD corregido antes de merge y despacho privado.**
+
 ## Pregunta predefinida
 
 > ¿La ventaja condicional de priorizar leche sobre FCFS en Q75 se conserva si se reemplaza **únicamente** la extracción automática supuesta de 90 segundos por **30 segundos**?
