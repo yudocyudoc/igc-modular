@@ -1,0 +1,75 @@
+name: Coffee three-arm V2 PR1 — authentic public artifact readback
+
+on:
+  pull_request:
+    paths:
+      - "arena/coffee_three_arms_readback_v2.py"
+      - "tests/test_coffee_three_arms_readback_v2.py"
+      - "experiments/coffee_three_arms_v2/**"
+      - ".github/workflows/coffee-three-arms-v2-readback.yml"
+      - "COFFEE_THREE_ARMS_V2_PR1.md"
+  push:
+    branches: [main]
+    paths:
+      - "arena/coffee_three_arms_readback_v2.py"
+      - "tests/test_coffee_three_arms_readback_v2.py"
+      - "experiments/coffee_three_arms_v2/**"
+      - ".github/workflows/coffee-three-arms-v2-readback.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  authentic-retrospective-eight-artifacts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Download only eight pinned PUBLIC GitHub Actions archives (no R2, provider, OMC)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/arena-public-history"
+          for id in 14094919865 14100770369 14090920829 14102098459 14150642285 14157186844 14157799232 14396368697; do
+            curl --fail --location --silent --show-error --retry 0 \
+              --connect-timeout 15 --max-time 120 \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "Accept: application/vnd.github+json" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/yudocyudoc/igc-modular/actions/artifacts/${id}/zip" \
+              --output "$RUNNER_TEMP/arena-public-history/artifact-${id}.zip"
+          done
+      - name: Run 11 genuine-artifact and adversarial tests, no network or secrets
+        env:
+          ARENA_PUBLIC_ZIP_DIR: ${{ runner.temp }}/arena-public-history
+        run: |
+          python -m unittest discover -s tests -p test_coffee_three_arms_readback_v2.py -v
+      - name: Reconstruct authentic D/M/B + Hydra report with pinned ZIP SHA256
+        run: |
+          python -m arena.coffee_three_arms_readback_v2 \
+            --public-zips "$RUNNER_TEMP/arena-public-history" \
+            --out "$RUNNER_TEMP/three-arms-v2-real"
+          cmp experiments/coffee_three_arms_v2/THREE_ARMS_V2_READBACK.json \
+              "$RUNNER_TEMP/three-arms-v2-real/THREE_ARMS_V2_READBACK.json"
+          cmp experiments/coffee_three_arms_v2/THREE_ARMS_V2_DECISION.md \
+              "$RUNNER_TEMP/three-arms-v2-real/THREE_ARMS_V2_DECISION.md"
+          cat "$RUNNER_TEMP/three-arms-v2-real/THREE_ARMS_V2_DECISION.md" >> "$GITHUB_STEP_SUMMARY"
+          echo "RETROSPECTIVE_TRUE REAL_PUBLIC_ARTIFACTS_8 NEW_OMC_0 NEW_PROVIDER_POST_0 PRIVATE_R2_GET_0"
+      - name: Publish authenticated readable retrospective MD + JSON
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-three-arms-v2-authentic-readback-${{ github.run_id }}
+          path: ${{ runner.temp }}/three-arms-v2-real/
+          retention-days: 90
+          if-no-files-found: error
+      - name: Delete downloaded archives and generated copies
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/arena-public-history" "$RUNNER_TEMP/three-arms-v2-real"
+
+# No workflow_dispatch/OMC/cloudflare/R2 calls or read of sealed private data.
+# A successful PR1 is a RETROSPECTIVE claim only, not a scientific prediction.
