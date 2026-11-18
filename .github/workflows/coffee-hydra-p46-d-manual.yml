@@ -19,6 +19,7 @@ concurrency:
 jobs:
   manual-eight-policy-comparisons:
     runs-on: ubuntu-24.04
+    environment: arena-custodian
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
