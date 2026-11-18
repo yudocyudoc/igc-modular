@@ -24,6 +24,11 @@ SCHEMA="arena.coffee.p47.e1.q75-extraction-sensitivity/1"
 HISTORICAL_SCHEMA="arena.coffee.p46.public-eight-scenario-aggregate/1"
 HISTORICAL_D_RUN=44234407455
 HISTORICAL_D_SHA="e2da7eeaadd7c9e361ca38090a3de25a161916f3"
+# sha256 over arena.common.canonical(JSON) of the ORIGINAL accepted D public
+# aggregate downloaded from GitHub run 44234407455, independently checked
+# against its archived ZIP. A self-generated digest is not an authenticity gate.
+HISTORICAL_D_AGGREGATE_SHA256=(
+    "sha256:197ee046eb4030371ce4049c674c701781fe7aeaeb175adc107e7b2d4b55a215")
 SOURCE_RUN_ID=43684660729
 Q75_LABEL="HIGHER_PAID_INPUT_Q75"
 BASE="FCFS_READY_ASSUMED"
@@ -51,6 +56,13 @@ def _historical_q75(archive,original_dossier,*,allow_fixture=False):
     b.validate(original_dossier)
     require(original_dossier["durations_min"]["espresso_auto_min"]["value"]==
             OLD_AUTO_MIN,"HISTORICAL_PHYSICS_NOT_90_SECONDS")
+    # Check the accepted hash BEFORE trusting any historical P90, receipt,
+    # case digest or source label. Real/manual mode MUST NOT compute a fresh
+    # hash and then call the received value "verified".
+    if not allow_fixture:
+        require(isinstance(archive,dict) and
+                digest(archive)==HISTORICAL_D_AGGREGATE_SHA256,
+                "HISTORICAL_AGGREGATE_SHA256_MISMATCH")
     require(isinstance(archive,dict) and
             archive.get("schema")==HISTORICAL_SCHEMA and
             archive.get("scenario_count")==8 and
@@ -249,6 +261,14 @@ def compare_verified_q75(view_dir,archive,original_dossier,*,
     overrides=[e for e in milk_trace if e["event"]=="dispatch_override"]
     require(all(e["policy"]==MILK and e["selected_stage"]=="milk"
                 for e in overrides),"NOT_EXCLUSIVELY_MILK_PRIORITY")
+    historical_source=(
+        "SOFTWARE_FIXTURE_D_90S_INVENTED_NOT_GITHUB_RUN"
+        if allow_fixture_for_tests else
+        "ARCHIVED_ACCEPTED_D_RUN_44234407455_NOT_RERUN")
+    new_source=(
+        "SOFTWARE_FIXTURE_E1_30S_INVENTED_NOT_PRIVATE_RUN"
+        if allow_fixture_for_tests else
+        "NEW_30_SECOND_E1_CONDITIONAL_MODEL")
     old_reference=[
         {"auto_extraction_seconds":90,"policy":policy,
          "p50_paid_to_handoff_min":old[policy][
@@ -257,7 +277,7 @@ def compare_verified_q75(view_dir,archive,original_dossier,*,
              "p90_paid_to_handoff_full_drain_min"],
          "handoffs_before_source_cut":
              old[policy]["handoffs_before_source_cut"],
-         "source":"ARCHIVED_ACCEPTED_D_RUN_44234407455_NOT_RERUN"}
+         "source":historical_source}
         for policy in (BASE,MILK)]
     new_scenarios=[
         {"auto_extraction_seconds":30,"policy":policy,
@@ -270,7 +290,7 @@ def compare_verified_q75(view_dir,archive,original_dossier,*,
          "orders_pending_at_source_cut":runs[policy][0][
              "modeled_handoffs_after_cut"],
          "waits_C":_waits(runs[policy][3]),
-         "source":"NEW_30_SECOND_E1_CONDITIONAL_MODEL"}
+         "source":new_source}
         for policy in (BASE,MILK)]
     require(all(r["handoffs_before_source_cut"]+
                 r["orders_pending_at_source_cut"]==q75["paid_orders"]
