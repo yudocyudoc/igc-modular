@@ -29,6 +29,32 @@ DURATIONS = ("manual_setup_min", "espresso_auto_min",
              "milk_finish_min", "handoff_min")
 ARCHETYPES = ("solo_extraccion", "con_leche")
 S5 = "S5_TRANSFER_HANDOFF_TO_EXISTING_SUPPORT"
+# Shared source of truth: the engine uses these resource requirements and
+# the episode checker reads exactly the same constants. No scheduling change.
+STAGE_REQUIRED_RESOURCES = {
+    "manual_setup": ("barista", "prep_space"),
+    "espresso_auto": ("espresso_group",),
+    "milk_finish": ("barista", "steam_wand", "prep_space"),
+}
+# Historical engine releases the group as soon as espresso_auto finishes.
+# This cannot represent an observed mounted/held state after counter stops.
+POST_COUNTER_MOUNTED_STATE_SUPPORTED = False
+
+
+def episode_model_capabilities(dossier):
+    """Read the actual reference-stage contracts and current dossier capacities."""
+    config_gate(dossier)
+    return {
+        "resource_units": {k: v["units"] for k, v in dossier["resources"].items()},
+        "stage_requirements": {
+            k: list(v) for k, v in STAGE_REQUIRED_RESOURCES.items()},
+        "post_counter_mounted_state_supported":
+            POST_COUNTER_MOUNTED_STATE_SUPPORTED,
+        "stage_source": "coffee_v2_reference._engine.needed",
+        "time_source": "coffee_v2_reference._engine.needed espresso_auto_min",
+        "engine_verified_descriptor": True,
+    }
+
 SCOPES = {
     "no_cashier_arrivals": True,
     "no_pre_payment_abandonment": True,
@@ -248,11 +274,11 @@ def _engine(positions, lines, dossier, horizon, *, support_busy_windows=(),
     def needed(task):
         stage = task["stage"]
         if stage == "manual_setup":
-            return ("barista", "prep_space"), dur["manual_setup_min"]
+            return STAGE_REQUIRED_RESOURCES["manual_setup"], dur["manual_setup_min"]
         if stage == "espresso_auto":
-            return ("espresso_group",), dur["espresso_auto_min"]
+            return STAGE_REQUIRED_RESOURCES["espresso_auto"], dur["espresso_auto_min"]
         if stage == "milk_finish":
-            return ("barista", "steam_wand", "prep_space"), dur["milk_finish_min"]
+            return STAGE_REQUIRED_RESOURCES["milk_finish"], dur["milk_finish_min"]
         need(stage == "handoff", "UNKNOWN_STAGE")
         who = "barista" if dossier["policy"] == "B0" else "existing_support"
         return (who, "pickup_pass"), dur["handoff_min"]
