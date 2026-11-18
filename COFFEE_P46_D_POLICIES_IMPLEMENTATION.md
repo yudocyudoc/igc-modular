@@ -26,13 +26,24 @@ En cada variante, si el candidato priorizado **no es ejecutable ahora**, se apli
 
 ## Entradas y alcance: fixture ahora, Q25/Q75 después
 
-El PR ejecuta en CI **cuatro políticas en el microcaso existente de tres pagos ficticios**, única fuente para pruebas de software. Reutiliza sus posiciones y líneas sin crear un corpus, alterar el modelo ni consumir un lote experimental.
+El PR produce un **reporte público de cuatro políticas sobre el microcaso existente de tres pagos ficticios**. Además, las pruebas unitarias usan microfixtures ficticios adicionales de conflicto (una bebida con leche o sin leche y tres pagos tardíos) para verificar que leche y entrega **sí alteran** el despacho cuando hay preparación ejecutable a la espera. Son contraejemplos de software, no escenarios de un nuevo corpus ni una campaña científica. No se modifica la fuente P39 ni se consume el lote Q25/Q75.
 
 La función `compare_existing_construction_q25_q75(view_dir,dossier,dispatch_authorized=True)` está preparada para un lote ulterior desde `main`. Reutiliza los selectores autorizados `coffee_v2_p11._verified_load_choices()` y `coffee_v2_reference_inputs.select_case_day()`, exige partición `CONSTRUCTION`, separa Q25 y Q75, usa **sus** horizontes fuente y compara cuatro políticas en cada uno: **exactamente ocho escenarios**. No abre reservados, truth ni nuevos datasets. No recupera automáticamente nada desde R2.
 
 La llamada sin `dispatch_authorized=True` se rechaza **antes de leer** los archivos. La existencia histórica del run P39 demuestra que estas cargas se seleccionaron antes, pero **no acredita disponibilidad privada actual ni autorización de nuevo despacho**. Un ejecutor posterior en `main` deberá comprobar la disponibilidad con los permisos y gasto vigentes y publicar run/commit/artifact/consumo sin declarar cero por ausencia de factura. El workflow de este PR no ejecuta esas ocho simulaciones.
 
 El diagnóstico C se reutiliza con etiqueta explícita de la política activa. Sólo admite microfixtures `SOFTWARE_TOY_` o las etiquetas exactas de construcción `CONSTRUCTION_SYNTHETIC_Q25/Q75`. No presenta una fuente sintética como pedidos reales.
+
+### Resultado efectivo del microfixture público de tres pagos
+
+| Política | Veces que la prioridad cambió una asignación | P90 pago→entrega | ΔP90 vs FCFS | Pedidos adelantados / demorados |
+|---|---:|---:|---:|---:|
+| Base FCFS supuesta | 0 | 3,49 min | 0,00 | 0 / 0 |
+| Prioridad carga | 2 | 3,57 min | +0,08 min | 0 / 1 |
+| Prioridad leche | 0 | 3,49 min | 0,00 | 0 / 0 |
+| Prioridad entrega | 0 | 3,49 min | 0,00 | 0 / 0 |
+
+La prioridad de carga adelantó tres inicios de tareas, demoró seis y el tercer pedido se entregó **0,10 min más tarde**; no adelantó ninguna entrega. Las políticas de leche y entrega **no intervinieron en ese microcaso**: eso no demuestra que no funcionen. Dos regresiones con competencia explícita comprueban que ambas sí cambian la asignación cuando hay trabajo anterior y tarea priorizada ejecutable. Este resultado no identifica la política operativa real ni un efecto en la cafetería.
 
 ## Evidencia de aceptación y límites
 
