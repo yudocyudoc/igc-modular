@@ -123,8 +123,10 @@ class E1Tests(unittest.TestCase):
 
     def test_cannot_label_fixture_as_authentic_historical_run(self):
         def check(folder,view,original,archive):
+            # The canonical-hash gate now rejects first; metadata mismatches
+            # cannot be used to bypass this stronger historical boundary.
             with self.assertRaisesRegex(
-                    ArenaError,"HISTORICAL_D_RUN_IDENTITY_OR_CUSTODY_MISMATCH"):
+                    ArenaError,"HISTORICAL_AGGREGATE_SHA256_MISMATCH"):
                 e1.compare_verified_q75(
                     view,archive,original,dispatch_authorized=True)
             with self.assertRaisesRegex(
