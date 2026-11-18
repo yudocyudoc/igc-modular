@@ -108,6 +108,7 @@ def diagnose_trace(result, trace, dossier, *, fixture_label,
     group_extract_time=0.0
     group_postauto_time=0.0
     prep_load_pressure=0.0
+    manual_bottleneck_with_free_group=0.0
     milk_handoff_pressure=0.0
     total_task_wait=0.0
     max_wait=0.0
@@ -142,6 +143,11 @@ def diagnose_trace(result, trace, dossier, *, fixture_label,
             minutes=span["minutes"]
             details=span["blocking"]
             routes=details["alternative_routes"]
+            group_states=details["enabled_group_states"]
+            require(set(group_states)==set(dossier["enabled_group_ids"])
+                    and all(state in b.GROUP_STATES for state in
+                            group_states.values()),
+                    "DIAGNOSTIC_ENABLED_GROUP_SNAPSHOT_MISSING")
             # Route reasons are an OR-of-allocations with AND-of-blockers.
             # Multiple reasons can coexist, including on the same route.
             # Their intervals are intentionally NOT additive contributions.
@@ -158,6 +164,27 @@ def diagnose_trace(result, trace, dossier, *, fixture_label,
                 buckets[reason]+=minutes
             if stage in ("prepare","load"):
                 prep_load_pressure+=minutes
+                # C2: an idle enabled machine does not mean manual work can
+                # begin. Require a free group and NO viable manual allocation.
+                # For load, inspect only routes to free groups; other group
+                # states must not transform a machine blockage into a manual
+                # shortage. For off-group prepare, station occupancy matters.
+                if any(state=="FREE" for state in group_states.values()):
+                    candidates=(routes if stage=="prepare" else
+                                [route for route in routes
+                                 if group_states.get(route["resource"][2:])
+                                 =="FREE"])
+                    require(bool(candidates),
+                            "FREE_GROUP_WITHOUT_MANUAL_ROUTE")
+                    def blocked_manually(route):
+                        return any(
+                            reason.startswith("ACTOR_") or
+                            (stage=="prepare" and
+                             reason=="RESOURCE_BUSY_PREP_SPACE")
+                            for reason in route["blockers"])
+                    if all(blocked_manually(route)
+                           for route in candidates):
+                        manual_bottleneck_with_free_group+=minutes
             if stage in ("milk","handoff"):
                 milk_handoff_pressure+=minutes
             if stage=="load":
@@ -264,6 +291,19 @@ def diagnose_trace(result, trace, dossier, *, fixture_label,
                 "signal":"eligible prepare/load task blocked by modeled "
                          "actor, preparation station or group",
                 "signal_task_min_ANY_CAUSE":rounded(prep_load_pressure),
+                "signal_task_min_MANUAL_BLOCKED_WITH_GROUP_FREE":
+                    rounded(manual_bottleneck_with_free_group),
+                "manual_signal_definition":(
+                    "Eligible prepare/load and at least one enabled group "
+                    "FREE; every preparation actor+station allocation or "
+                    "every load actor+FREE-group allocation is blocked by "
+                    "operator skill, occupation, valid-start window or "
+                    "required preparation station. Count each task interval "
+                    "once; excludes group-only contention."),
+                "manual_signal_status":(
+                    "SIGNAL_IN_ASSUMED_MODEL" if
+                    manual_bottleneck_with_free_group>EPS else
+                    "NO_MANUAL_WITH_FREE_GROUP_SIGNAL"),
                 "status":("WAIT_IN_ASSUMED_MODEL" if
                           prep_load_pressure>EPS else "NO_WAIT_IN_TOY_TRACE"),
                 "weakens":"task still awaits its predecessor; that time is "
