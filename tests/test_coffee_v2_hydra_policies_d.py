@@ -93,10 +93,10 @@ class DPolicies(unittest.TestCase):
                             row["task_start_or_assignment_changes"]))
         self.assertEqual(row["rule_changed_assignment_count"],
                          len(row["override_events_pseudonymous"]))
-        self.assertEqual(row["p90_paid_to_handoff_full_drain_min"]-
-                         report["policies"][0][
-                             "p90_paid_to_handoff_full_drain_min"],
-                         row["delta_p90_min_positive_is_worse"])
+        self.assertAlmostEqual(row["p90_paid_to_handoff_full_drain_min"]-
+                               report["policies"][0][
+                                   "p90_paid_to_handoff_full_drain_min"],
+                               row["delta_p90_min_positive_is_worse"])
 
     def test_policy_overrides_are_atomic_resource_feasible_and_nonpreemptive(self):
         x=fixture()
