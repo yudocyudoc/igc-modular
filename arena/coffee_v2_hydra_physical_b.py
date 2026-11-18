@@ -637,6 +637,11 @@ def _engine(positions, lines, d, horizon, *,
         "no_empirical_capacity_or_wait_conclusion":True,
         "no_new_worlds_or_provider_or_OMC":True,
     }
+    # The accepted FCFS result stays byte-for-byte identical to PR45.
+    # Nonbaseline result/trace carry a matching executed-policy identity,
+    # so a later diagnostic cannot substitute a trace from a different arm.
+    if dispatch_policy!="FCFS_READY_ASSUMED":
+        result["executed_dispatch_policy"]=dispatch_policy
     need(op_counts["prepare"]==op_counts["load"]==
          op_counts["extract_auto"]==op_counts["remove"]==beverages and
          op_counts["clean"]==(beverages if
