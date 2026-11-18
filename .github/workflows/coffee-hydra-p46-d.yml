@@ -1,0 +1,58 @@
+name: Coffee P46 D — single-priority paired policies (software fixtures)
+
+on:
+  pull_request:
+    paths:
+      - 'arena/coffee_v2_hydra_physical_b.py'
+      - 'arena/coffee_v2_hydra_causes_c.py'
+      - 'arena/coffee_v2_hydra_policies_d.py'
+      - 'tests/test_coffee_v2_hydra_policies_d.py'
+      - 'COFFEE_P46_D_POLICIES_IMPLEMENTATION.md'
+      - '.github/workflows/coffee-hydra-p46-d.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coffee-p46-d-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  d-paired-policy-fixtures:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Test D baseline identity, runnable priorities and paired outcomes
+        run: python -m unittest discover -s tests -p test_coffee_v2_hydra_policies_d.py -v
+      - name: Regress accepted C, B, A3 and historical engine
+        run: |
+          python -m unittest discover -s tests -p test_coffee_v2_hydra_causes_c.py -v
+          python -m unittest discover -s tests -p test_coffee_v2_hydra_physical_b.py -v
+          python -m unittest discover -s tests -p test_coffee_hydra_episodes_a.py -v
+          python -m unittest discover -s tests -p test_coffee_v2_reference.py -v
+          python -m unittest discover -s tests -p test_coffee_hydra_p39.py -v
+          python -m unittest discover -s tests -p test_coffee_hydra_p42.py -v
+      - name: Compare four policies on the existing fictional three-payment microcase
+        run: |
+          python -m arena.coffee_v2_hydra_policies_d \
+            --toy-input experiments/coffee_v2/C_FIXED_TOY_PAID_INPUT.json \
+            --dossier experiments/coffee_v2/HYDRA_TWO_OPERATORS_PHYSICAL_B_ASSUMPTIONS.json \
+            --out "$RUNNER_TEMP/p46-d"
+          cat "$RUNNER_TEMP/p46-d/D_PAIRED_POLICY_COMPARISON.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish only pseudonymous fixture reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-p46-d-toy-paired-results-${{ github.run_id }}
+          path: ${{ runner.temp }}/p46-d/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Remove temporary outputs
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/p46-d"
+
+# No Q25/Q75 construction views, R2 reads, provider, OMC, new corpus,
+# private source, or scientific dispatch in this PR workflow.
