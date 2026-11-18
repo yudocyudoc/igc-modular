@@ -61,6 +61,33 @@ class ReadbackV2(unittest.TestCase):
                          {"NO_TWO_LATE_CONSTRUCTION_OBSERVATIONS"})
         self.assertTrue(all(i["feedback_projection_hash"] for i in rows))
 
+    def test_coverage_audit_does_not_call_archived_natives_the_full_methods(self):
+        x=self.report
+        coverage=x["coverage_audit"]
+        self.assertFalse(coverage["question_H123_newly_asked_of_D_M_B_in_PR1"])
+        self.assertFalse(coverage["full_producer_capability_to_construct_H123_models_tested"])
+        self.assertEqual(coverage["new_cloudflare_Buffalo_generate_or_review_POST"],0)
+        self.assertEqual(coverage["M_B0_archived_graph_count"],6)
+        self.assertEqual(coverage["M_B0_distinct_classes_used"],
+            ["accepted-source","bounded-queue","delivery-counter",
+             "first-order-report-filter"])
+        self.assertEqual(coverage["M_P08_archived_topologies"],1)
+        self.assertEqual(coverage["M_P08_parameter_scenarios"],6)
+        self.assertFalse(coverage["other_Vensim_MDL_or_alternative_catalogs_tested"])
+        rows=x["H1_H2_H3_method_matrix"]
+        self.assertTrue(all(row["full_method_H123_capacity_tested"] is False
+                            for row in rows))
+        for row in rows[:3]:
+            self.assertEqual(row["H1"],"NOT_ENCODED_IN_ARCHIVED_NATIVE")
+            self.assertEqual(row["H2"],"NOT_ENCODED_IN_ARCHIVED_NATIVE")
+            self.assertEqual(row["H3"],"NOT_ENCODED_IN_ARCHIVED_NATIVE")
+            self.assertEqual(row["question_H123_asked"],"NO")
+        self.assertIn("METHOD_CAPABILITIES_NOT_TESTED",
+                      x["decision_with_Hydra_plus_DMB"]["reason"])
+        md=r.markdown(x)
+        self.assertIn("PR1 no hizo un nuevo POST Cloudflare",md)
+        self.assertIn("una sola topología",md)
+
     def test_real_buffalo_parent_r1_not_replaced_by_hydra_or_first_packet(self):
         x=self.report["buffalo_R1"]
         self.assertEqual(x["original_variables"],10)
