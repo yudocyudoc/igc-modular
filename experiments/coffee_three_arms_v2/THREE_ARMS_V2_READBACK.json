@@ -83,6 +83,33 @@
       "read_only_public": true
     }
   },
+  "coverage_audit": {
+    "question_H123_newly_asked_of_D_M_B_in_PR1": false,
+    "full_producer_capability_to_construct_H123_models_tested": false,
+    "new_cloudflare_Buffalo_generate_or_review_POST": 0,
+    "D_B0_grammar_version": "generic-conservative-chain-search/0.1",
+    "D_B0_grammar_examined": "ONE_TO_THREE_SERIAL_STOCKS_WITH_OPTIONAL_LOSS",
+    "D_B0_direct_topology_primitives_not_new_fitted_search": true,
+    "M_B0_registry": "arena/coffee_adapters/registry.coffee.v1.json",
+    "M_B0_declared_e0_catalog": "arena/_vendor/igc/experiments/e0/catalog.json",
+    "M_B0_distinct_classes_used": [
+      "accepted-source",
+      "bounded-queue",
+      "delivery-counter",
+      "first-order-report-filter"
+    ],
+    "M_B0_archived_graph_count": 6,
+    "M_P08_distinct_classes_used": [
+      "accepted-source",
+      "bounded-queue",
+      "delivery-counter"
+    ],
+    "M_P08_archived_topologies": 1,
+    "M_P08_parameter_scenarios": 6,
+    "additional_unexamined_molecules_may_exist": true,
+    "other_Vensim_MDL_or_alternative_catalogs_tested": false,
+    "D_accuracy_on_B0_not_causal_mechanism_identification": true
+  },
   "original_B0": {
     "case_sha256": "sha256:756d16d2824a9052f5494dd41c3eef1f0e8826537deffbfc7cd39b0ca2d2457f",
     "D_candidate_count": 6,
@@ -604,12 +631,14 @@
       "case": "B0",
       "native_location": "g2:input/native/D/manifest.json; G2 Modelica + CSV",
       "observable": "delivered cumulative at 80/100/103.237 min",
-      "H1": "NOT_DISTINGUISHED",
-      "H2": "NOT_DISTINGUISHED",
-      "H3": "NOT_DISTINGUISHED",
+      "H1": "NOT_ENCODED_IN_ARCHIVED_NATIVE",
+      "H2": "NOT_ENCODED_IN_ARCHIVED_NATIVE",
+      "H3": "NOT_ENCODED_IN_ARCHIVED_NATIVE",
       "method_decision": "RATIFIED_6_CANDIDATES",
       "question_H123_asked": "NO",
-      "attribution": "evaluator_from_native_and_method_policy"
+      "attribution": "evaluator_from_native_and_method_policy",
+      "full_method_H123_capacity_tested": false,
+      "interpretation_scope": "ARCHIVED_NATIVE_AND_EXISTING_RESULTS_ONLY"
     },
     {
       "method": "moléculas M",
@@ -617,12 +646,14 @@
       "case": "B0",
       "native_location": "g2:input/native/M/native.mo; six full ASTs in manifest",
       "observable": "deliveredTotal cumulative at 80/100/103.237 min",
-      "H1": "NOT_DISTINGUISHED",
-      "H2": "NOT_DISTINGUISHED",
-      "H3": "NOT_DISTINGUISHED",
+      "H1": "NOT_ENCODED_IN_ARCHIVED_NATIVE",
+      "H2": "NOT_ENCODED_IN_ARCHIVED_NATIVE",
+      "H3": "NOT_ENCODED_IN_ARCHIVED_NATIVE",
       "method_decision": "ABSTAINED_6_NO_TWO_LATE_CONSTRUCTION_OBSERVATIONS",
       "question_H123_asked": "NO",
-      "attribution": "evaluator_from_native_and_method_policy"
+      "attribution": "evaluator_from_native_and_method_policy",
+      "full_method_H123_capacity_tested": false,
+      "interpretation_scope": "ARCHIVED_NATIVE_AND_EXISTING_RESULTS_ONLY"
     },
     {
       "method": "Buffalo",
@@ -630,12 +661,14 @@
       "case": "B0",
       "native_location": "buffalo_initial + buffalo_r1:provider/native-engine-result.json",
       "observable": "Picked Up Orders Cumulative at three B0 cuts; MAE in synthetic orders",
-      "H1": "NOT_DISTINGUISHED",
-      "H2": "NOT_DISTINGUISHED",
-      "H3": "NOT_DISTINGUISHED",
+      "H1": "NOT_ENCODED_IN_ARCHIVED_NATIVE",
+      "H2": "NOT_ENCODED_IN_ARCHIVED_NATIVE",
+      "H3": "NOT_ENCODED_IN_ARCHIVED_NATIVE",
       "method_decision": "REVISION_EXECUTED_G1; G2_RESULT_RECOVERED",
       "question_H123_asked": "NO",
-      "attribution": "evaluator_from_R1_and_sealed_score"
+      "attribution": "evaluator_from_R1_and_sealed_score",
+      "full_method_H123_capacity_tested": false,
+      "interpretation_scope": "ARCHIVED_NATIVE_AND_EXISTING_RESULTS_ONLY"
     },
     {
       "method": "gramática D",
@@ -648,7 +681,9 @@
       "H3": "NO_RETAINED_GROUP",
       "method_decision": "NOT_ASKED_TO_REVISE_H123",
       "question_H123_asked": "NO",
-      "attribution": "evaluator_from_equations_and_result"
+      "attribution": "evaluator_from_equations_and_result",
+      "full_method_H123_capacity_tested": false,
+      "interpretation_scope": "ARCHIVED_NATIVE_AND_EXISTING_RESULTS_ONLY"
     },
     {
       "method": "moléculas M",
@@ -661,7 +696,9 @@
       "H3": "NO_RETAINED_GROUP",
       "method_decision": "NOT_ASKED_TO_REVISE_H123",
       "question_H123_asked": "NO",
-      "attribution": "evaluator_from_AST_and_result"
+      "attribution": "evaluator_from_AST_and_result",
+      "full_method_H123_capacity_tested": false,
+      "interpretation_scope": "ARCHIVED_NATIVE_AND_EXISTING_RESULTS_ONLY"
     },
     {
       "method": "referencia Hydra",
@@ -674,7 +711,9 @@
       "H3": "STATE_RETAINED_AFTER_EXTRACTION_NO_OBSERVED_LOCAL_DURATION",
       "method_decision": "ASSUMED_FCFS_MODEL_DIAGNOSTIC",
       "question_H123_asked": "PARTIALLY",
-      "attribution": "evaluator_from_reference_results_and_B_contract"
+      "attribution": "evaluator_from_reference_results_and_B_contract",
+      "full_method_H123_capacity_tested": false,
+      "interpretation_scope": "ASSUMED_PHYSICAL_REFERENCE_NOT_FIELD_OBSERVATION"
     }
   ],
   "numeric_comparability_p08_vs_hydra": {
@@ -716,7 +755,7 @@
     "next_observation": "ONE_ELIGIBLE_LOADING_OPPORTUNITY_WITH_ALL_GROUP_STATES_AND_ELIGIBLE_OPERATOR_ACTIVITY",
     "incremental_operational_observation_demonstrated": false,
     "representational_insight": "P08 AGGREGATE_PREPARATION_PROXY_SEPARATE_FROM_PHYSICAL_DISPATCH",
-    "reason": "HISTORIC_D_M_B_CANNOT_DISCRIMINATE_PHYSICAL_H1_H2_H3"
+    "reason": "ARCHIVED_D_M_B_NATIVES_LACK_EXPLICIT_H123_STATES_METHOD_CAPABILITIES_NOT_TESTED"
   },
   "contribution_assessment": {
     "representational": "D_M_P08_AGGREGATE_STAGE_CAPACITY_CONDITIONAL_MECHANISM; BUFFALO_G1_CAUSAL_REVIEW",
