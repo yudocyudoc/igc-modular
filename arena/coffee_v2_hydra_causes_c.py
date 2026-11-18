@@ -37,7 +37,8 @@ def _keys(trace, kind):
 
 
 def diagnose_trace(result, trace, dossier, *, fixture_label,
-                   episode_view=None, historical_dossier=None):
+                   episode_view=None, historical_dossier=None,
+                   dispatch_policy=None):
     """Aggregate authenticated model trace, never publish private job IDs.
 
     Every blocked interval is counted ONCE per waiting task. Summing
@@ -49,8 +50,14 @@ def diagnose_trace(result, trace, dossier, *, fixture_label,
             result.get("status")==
             "SIMULATED_CONDITIONAL_PHYSICAL_B_NOT_EMPIRICAL",
             "INCOMPATIBLE_ENGINE_RESULT")
-    require(isinstance(fixture_label,str) and fixture_label.startswith(
-            "SOFTWARE_TOY_"),"REQUIRES_EXPLICIT_TOY_SCOPE")
+    allowed_construction={
+        "CONSTRUCTION_SYNTHETIC_Q25","CONSTRUCTION_SYNTHETIC_Q75"}
+    require(isinstance(fixture_label,str) and (
+            fixture_label.startswith("SOFTWARE_TOY_") or
+            fixture_label in allowed_construction),
+            "REQUIRES_EXPLICIT_TOY_SCOPE")
+    require(dispatch_policy is None or dispatch_policy in
+            b.D_DISPATCH_STAGE,"UNDECLARED_DIAGNOSTIC_POLICY")
 
     eligible={}
     starts={}
@@ -236,10 +243,14 @@ def diagnose_trace(result, trace, dossier, *, fixture_label,
 
     report={
         "schema":SCHEMA,
-        "scope":"SOFTWARE_TOY_SIMULATION_DIAGNOSTIC_NOT_REAL_CAFE",
+        "scope":("CONSTRUCTION_SYNTHETIC_MODEL_NOT_REAL_CAFE" if
+                 fixture_label in allowed_construction else
+                 "SOFTWARE_TOY_SIMULATION_DIAGNOSTIC_NOT_REAL_CAFE"),
         "fixture_label":fixture_label,
         "engine_schema":b.RESULT_SCHEMA,
-        "dispatch_policy":dossier["dispatch_policy"],
+        "dispatch_policy":(
+            dispatch_policy if dispatch_policy is not None
+            else dossier["dispatch_policy"]),
         "source_contract":{
             "synthetic_paid_gate":True,
             "dossier_schema":dossier["schema"],
