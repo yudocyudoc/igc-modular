@@ -8,6 +8,8 @@ from __future__ import annotations
 import copy
 import csv
 import json
+import io
+from contextlib import redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -120,8 +122,12 @@ class DPolicies(unittest.TestCase):
                 "--dossier",str(DOSSIER),
                 "--out",str(out),
             ]
+            # Keep simulated GitHub identity out of actual CI logs.
+            captured=io.StringIO()
             with patch.dict("os.environ",env,clear=False):
-                d.main(command)
+                with redirect_stdout(captured):
+                    d.main(command)
+            self.assertIn("GITHUB_RUN_ID 777333",captured.getvalue())
             public=read_json(out/"D_Q25_Q75_AGGREGATE.json")
             self.assertEqual(public["scenario_count"],8)
             self.assertEqual(public["execution_and_consumption"][
@@ -184,6 +190,26 @@ class DPolicies(unittest.TestCase):
         self.assertEqual(accepted["dispatch_policy"],policy)
         self.assertEqual(accepted["dispatch_policy_identity_source"],
                          "ENGINE_TRACE_VARIANT_IDENTITY")
+
+    def test_astra_cannot_cross_result_and_trace_of_two_priorities(self):
+        x=fixture()
+        params=(x["positions"],x["lines"],dossier(),x["horizon_min"])
+        result_load,trace_load,_=b._engine(
+            *params,dispatch_policy="PRIORITIZE_LOAD_READY_WITH_FREE_GROUP")
+        result_milk,trace_milk,_=b._engine(
+            *params,dispatch_policy="PRIORITIZE_MILK_READY")
+        with self.assertRaisesRegex(
+                ArenaError,"ENGINE_RESULT_TRACE_POLICY_IDENTITY_MISMATCH"):
+            c.diagnose_trace(result_load,trace_milk,dossier(),
+                             fixture_label="SOFTWARE_TOY_D_FIXED")
+        with self.assertRaisesRegex(
+                ArenaError,"ENGINE_RESULT_TRACE_POLICY_IDENTITY_MISMATCH"):
+            c.diagnose_trace(result_milk,trace_load,dossier(),
+                             fixture_label="SOFTWARE_TOY_D_FIXED")
+        self.assertEqual(result_load["executed_dispatch_policy"],
+                         "PRIORITIZE_LOAD_READY_WITH_FREE_GROUP")
+        self.assertEqual(result_milk["executed_dispatch_policy"],
+                         "PRIORITIZE_MILK_READY")
 
     def test_astra_no_intervention_variant_still_bound_to_actual_policy(self):
         x={"positions":[paid("solo")],
