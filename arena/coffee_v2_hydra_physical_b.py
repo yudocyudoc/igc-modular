@@ -240,6 +240,12 @@ def _engine(positions, lines, d, horizon, *,
     events=[]
     ready=[]
     trace=[]                     # PRIVATE, IDs not exported in aggregate
+    # For D variants identity must survive even when the priority NEVER
+    # overrides any assignment. The accepted B default trace stays exact.
+    if dispatch_policy!="FCFS_READY_ASSUMED":
+        trace.append({"event":"dispatch_policy_identity",
+                      "policy":dispatch_policy,
+                      "declared_as":"EXECUTED_ENGINE_POLICY_NOT_DIAGNOSIS_HINT"})
     order_counter=itertools.count()
     op_counts=Counter()
     max_group_occupied=0
