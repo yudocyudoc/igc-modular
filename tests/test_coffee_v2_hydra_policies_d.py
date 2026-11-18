@@ -16,7 +16,7 @@ from arena.common import ArenaError, read_json
 from arena import coffee_v2_hydra_physical_b as b
 from arena import coffee_v2_hydra_causes_c as c
 from arena import coffee_v2_hydra_policies_d as d
-from test_coffee_v2_reference import paid,item
+from test_coffee_v2_reference import paid,item,make_view
 
 ROOT=Path(__file__).resolve().parents[1]
 DOSSIER=ROOT/"experiments/coffee_v2/HYDRA_TWO_OPERATORS_PHYSICAL_B_ASSUMPTIONS.json"
@@ -38,6 +38,155 @@ def compare_toy(x=None,conf=None):
 
 
 class DPolicies(unittest.TestCase):
+    def test_astra_q25_q75_make_view_adaptor_exports_exact_eight_aggregates(self):
+        with TemporaryDirectory() as tmp:
+            view,_=make_view(tmp)
+            comparison=d.compare_existing_construction_q25_q75(
+                view,dossier(),dispatch_authorized=True)
+            self.assertEqual(comparison["schema"],d.CASE_SET_SCHEMA)
+            self.assertEqual(comparison["scenario_count"],8)
+            self.assertEqual([r["load_label"] for r in comparison["results"]],
+                             list(d.ALLOWED_CONSTRUCTION))
+            target=Path(tmp)/"eight-public"
+            aggregate=d.export(comparison,target)
+            self.assertEqual(aggregate["scenario_count"],8)
+            self.assertEqual(len(aggregate["paired_interpretation"]),4)
+            self.assertEqual(aggregate["execution_and_consumption"][
+                "status"],"LOCAL_FIXTURE_NOT_GITHUB_RUN")
+            self.assertIsNone(aggregate["execution_and_consumption"][
+                "github_run_id"])
+            self.assertEqual(aggregate["source_view_run_id"],None)
+            self.assertEqual({p.name for p in target.iterdir()},{
+                "D_Q25_Q75_AGGREGATE.json","D_Q25_Q75_PAIRED.csv",
+                "D_Q25_Q75_OPERATOR_STAGE.csv","D_Q25_Q75_DECISION.md"})
+            with (target/"D_Q25_Q75_PAIRED.csv").open(
+                    encoding="utf-8",newline="") as stream:
+                rows=list(csv.DictReader(stream))
+            self.assertEqual(len(rows),8)
+            with (target/"D_Q25_Q75_OPERATOR_STAGE.csv").open(
+                    encoding="utf-8",newline="") as stream:
+                by_stage=list(csv.DictReader(stream))
+            self.assertEqual(len(by_stage),8*2*6)
+            self.assertTrue(all(item["stage"] and
+                                item["busy_manual_min"] for item in by_stage))
+            public_json=(target/"D_Q25_Q75_AGGREGATE.json").read_text()
+            for forbidden in (
+                    "per_order_pseudonymous","override_events_pseudonymous",
+                    "task_start_or_assignment_changes",
+                    '"order_id"','"pos_event_id"',"producer-pos-observations"):
+                self.assertNotIn(forbidden,public_json)
+            self.assertIn("Q25",target.joinpath(
+                "D_Q25_Q75_DECISION.md").read_text())
+            self.assertIn("Q75",target.joinpath(
+                "D_Q25_Q75_DECISION.md").read_text())
+            with self.assertRaisesRegex(ArenaError,"OUTPUT_ALREADY_EXISTS"):
+                d.export(comparison,target)
+
+    def test_astra_construction_label_requires_p11_verified_selection(self):
+        x=fixture()
+        with self.assertRaisesRegex(ArenaError,
+                "CONSTRUCTION_REQUIRES_VERIFIED_SELECTION"):
+            d.compare(x["positions"],x["lines"],dossier(),
+                      x["horizon_min"],
+                      source_label="CONSTRUCTION_SYNTHETIC_Q25",
+                      load_label="LOWER_PAID_INPUT_Q25")
+        result,trace,_=b._engine(
+            x["positions"],x["lines"],dossier(),x["horizon_min"])
+        with self.assertRaisesRegex(ArenaError,
+                "CONSTRUCTION_REQUIRES_VERIFIED_ADAPTER"):
+            c.diagnose_trace(
+                result,trace,dossier(),
+                fixture_label="CONSTRUCTION_SYNTHETIC_Q25")
+        self.assertEqual(compare_toy()["source"],
+                         "SOFTWARE_TOY_ONLY_NOT_REAL_CAFE")
+
+    def test_astra_c_diagnostic_policy_must_match_executed_engine_trace(self):
+        x=fixture()
+        policy="PRIORITIZE_LOAD_READY_WITH_FREE_GROUP"
+        result,trace,_=b._engine(
+            x["positions"],x["lines"],dossier(),x["horizon_min"],
+            dispatch_policy=policy)
+        self.assertTrue(any(v["event"]=="dispatch_policy_identity"
+                            for v in trace))
+        with self.assertRaisesRegex(ArenaError,
+                "DIAGNOSIS_POLICY_NOT_EXECUTED_ENGINE_POLICY"):
+            c.diagnose_trace(
+                result,trace,dossier(),fixture_label="SOFTWARE_TOY_D_FIXED",
+                dispatch_policy="PRIORITIZE_MILK_READY")
+        with self.assertRaisesRegex(ArenaError,
+                "DIAGNOSIS_POLICY_NOT_EXECUTED_ENGINE_POLICY"):
+            c.diagnose_trace(
+                result,trace,dossier(),fixture_label="SOFTWARE_TOY_D_FIXED",
+                dispatch_policy="FCFS_READY_ASSUMED")
+        accepted=c.diagnose_trace(
+            result,trace,dossier(),fixture_label="SOFTWARE_TOY_D_FIXED",
+            dispatch_policy=policy)
+        self.assertEqual(accepted["dispatch_policy"],policy)
+        self.assertEqual(accepted["dispatch_policy_identity_source"],
+                         "ENGINE_TRACE_VARIANT_IDENTITY")
+
+    def test_astra_no_intervention_variant_still_bound_to_actual_policy(self):
+        x={"positions":[paid("solo")],
+           "lines":[item("solo")],"horizon_min":10}
+        result,trace,_=b._engine(
+            x["positions"],x["lines"],dossier(),x["horizon_min"],
+            dispatch_policy="PRIORITIZE_MILK_READY")
+        self.assertFalse(any(r["event"]=="dispatch_override" for r in trace))
+        self.assertEqual(c.diagnose_trace(
+            result,trace,dossier(),fixture_label="SOFTWARE_TOY_D_FIXED")[
+                "dispatch_policy"],"PRIORITIZE_MILK_READY")
+        with self.assertRaisesRegex(ArenaError,
+                "DIAGNOSIS_POLICY_NOT_EXECUTED_ENGINE_POLICY"):
+            c.diagnose_trace(
+                result,trace,dossier(),fixture_label="SOFTWARE_TOY_D_FIXED",
+                dispatch_policy="PRIORITIZE_HANDOFF_READY")
+
+    def test_astra_direction_classifies_regressions_losses_and_costly_gains(self):
+        report=compare_toy()
+        load=next(p for p in report["policies"] if p["policy"]==
+                  "PRIORITIZE_LOAD_READY_WITH_FREE_GROUP")
+        self.assertEqual(load["classification"],
+                         "MODEL_P90_WORSE_NO_ORDER_ADVANCED")
+        self.assertEqual(load["orders_handoff_earlier"],0)
+        self.assertGreater(load["orders_handoff_later"],0)
+        self.assertIn("worsens",load["decision_note"])
+        milk=self._competition_at_group_release("con_leche")
+        result=compare_toy(milk)
+        milk_arm=next(p for p in result["policies"] if
+                      p["policy"]=="PRIORITIZE_MILK_READY")
+        self.assertEqual(milk_arm["classification"],
+                         "MODEL_P90_BETTER_WITH_LATE_ORDERS")
+        self.assertGreater(milk_arm["orders_handoff_earlier"],0)
+        self.assertGreater(milk_arm["orders_handoff_later"],0)
+        self.assertIn("later",milk_arm["decision_note"])
+
+    def test_astra_operator_stage_minutes_and_start_shift_sums(self):
+        report=compare_toy()
+        for arm in report["policies"]:
+            for actor,work in arm["work_assigned_by_actor"].items():
+                self.assertAlmostEqual(
+                    work["busy_manual_minutes"],
+                    sum(work["stage_busy_manual_min"].values()))
+                self.assertEqual(sum(work["stage_counts"].values()),
+                                 work["completed_manual_tasks"])
+                delta=arm["work_assignment_delta_from_base"][actor]
+                self.assertAlmostEqual(delta["busy_manual_min_change"],
+                                       sum(delta[
+                                           "stage_busy_manual_min_change"].values()))
+            self.assertEqual(sum(row["earlier_tasks"] for row in
+                                 arm["start_shift_by_stage"].values()),
+                             arm["task_changes_earlier"])
+            self.assertEqual(sum(row["later_tasks"] for row in
+                                 arm["start_shift_by_stage"].values()),
+                             arm["task_changes_later"])
+        with TemporaryDirectory() as tmp:
+            output=Path(tmp)/"toy-report"
+            d.export(report,output)
+            md=(output/"D_PAIRED_POLICY_COMPARISON.md").read_text()
+            self.assertIn("microfixture de software ficticio",md)
+            self.assertIn("Minutos por operador y etapa",md)
+            self.assertIn("Lectura direccional",md)
+
     def test_baseline_reproduces_accepted_B_exact_result_trace_and_orders(self):
         x=fixture()
         inputs=(x["positions"],x["lines"],dossier(),x["horizon_min"])
