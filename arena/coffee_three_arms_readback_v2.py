@@ -154,6 +154,16 @@ def readback(zip_dir):
          fb["case_sha256"] == CASE_B0 and
          fb["status"] == "OWN_FEEDBACK_RETRIEVED_DM_POLICIES_INVOKED_B_PACKET_NOT_SENT" and
          set(fb["arms"]) == {"D", "M", "B"}, "FEEDBACK_PROVENANCE_INVALID")
+    # This is an inventory of what the archived coffee-specific M registry
+    # actually selected. It is NOT a search of other possible libraries or
+    # alternative molecules for a newly posed H1/H2/H3 question.
+    m_B0_classes = sorted({instance["class_id"]
+        for candidate in g2m["candidates"]
+        for instance in candidate["full_ast"]["instances"]})
+    need(m_B0_classes == ["accepted-source", "bounded-queue",
+                           "delivery-counter", "first-order-report-filter"] and
+         g2m["candidate_count"] == 6,
+         "M_B0_RESTRICTED_CLASS_INVENTORY_DRIFT")
     by_g2 = {(x["arm"], x["candidate_id"]): x for x in g2["results"]}
     need(len(by_g2) == 12, "G2_DUPLICATE_CANDIDATE")
     original_rows = []
@@ -322,20 +332,22 @@ def readback(zip_dir):
         "provenance":q75["source_provenance"]}
     need(hv["milk_priority_P90_delta_s"]<0 and hv["load_priority_P90_delta_s"]>0,
          "HYDRA_POLICY_DIRECTION_DRIFT")
-    # Explicit, falsifiable observables. None of the historical D/M/B models
-    # can distinguish H1 vs H2 vs H3 at the opportunity-of-load resolution.
+    # These are findings about ARCHIVED NATIVES, not the maximal expressive
+    # power of the underlying deterministic grammar, molecular compositor,
+    # provider-backed Buffalo, or any unexamined Vensim .mdl library. PR1
+    # never submitted the new H1/H2/H3 question to those producers.
     method_matrix = [
         {"method":"gramática D", "version":"original B0 6-candidate stock-flow family", "case":"B0",
          "native_location":"g2:input/native/D/manifest.json; G2 Modelica + CSV",
-         "observable":"delivered cumulative at 80/100/103.237 min", "H1":"NOT_DISTINGUISHED","H2":"NOT_DISTINGUISHED","H3":"NOT_DISTINGUISHED",
+         "observable":"delivered cumulative at 80/100/103.237 min", "H1":"NOT_ENCODED_IN_ARCHIVED_NATIVE","H2":"NOT_ENCODED_IN_ARCHIVED_NATIVE","H3":"NOT_ENCODED_IN_ARCHIVED_NATIVE",
          "method_decision":"RATIFIED_6_CANDIDATES", "question_H123_asked":"NO", "attribution":"evaluator_from_native_and_method_policy"},
         {"method":"moléculas M","version":"Short E1 original B0", "case":"B0",
          "native_location":"g2:input/native/M/native.mo; six full ASTs in manifest",
-         "observable":"deliveredTotal cumulative at 80/100/103.237 min","H1":"NOT_DISTINGUISHED","H2":"NOT_DISTINGUISHED","H3":"NOT_DISTINGUISHED",
+         "observable":"deliveredTotal cumulative at 80/100/103.237 min","H1":"NOT_ENCODED_IN_ARCHIVED_NATIVE","H2":"NOT_ENCODED_IN_ARCHIVED_NATIVE","H3":"NOT_ENCODED_IN_ARCHIVED_NATIVE",
          "method_decision":"ABSTAINED_6_NO_TWO_LATE_CONSTRUCTION_OBSERVATIONS", "question_H123_asked":"NO", "attribution":"evaluator_from_native_and_method_policy"},
         {"method":"Buffalo", "version":"original B0→R1 currentModel","case":"B0",
          "native_location":"buffalo_initial + buffalo_r1:provider/native-engine-result.json",
-         "observable":"Picked Up Orders Cumulative at three B0 cuts; MAE in synthetic orders", "H1":"NOT_DISTINGUISHED","H2":"NOT_DISTINGUISHED","H3":"NOT_DISTINGUISHED",
+         "observable":"Picked Up Orders Cumulative at three B0 cuts; MAE in synthetic orders", "H1":"NOT_ENCODED_IN_ARCHIVED_NATIVE","H2":"NOT_ENCODED_IN_ARCHIVED_NATIVE","H3":"NOT_ENCODED_IN_ARCHIVED_NATIVE",
          "method_decision":"REVISION_EXECUTED_G1; G2_RESULT_RECOVERED", "question_H123_asked":"NO", "attribution":"evaluator_from_R1_and_sealed_score"},
         {"method":"gramática D", "version":"P08 3-stage capacity extension","case":"P08 Q25/Q75",
          "native_location":"d_p08:DP08_*.mo + result.json",
@@ -350,6 +362,12 @@ def readback(zip_dir):
          "H1":"MODEL_SIGNAL_EXTRACTION_BUSY","H2":"MODEL_SIGNAL_MANUAL_BLOCK","H3":"STATE_RETAINED_AFTER_EXTRACTION_NO_OBSERVED_LOCAL_DURATION",
          "method_decision":"ASSUMED_FCFS_MODEL_DIAGNOSTIC", "question_H123_asked":"PARTIALLY", "attribution":"evaluator_from_reference_results_and_B_contract"},
     ]
+    for row in method_matrix:
+        row["full_method_H123_capacity_tested"] = False
+        row["interpretation_scope"] = (
+            "ARCHIVED_NATIVE_AND_EXISTING_RESULTS_ONLY" if
+            row["method"] != "referencia Hydra" else
+            "ASSUMED_PHYSICAL_REFERENCE_NOT_FIELD_OBSERVATION")
     # Numeric scope/type controls: P08 D and M can be compared under their
     # shared pulse at cut; P08 vs Hydra is NOT a comparable numeric experiment.
     p08_scope={"case":"P08_Q75","input_profile":"RECTANGULAR_105_MIN","material_unit":"orders_as_continuous_flow",
@@ -367,6 +385,24 @@ def readback(zip_dir):
             "cross_arm_ATMS_what_if_executed_in_PR1":False}
     return {"schema": SCHEMA, "mode":"RETROSPECTIVE_PUBLIC_ARTIFACT_READBACK_NOT_BLIND",
             "source_registry":public_provenance(),
+            "coverage_audit":{
+                "question_H123_newly_asked_of_D_M_B_in_PR1":False,
+                "full_producer_capability_to_construct_H123_models_tested":False,
+                "new_cloudflare_Buffalo_generate_or_review_POST":0,
+                "D_B0_grammar_version":"generic-conservative-chain-search/0.1",
+                "D_B0_grammar_examined":"ONE_TO_THREE_SERIAL_STOCKS_WITH_OPTIONAL_LOSS",
+                "D_B0_direct_topology_primitives_not_new_fitted_search":True,
+                "M_B0_registry":"arena/coffee_adapters/registry.coffee.v1.json",
+                "M_B0_declared_e0_catalog":"arena/_vendor/igc/experiments/e0/catalog.json",
+                "M_B0_distinct_classes_used":m_B0_classes,
+                "M_B0_archived_graph_count":6,
+                "M_P08_distinct_classes_used":["accepted-source","bounded-queue","delivery-counter"],
+                "M_P08_archived_topologies":1,
+                "M_P08_parameter_scenarios":6,
+                "additional_unexamined_molecules_may_exist":True,
+                "other_Vensim_MDL_or_alternative_catalogs_tested":False,
+                "D_accuracy_on_B0_not_causal_mechanism_identification":True,
+            },
             "original_B0":{"case_sha256":CASE_B0,"D_candidate_count":6,"M_candidate_count":6,
                            "G2_authenticated":12,"candidate_receipts":original_rows,
                            "feedback_original_policies_invoked":{"D":True,"M":True,"B":False},
@@ -391,7 +427,7 @@ def readback(zip_dir):
                 "action":"NO_SHOP_POLICY_CHANGE", "next_observation":"ONE_ELIGIBLE_LOADING_OPPORTUNITY_WITH_ALL_GROUP_STATES_AND_ELIGIBLE_OPERATOR_ACTIVITY",
                 "incremental_operational_observation_demonstrated":False,
                 "representational_insight":"P08 AGGREGATE_PREPARATION_PROXY_SEPARATE_FROM_PHYSICAL_DISPATCH",
-                "reason":"HISTORIC_D_M_B_CANNOT_DISCRIMINATE_PHYSICAL_H1_H2_H3"},
+                "reason":"ARCHIVED_D_M_B_NATIVES_LACK_EXPLICIT_H123_STATES_METHOD_CAPABILITIES_NOT_TESTED"},
             "contribution_assessment":{"representational":"D_M_P08_AGGREGATE_STAGE_CAPACITY_CONDITIONAL_MECHANISM; BUFFALO_G1_CAUSAL_REVIEW",
                 "informative":"NO_ADDITIONAL_H1_H2_H3_OBSERVATION_DEMONSTRATED_RETROSPECTIVELY",
                 "decisional":"PENDING_INDEPENDENT_PROSPECTIVE_CONTRAST",
@@ -458,8 +494,31 @@ def markdown(report):
                   f"- Espera de carga: `{h['fcfs_loading_wait_task_min']:.4f}` → `{h['load_policy_loading_wait_task_min']:.4f}` min-tarea; 9 pedidos antes/9 después bajo prioridad de carga.",
                   f"- FCFS H1 señal `{h['fcfs_all_groups_extracting_task_min']:.4f}` min-tarea; H2 señal `{h['fcfs_manual_block_group_free_task_min']:.4f}` min-tarea. Son esperas de tareas, **no tiempo de reloj sumable**.",
                   "- H3 es estado representado en el motor B; el agregado publicado no permite atribuir un episodio real ni cuantificar su duración en barra.",
+                  "", "## Alcance exacto: modelos archivados, no productores completos",
+                  "", "Esta reconstrucción **NO ejecutó de nuevo D/M/B** ni les formuló H1/H2/H3.",
+                  "El veredicto de la tabla habla exclusivamente de la representación nativa archivada:",
+                  "NO codificar una variable no demuestra incapacidad del método para construirla.",
+                  "", "**D B0:** gramática determinista `generic-conservative-chain-search/0.1`,",
+                  "seis cadenas de 1–3 stocks con/sin pérdida y parámetros supuestos.",
+                  "La ruta de cafetería invocó primitivas de topología, no una nueva búsqueda",
+                  "ajustada a observaciones de tareas. Su MAE sintético de retiros acumulados",
+                  "no identifica qué recurso originó una espera.",
+                  "", "**M B0:** seis grafos enumerados del registro específico de cafetería",
+                  "con cuatro clases distintas: " + ", ".join(report["coverage_audit"]["M_B0_distinct_classes_used"])+".",
+                  "Las alternativas varían tránsito y filtrado de reporte, no operadores",
+                  "ni reservas de grupos físicos. **M P08:** una sola topología",
+                  "`AcceptedSource → BoundedQueue preparación → BoundedQueue espresso →",
+                  "BoundedQueue despacho → DeliveryCounter` en seis casos de parámetros.",
+                  "No se probaron otras moléculas, catálogos alternativos o archivos Vensim .mdl.",
+                  "", "**Buffalo:** B0→R1 es una revisión real y su modelo sellado,",
+                  "pero de una pregunta sobre retiros acumulados. El nativo R1 no codifica",
+                  "operadores ni grupos identificados. **PR1 no hizo un nuevo POST Cloudflare**",
+                  "ni probó si Buffalo puede generar ese detalle bajo otra consigna.",
                   "", "## Capacidad de distinguir H1 / H2 / H3",
                   "", "**Unidad de análisis:** una oportunidad de carga sobre grupo concreto, no el contador acumulado de pedidos.",
+                  "Los códigos `NOT_ENCODED_IN_ARCHIVED_NATIVE` describen el modelo",
+                  "publicado; `full_method_H123_capacity_tested=false` impide extrapolarlos",
+                  "a la capacidad de construcción del método completo.",
                   "", "| Método (versión) | H1 | H2 | H3 | ¿Se le preguntó históricamente? |",
                   "|---|---|---|---|---|"])
     for row in report["H1_H2_H3_method_matrix"]:
