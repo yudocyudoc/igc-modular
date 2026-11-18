@@ -397,7 +397,8 @@ def compare(positions,lines,dossier,horizon, *,
 
 
 def compare_existing_construction_q25_q75(view_dir,dossier, *,
-                                           dispatch_authorized=False):
+                                           dispatch_authorized=False,
+                                           source_receipt=None):
     """Read only P39/P11 verified construction views, then exactly eight arms.
 
     Called ONLY by an explicitly authorized main-line execution. Never fetch
@@ -408,17 +409,45 @@ def compare_existing_construction_q25_q75(view_dir,dossier, *,
     selection=p11._verified_load_choices(view_dir)
     require([x["load_label"] for x in selection["selected"]]==
             list(ALLOWED_CONSTRUCTION),"EXACT_Q25_Q75_SELECTION")
+    if source_receipt is not None:
+        require(isinstance(source_receipt,dict) and
+                source_receipt.get("status")==
+                    "EXISTING_CONSTRUCTION_VIEWS_VERIFIED_NO_NEW_CORPUS" and
+                source_receipt.get("read_only_source_run_id")==SOURCE_RUN_ID,
+                "PRIVATE_SOURCE_RUN_RECEIPT_INVALID")
     compared=[]
     for index,chosen in enumerate(selection["selected"]):
         case=inputs.select_case_day(
             view_dir,chosen["case_id"],chosen["day"])
         require(case["partition"]=="CONSTRUCTION",
                 "NO_DEVELOPMENT_OR_EVALUATION")
+        require(case["horizon"]>0 and
+                chosen["load_label"] in ALLOWED_CONSTRUCTION,
+                "SELECTED_CASE_HORIZON_OR_LABEL")
+        source_provenance={
+            "verified_adapter":"P11_P39_CONSTRUCTION_SELECT_CASE_DAY",
+            "selected_load_label":chosen["load_label"],
+            "selected_case_day_digest":digest({
+                "case_id":chosen["case_id"],"day":chosen["day"]}),
+            "selection_receipt_sha256":digest(selection),
+            "source_view_run_id":(
+                source_receipt["read_only_source_run_id"]
+                if source_receipt is not None else None),
+            "source_type":(
+                "R2_READ_ONLY_VERIFIED_RUN" if source_receipt is not None
+                else "LOCAL_FIXTURE_VERIFIED_VIEWS_NO_R2_CLAIM"),
+            "source_peak_horizon_min":case["horizon"],
+            "partition":"CONSTRUCTION",
+            "case_paid_input_digest":digest({
+                "positions":case["positions"],"items":case["items"]}),
+        }
         report=compare(
             case["positions"],case["items"],dossier,case["horizon"],
             source_label=("CONSTRUCTION_SYNTHETIC_Q25" if index==0 else
                           "CONSTRUCTION_SYNTHETIC_Q75"),
-            load_label=chosen["load_label"])
+            load_label=chosen["load_label"],
+            _verified_selection_capability=_VERIFIED_SELECTION_CAPABILITY,
+            _source_provenance=source_provenance)
         compared.append(report)
     require(len(compared)==2 and
             sum(len(r["policies"]) for r in compared)==8,
@@ -429,6 +458,10 @@ def compare_existing_construction_q25_q75(view_dir,dossier, *,
         "selected_loads":list(ALLOWED_CONSTRUCTION),
         "scenario_count":8,
         "source":"P39_P11_VERIFIED_CONSTRUCTION_ONLY",
+        "source_selection_sha256":digest(selection),
+        "source_view_run_id":(
+            source_receipt["read_only_source_run_id"]
+            if source_receipt is not None else None),
         "results":compared,
         "not_a_new_evidence_collection":True,
     }
