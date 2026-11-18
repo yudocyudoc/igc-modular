@@ -25,6 +25,18 @@ El primer run de CI vuelve a descargar los ocho ZIP desde GitHub, ejecuta las re
 
 **Hydra Q75:** 46 pagos, 53 bebidas, extracción automática 90s no calibrada, 4 políticas. Se reproducen los efectos P90, las señales de extracción ocupada y carga manual bloqueada. Retención del grupo tras timer terminando es una propiedad del simulador físico; no se atribuyen minutos reales de H3 observados.
 
+## Corrección metodológica tras la auditoría de alcance
+
+**No se ha probado la capacidad máxima de los métodos.** PR1 examinó nativos históricos, no ejecutó una nueva búsqueda D, catálogo molecular alternativo ni llamada nueva a Cloudflare Buffalo. Los códigos de la matriz `NOT_ENCODED_IN_ARCHIVED_NATIVE` describen exclusivamente las variables y estados de esos modelos archivados, no establecen `METHOD_CANNOT_MODEL_H123`. Cada fila añade `full_method_H123_capacity_tested=false` y el JSON publica `coverage_audit`.
+
+La gramática D original B0 usó las primitivas deterministas de `generic-conservative-chain-search/0.1`, una familia restringida de 1–3 stocks en cadena con/sin pérdida. El adaptador de cafetería evitó llamar `generate()` porque ese contrato exige observaciones de entregas que no estaban disponibles. Su buen error de predicción en retiros agregados sintéticos no demuestra identificación de causas físicas.
+
+M original B0 usó **cuatro clases** de E0: `accepted-source`, `bounded-queue`, `delivery-counter` y `first-order-report-filter`, en **seis composiciones** restringidas por `registry.coffee.v1.json`; las diferencias opcionales fueron tránsito y filtrado de señal. M P08 usó **una topología** de `AcceptedSource`, tres `BoundedQueue` y `DeliveryCounter` en **seis combinaciones de carga/parámetro**, no seis nuevas estructuras. No se inspeccionaron otros catálogos, moléculas Vensim `.mdl` ni todas las posibles composiciones para H1/H2/H3. Una cola continua no contiene por sí misma asignación a un operador o grupo.
+
+El Buffalo archivado es B0 original y revisión R1 con `currentModel`, dos ejecuciones auténticas anteriores que no se repitieron en PR1. El modelo R1 expresa pedidos pagados, espera y retiros acumulados (11 variables, 12 relaciones) sin identificación individual de baristas, grupos y fases de retirada. Eso **no prueba que Buffalo sea incapaz de generar otro modelo** ante evidencia y consigna H1/H2/H3.
+
+El siguiente experimento de cobertura tendría que formular la nueva pregunta a los métodos completos, declarar bibliotecas y familias candidatas, comprobar representabilidad y después, si está autorizado, ejecutar nuevas propuestas y revisiones. Ese trabajo queda fuera de PR1 y requiere presupuesto/autoridad independiente.
+
 ## Conclusiones operativas
 
 **Hydra sola:** no cambiar política; observar una única oportunidad de carga con estado simultáneo G01/G02/G03, elegibilidad de tarea, operador apto, extracción y retirada.
