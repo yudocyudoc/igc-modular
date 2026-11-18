@@ -467,6 +467,248 @@ def compare_existing_construction_q25_q75(view_dir,dossier, *,
     }
 
 
+
+def effect_direction(delta):
+    if delta is None:
+        return "UNKNOWN"
+    return "BETTER" if delta<-EPS else "WORSE" if delta>EPS else "TIE"
+
+
+def _public_construction_summary(case_set, execution_receipt=None):
+    """Only aggregates cross the public artifact boundary, never order rows."""
+    require(case_set["schema"]==CASE_SET_SCHEMA and
+            case_set["scenario_count"]==8 and
+            len(case_set["results"])==2 and
+            [x["load_label"] for x in case_set["results"]]==
+            list(ALLOWED_CONSTRUCTION),"WRONG_CASE_SET")
+    results=[]
+    for load in case_set["results"]:
+        require(load["schema"]==SCHEMA and len(load["policies"])==4 and
+                load["source_provenance"]["verified_adapter"]==
+                    "P11_P39_CONSTRUCTION_SELECT_CASE_DAY" and
+                load["source_provenance"]["selected_load_label"]==
+                    load["load_label"],"UNVERIFIED_CASE_IN_SET")
+        arm_rows=[]
+        for p in load["policies"]:
+            arm_rows.append({
+                "policy":p["policy"],
+                "rule_changed_assignment_count":
+                    p["rule_changed_assignment_count"],
+                "handoffs_before_source_cut":p["handoffs_before_source_cut"],
+                "orders_pending_at_source_cut":p["orders_pending_at_source_cut"],
+                "p50_paid_to_handoff_full_drain_min":
+                    p["p50_paid_to_handoff_full_drain_min"],
+                "p90_paid_to_handoff_full_drain_min":
+                    p["p90_paid_to_handoff_full_drain_min"],
+                "delta_p50_min_positive_is_worse":
+                    p["delta_p50_min_positive_is_worse"],
+                "delta_p90_min_positive_is_worse":
+                    p["delta_p90_min_positive_is_worse"],
+                "delta_handoffs_before_cut":p["delta_handoffs_before_cut"],
+                "orders_handoff_earlier":p["orders_handoff_earlier"],
+                "orders_handoff_later":p["orders_handoff_later"],
+                "orders_handoff_unchanged":p["orders_handoff_unchanged"],
+                "task_changes_earlier":p["task_changes_earlier"],
+                "task_changes_later":p["task_changes_later"],
+                "start_shift_by_stage":p["start_shift_by_stage"],
+                "work_assigned_by_actor":p["work_assigned_by_actor"],
+                "work_assignment_delta_from_base":
+                    p["work_assignment_delta_from_base"],
+                "waits_from_C_diagnosis":p["waits_from_C_diagnosis"],
+                "classification":p["classification"],
+                "decision_note":p["decision_note"],
+                "p90_direction_vs_assumed_FCFS":
+                    effect_direction(p["delta_p90_min_positive_is_worse"]),
+            })
+        results.append({
+            "load_label":load["load_label"],
+            "source_provenance":load["source_provenance"],
+            "source_horizon_min":load["source_horizon_min"],
+            "scenario_input_sha256":load["scenario_input_sha256"],
+            "physical_dossier_sha256":load["physical_dossier_sha256"],
+            "arms":arm_rows,
+        })
+    cross=[]
+    for idx in range(4):
+        a=results[0]["arms"][idx]
+        z=results[1]["arms"][idx]
+        require(a["policy"]==z["policy"]==POLICIES[idx],
+                "POLICY_PAIR_MISALIGNED")
+        direction_a=a["p90_direction_vs_assumed_FCFS"]
+        direction_z=z["p90_direction_vs_assumed_FCFS"]
+        if idx==0:
+            verdict="BASELINE_ASSUMED_NOT_REAL_POLICY"
+        elif direction_a!=direction_z:
+            verdict="DIRECTION_DIFFERS_BETWEEN_Q25_AND_Q75"
+        elif direction_a=="TIE":
+            verdict=("P90_TIE_WITH_TASK_OR_ORDER_CHANGE" if
+                     any(x["rule_changed_assignment_count"] or
+                         x["orders_handoff_earlier"] or
+                         x["orders_handoff_later"] for x in (a,z)) else
+                     "NO_MEASURED_P90_DIFFERENCE_IN_THESE_TWO_INPUTS")
+        elif direction_a=="BETTER" and (
+                a["orders_handoff_later"] or z["orders_handoff_later"]):
+            verdict="BOTH_P90_BETTER_BUT_SOME_ORDERS_LATER"
+        elif direction_a=="WORSE":
+            verdict="BOTH_P90_WORSE_IN_ASSUMED_MODEL"
+        else:
+            verdict="SAME_DIRECTION_WITHOUT_PROVEN_REAL_WORLD_EFFECT"
+        cross.append({
+            "policy":POLICIES[idx],
+            "Q25_p90_direction":direction_a,
+            "Q75_p90_direction":direction_z,
+            "Q25_advanced_orders":a["orders_handoff_earlier"],
+            "Q25_delayed_orders":a["orders_handoff_later"],
+            "Q75_advanced_orders":z["orders_handoff_earlier"],
+            "Q75_delayed_orders":z["orders_handoff_later"],
+            "interpretation":verdict,
+        })
+    receipt=(dict(execution_receipt) if execution_receipt is not None else {
+        "status":"LOCAL_FIXTURE_NOT_GITHUB_RUN",
+        "github_run_id":None,
+        "github_commit_sha":None,
+        "source_view_run_id":None,
+        "R2_read_attempts":"NONE_IN_LOCAL_FIXTURE",
+        "R2_billing_cost":"UNKNOWN_NOT_BILLED",
+        "new_solver_and_provider_attempts":0,
+        "no_new_corpus":True,
+    })
+    if receipt.get("status")=="GITHUB_MANUAL_EIGHT_ARM_DISPATCH":
+        require(receipt.get("github_run_id") and
+                receipt.get("github_commit_sha") and
+                receipt.get("source_view_run_id")==SOURCE_RUN_ID and
+                receipt.get("R2_read_attempts")!="NONE_IN_LOCAL_FIXTURE",
+                "INCOMPLETE_MANUAL_EXECUTION_RECEIPT")
+    return {
+        "schema":"arena.coffee.p46.public-eight-scenario-aggregate/1",
+        "scope":"SYNTHETIC_VERIFIED_CONSTRUCTION_ONLY_NOT_REAL_CAFE",
+        "selected_loads":list(ALLOWED_CONSTRUCTION),
+        "scenario_count":8,
+        "source_selection_sha256":case_set["source_selection_sha256"],
+        "source_view_run_id":case_set["source_view_run_id"],
+        "execution_and_consumption":receipt,
+        "results":results,
+        "paired_interpretation":cross,
+        "limits":{
+            "not_real_cafe_service_evidence":True,
+            "not_a_policy_selection_or_economic_benefit":True,
+            "full_per_order_and_task_rows_not_in_public_artifact":True,
+            "only_existing_construction_not_reserved_data":True,
+        },
+    }
+
+
+def _export_case_set(case_set,output_dir, *, execution_receipt=None):
+    aggregate=_public_construction_summary(case_set,execution_receipt)
+    target=Path(output_dir)
+    require(not target.exists(),"OUTPUT_ALREADY_EXISTS")
+    target.mkdir(mode=0o700,parents=True)
+    write_json(target/"D_Q25_Q75_AGGREGATE.json",aggregate,exclusive=True)
+    rows=[]
+    stage_rows=[]
+    for load in aggregate["results"]:
+        for arm in load["arms"]:
+            rows.append({
+                "load_label":load["load_label"],
+                "policy":arm["policy"],
+                "priority_interventions":
+                    arm["rule_changed_assignment_count"],
+                "handoffs_before_source_cut":arm["handoffs_before_source_cut"],
+                "pending_at_source_cut":arm["orders_pending_at_source_cut"],
+                "p50_min":arm["p50_paid_to_handoff_full_drain_min"],
+                "p90_min":arm["p90_paid_to_handoff_full_drain_min"],
+                "delta_p90_positive_is_worse":
+                    arm["delta_p90_min_positive_is_worse"],
+                "p90_direction":arm["p90_direction_vs_assumed_FCFS"],
+                "orders_earlier":arm["orders_handoff_earlier"],
+                "orders_later":arm["orders_handoff_later"],
+                "classification":arm["classification"],
+            })
+            for actor,details in arm["work_assigned_by_actor"].items():
+                for stage,minutes in details["stage_busy_manual_min"].items():
+                    stage_rows.append({
+                        "load_label":load["load_label"],
+                        "policy":arm["policy"],
+                        "operator":actor,
+                        "stage":stage,
+                        "tasks":details["stage_counts"][stage],
+                        "busy_manual_min":minutes,
+                        "delta_busy_manual_min":arm[
+                            "work_assignment_delta_from_base"][actor][
+                                "stage_busy_manual_min_change"][stage],
+                        "earlier_task_starts":arm["start_shift_by_stage"][
+                            stage]["earlier_tasks"],
+                        "later_task_starts":arm["start_shift_by_stage"][
+                            stage]["later_tasks"],
+                    })
+    for name,records in (
+            ("D_Q25_Q75_PAIRED.csv",rows),
+            ("D_Q25_Q75_OPERATOR_STAGE.csv",stage_rows)):
+        require(records,"EMPTY_CONSTRUCTION_AGGREGATE")
+        with (target/name).open("x",encoding="utf-8",newline="") as stream:
+            writer=csv.DictWriter(stream,fieldnames=list(records[0]))
+            writer.writeheader()
+            writer.writerows(records)
+    lines=[
+        "# D — comparación Q25/Q75 de ocho escenarios de construcción",
+        "",
+        "**No son pedidos reales ni una medición de desempeño del local.**",
+        "**Run:** "+str(aggregate["execution_and_consumption"].get(
+            "github_run_id")),
+        "**Commit:** "+str(aggregate["execution_and_consumption"].get(
+            "github_commit_sha")),
+        "**Fuente privada histórica:** "+
+            str(aggregate["source_view_run_id"]),
+        "**Estado de consumo:** "+
+            str(aggregate["execution_and_consumption"].get(
+                "R2_billing_cost","UNKNOWN")),
+        "**Selección verificada:** "+aggregate["source_selection_sha256"],
+        "",
+        "| Carga | Política | Cambios de decisión | Entregas antes corte | "
+        "Pendientes | P50 | P90 | ΔP90 | Adelantados/Demorados | Lectura |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---|---|",
+    ]
+    for row in rows:
+        lines.append("| "+row["load_label"]+" | "+row["policy"]+" | "+
+                     str(row["priority_interventions"])+" | "+
+                     str(row["handoffs_before_source_cut"])+" | "+
+                     str(row["pending_at_source_cut"])+" | "+
+                     str(row["p50_min"])+" | "+str(row["p90_min"])+
+                     " | "+str(row["delta_p90_positive_is_worse"])+
+                     " | "+str(row["orders_earlier"])+"/"+
+                     str(row["orders_later"])+" | "+row["classification"]+" |")
+    lines+=["","## Consistencia entre cargas",""]
+    for cross in aggregate["paired_interpretation"]:
+        lines.append("- "+cross["policy"]+": Q25="+cross[
+            "Q25_p90_direction"]+", Q75="+cross["Q75_p90_direction"]+
+            "; "+cross["interpretation"]+".")
+    lines += [
+        "",
+        "## Trabajo desplazado",
+        "",
+        "La tabla separada D_Q25_Q75_OPERATOR_STAGE.csv informa minutos "
+        "manuales B01/B02 por etapa y cambios relativos a la base; "
+        "las cuentas de inicios adelantados/demorados son por etapa.",
+        "",
+        "## Límites",
+        "",
+        "P90 se calcula sobre el drenaje completo. Dos políticas con el "
+        "mismo P90 pueden cambiar distintos pedidos. Una reducción de "
+        "P90 con pedidos más tardíos requiere registrar ese costo.",
+        "La ruta de construcción se seleccionó mediante P11 y "
+        "select_case_day; no se mezclaron intervalos de video.",
+        "El reporte público contiene sólo agregados; nunca incluye los "
+        "identificadores de pedidos ni los cambios de tarea individuales.",
+        "Un GET a R2 puede tener costo aun si falla; el costo de R2 se "
+        "marca UNKNOWN si no existe recibo de facturación.",
+        "No se realizó una nueva campaña, un envío a proveedor ni OMC. "
+        "Esta ejecución de políticas locales no establece ahorro real.",
+    ]
+    (target/"D_Q25_Q75_DECISION.md").write_text(
+        "\n".join(lines)+"\n",encoding="utf-8")
+    return aggregate
+
+
 ORDER_FIELDS=("paid_case_label","paid_time_min","beverages","policy",
               "baseline_handoff_min","policy_handoff_min",
               "handoff_delta_min_positive_is_later",
