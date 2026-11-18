@@ -788,7 +788,7 @@ def export(report,output_dir, *, execution_receipt=None):
                     str(summary["earlier_tasks"])+"/"+
                     str(summary["later_tasks"]) for stage,summary in
                     row["start_shift_by_stage"].items()),
-            "**Minutos por operador y etapa:** "+
+            "**Trabajo reasignado (minutos por operador y etapa):** "+
                 ", ".join(actor+"="+
                     ", ".join(stage+":"+str(minutes) for stage,minutes in
                     record["stage_busy_manual_min"].items()) for actor,record
