@@ -135,6 +135,46 @@ class E1Tests(unittest.TestCase):
                     source_receipt={"read_only_source_run_id":e1.SOURCE_RUN_ID})
         case_in_tmp(check)
 
+    def test_astra_rejects_tampered_historical_p90_even_when_metadata_claims_real_run(self):
+        # The original artifact hash is pinned OUTSIDE the received JSON.
+        # Fabricate valid-looking receipt metadata; no R2 is ever contacted.
+        # Astra's adversarial mutation adds 0.5 min = 30 s to milk P90.
+        self.assertEqual(e1.HISTORICAL_D_AGGREGATE_SHA256,
+                         "sha256:197ee046eb4030371ce4049c674c701781fe7aeaeb175adc107e7b2d4b55a215")
+        def check(folder,view,original,archive):
+            fake=copy.deepcopy(archive)
+            receipt=fake["execution_and_consumption"]
+            receipt.update({
+                "status":"GITHUB_MANUAL_EIGHT_ARM_DISPATCH",
+                "github_run_id":e1.HISTORICAL_D_RUN,
+                "github_commit_sha":e1.HISTORICAL_D_SHA,
+                "source_view_run_id":e1.SOURCE_RUN_ID,
+                "R2_views_successfully_retrieved":8,
+            })
+            fake["source_view_run_id"]=e1.SOURCE_RUN_ID
+            milk=next(x for x in fake["results"][1]["arms"]
+                      if x["policy"]==e1.MILK)
+            baseline=next(x for x in fake["results"][1]["arms"]
+                          if x["policy"]==e1.BASE)
+            old_effect=60*(milk["p90_paid_to_handoff_full_drain_min"]-
+                           baseline["p90_paid_to_handoff_full_drain_min"])
+            milk["p90_paid_to_handoff_full_drain_min"]+=0.5
+            altered_effect=60*(milk["p90_paid_to_handoff_full_drain_min"]-
+                               baseline["p90_paid_to_handoff_full_drain_min"])
+            self.assertAlmostEqual(altered_effect-old_effect,30.0)
+            with self.assertRaisesRegex(
+                    ArenaError,"HISTORICAL_AGGREGATE_SHA256_MISMATCH"):
+                e1._historical_q75(fake,original)
+            with self.assertRaisesRegex(
+                    ArenaError,"HISTORICAL_AGGREGATE_SHA256_MISMATCH"):
+                e1.compare_verified_q75(
+                    view,fake,original,dispatch_authorized=True,
+                    source_receipt={
+                        "status":"EXISTING_CONSTRUCTION_VIEWS_VERIFIED_NO_NEW_CORPUS",
+                        "read_only_source_run_id":e1.SOURCE_RUN_ID,
+                        "R2_views_successfully_retrieved":8})
+        case_in_tmp(check)
+
     def test_reject_archive_wrong_selected_case_day_and_digest(self):
         def check(folder,view,original,archive):
             corrupt=copy.deepcopy(archive)
@@ -210,6 +250,27 @@ class E1Tests(unittest.TestCase):
                               for x in rows],[90,90,30,30])
             self.assertEqual([x["policy"] for x in rows],
                              [e1.BASE,e1.MILK,e1.BASE,e1.MILK])
+            self.assertEqual(
+                {x["source"] for x in rows if
+                 x["auto_extraction_seconds"]=="90"},
+                {"SOFTWARE_FIXTURE_D_90S_INVENTED_NOT_GITHUB_RUN"})
+            self.assertEqual(
+                {x["source"] for x in rows if
+                 x["auto_extraction_seconds"]=="30"},
+                {"SOFTWARE_FIXTURE_E1_30S_INVENTED_NOT_PRIVATE_RUN"})
+            markdown=(output/"E1_Q75_DECISION.md").read_text(
+                encoding="utf-8")
+            self.assertIn("SOFTWARE_FIXTURE_D_90S_INVENTED_NOT_GITHUB_RUN",
+                          markdown)
+            self.assertIn("SOFTWARE_FIXTURE_E1_30S_INVENTED_NOT_PRIVATE_RUN",
+                          markdown)
+            self.assertNotIn("ARCHIVED_ACCEPTED_D_RUN_44234407455_NOT_RERUN",
+                             markdown)
+            self.assertNotIn("ARCHIVED_ACCEPTED_D_RUN_44234407455_NOT_RERUN",
+                             (output/"E1_Q75_FOUR_CELLS.csv").read_text())
+            self.assertEqual(
+                {x["source"] for x in public["historical_90s_arms"]},
+                {"SOFTWARE_FIXTURE_D_90S_INVENTED_NOT_GITHUB_RUN"})
             self.assertEqual({int(x["paid_orders"]) for x in rows},
                              {report["paid_orders"]})
             raw=json.dumps(public)
