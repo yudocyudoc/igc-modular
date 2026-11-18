@@ -380,6 +380,9 @@ def _engine(positions, lines, d, horizon):
         return {"required_classes":list(STAGE_CLASSES[stage]),
                 "unskilled_actors":unskilled,
                 "alternative_routes":routes,
+                # Capture enabled groups for ALL stages. Preparation happens
+                # off-group, but its diagnosis still needs group availability.
+                "enabled_group_states":dict(group_state),
                 "all_routes_blocked":True}
 
     def start(task,choice,time):
@@ -512,13 +515,36 @@ def _engine(positions, lines, d, horizon):
             next_time=events[0][0]
             if next_time>time:
                 for task in ready:
-                    diagnosis=blocking_routes(task,time)
-                    trace.append({"event":"blocked_interval",
-                                  "start_time":time,"end_time":next_time,
-                                  "minutes":next_time-time,
-                                  "job":task["job"],"stage":task["stage"],
-                                  "eligible_at":task["eligible_at"],
-                                  "blocking":diagnosis})
+                    # At end-duration the actor loses the ability to START
+                    # and FINISH a nonpreemptive task within the window, even
+                    # before the calendar END event. These diagnostic cuts
+                    # do NOT wake, reorder or modify the FCFS dispatcher.
+                    stage=task["stage"]
+                    cuts={time,next_time}
+                    if stage!="extract_auto":
+                        duration=timing[stage]
+                        for actor in d["operators"].values():
+                            if stage not in actor["skills"]:
+                                continue
+                            for start,end in actor["availability_windows_min"]:
+                                last_start=end-duration
+                                for threshold in (start,last_start,end):
+                                    if time+1e-10<threshold<next_time-1e-10:
+                                        cuts.add(threshold)
+                    boundaries=sorted(cuts)
+                    for left,right in zip(boundaries,boundaries[1:]):
+                        if right-left<=1e-10:
+                            continue
+                        # Sample INSIDE positive-duration interval: a start
+                        # feasible only at the LEFT boundary has zero signal
+                        # time. Resource occupancy is constant between events.
+                        diagnosis=blocking_routes(task,(left+right)/2)
+                        trace.append({"event":"blocked_interval",
+                                      "start_time":left,"end_time":right,
+                                      "minutes":right-left,
+                                      "job":task["job"],"stage":stage,
+                                      "eligible_at":task["eligible_at"],
+                                      "blocking":diagnosis})
     need(not held and not occupied and
          all(state=="FREE" for state in group_state.values()) and
          len(completed)==len(paid) and
