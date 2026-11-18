@@ -41,6 +41,59 @@ def compare_toy(x=None,conf=None):
 
 
 class DPolicies(unittest.TestCase):
+    def test_astra_manual_workflow_uses_custodian_environment_but_not_in_compute(self):
+        # No R2 call or secrets needed: static YAML contract matches P39.
+        manual=(ROOT/".github/workflows/coffee-hydra-p46-d-manual.yml"
+                ).read_text(encoding="utf-8")
+        precedent=(ROOT/".github/workflows/coffee-hydra-p39.yml"
+                   ).read_text(encoding="utf-8")
+        self.assertIn("    environment: arena-custodian\n",manual)
+        self.assertIn("    environment: arena-custodian\n",precedent)
+        self.assertIn("  manual-eight-policy-comparisons:\n"
+                      "    runs-on: ubuntu-24.04\n"
+                      "    environment: arena-custodian\n",manual)
+        fetch=manual.split("      - name: Fetch only existing private "
+                           "CONSTRUCTION views from pinned source run\n")[1]
+        fetch,compute=fetch.split(
+            "      - name: Compare 2 verified construction loads x "
+            "4 policies without R2 credentials\n",1)
+        compute=compute.split(
+            "      - name: Publish only aggregate Q25/Q75 policy artifact",1)[0]
+        for key in ("CT03_R2_ACCESS_KEY_ID",
+                    "CT03_R2_SECRET_ACCESS_KEY"):
+            self.assertIn(key,fetch)
+            self.assertNotIn(key,compute)
+        self.assertIn("--mode construction",compute)
+        self.assertNotIn("s3api",compute)
+
+    def test_astra_one_paid_order_three_drinks_one_delayed_preparation(self):
+        # Astra's specific counterexample: operator rows must not each
+        # repeat the ONE globally late preparation.
+        x={"positions":[paid("triple",drinks=3)],
+           "lines":[item("triple",quantity=3)],
+           "horizon_min":10}
+        result=compare_toy(x)
+        arm=next(a for a in result["policies"] if
+                 a["policy"]=="PRIORITIZE_LOAD_READY_WITH_FREE_GROUP")
+        self.assertEqual(arm["paid_orders"],1)
+        self.assertEqual(arm["synthetic_beverages"],3)
+        prep=arm["start_shift_by_stage"]["prepare"]
+        self.assertEqual(prep["later_tasks"],1)
+        rows=d._global_stage_shift_rows("SOFTWARE_TOY_FIXED",arm)
+        preparation=[r for r in rows if r["stage"]=="prepare"]
+        self.assertEqual(len(preparation),1)
+        self.assertEqual(preparation[0]["later_task_starts"],1)
+        self.assertEqual(sum(r["later_task_starts"] for r in
+                             preparation),1)
+        manual=sum(work["stage_counts"]["prepare"] for work in
+                   arm["work_assigned_by_actor"].values())
+        self.assertEqual(manual,3)
+        self.assertEqual(sum(
+            work["stage_busy_manual_min"]["prepare"] for work in
+            arm["work_assigned_by_actor"].values()),
+            round(3*dossier()["durations_min"][
+                "prepare_off_group_min"]["value"],9))
+
     def test_astra_q25_q75_make_view_adaptor_exports_exact_eight_aggregates(self):
         with TemporaryDirectory() as tmp:
             view,_=make_view(tmp)
@@ -61,7 +114,9 @@ class DPolicies(unittest.TestCase):
             self.assertEqual(aggregate["source_view_run_id"],None)
             self.assertEqual({p.name for p in target.iterdir()},{
                 "D_Q25_Q75_AGGREGATE.json","D_Q25_Q75_PAIRED.csv",
-                "D_Q25_Q75_OPERATOR_STAGE.csv","D_Q25_Q75_DECISION.md"})
+                "D_Q25_Q75_OPERATOR_STAGE.csv",
+                "D_Q25_Q75_STAGE_SHIFTS.csv",
+                "D_Q25_Q75_DECISION.md"})
             with (target/"D_Q25_Q75_PAIRED.csv").open(
                     encoding="utf-8",newline="") as stream:
                 rows=list(csv.DictReader(stream))
@@ -72,6 +127,37 @@ class DPolicies(unittest.TestCase):
             self.assertEqual(len(by_stage),8*2*6)
             self.assertTrue(all(item["stage"] and
                                 item["busy_manual_min"] for item in by_stage))
+            self.assertTrue(all("earlier_task_starts" not in item and
+                                "later_task_starts" not in item
+                                for item in by_stage))
+            with (target/"D_Q25_Q75_STAGE_SHIFTS.csv").open(
+                    encoding="utf-8",newline="") as stream:
+                shifted=list(csv.DictReader(stream))
+            self.assertEqual(len(shifted),8*len(b.STAGES))
+            for load in aggregate["results"]:
+                self.assertEqual(load["paid_orders"],
+                                 load["arms"][0]["paid_orders"])
+                self.assertEqual(load["synthetic_beverages"],
+                                 load["arms"][0]["synthetic_beverages"])
+                self.assertGreater(load["paid_orders"],0)
+                self.assertGreater(load["synthetic_beverages"],0)
+                for arm in load["arms"]:
+                    self.assertEqual(arm["paid_orders"],load["paid_orders"])
+                    self.assertEqual(arm["synthetic_beverages"],
+                                     load["synthetic_beverages"])
+                    stage_rows=[x for x in shifted
+                                if x["load_label"]==load["load_label"] and
+                                x["policy"]==arm["policy"]]
+                    self.assertEqual(len(stage_rows),len(b.STAGES))
+                    self.assertEqual(sum(int(x["earlier_task_starts"])
+                                         for x in stage_rows),
+                                     arm["task_changes_earlier"])
+                    self.assertEqual(sum(int(x["later_task_starts"])
+                                         for x in stage_rows),
+                                     arm["task_changes_later"])
+            for row in rows:
+                self.assertGreater(int(row["paid_orders"]),0)
+                self.assertGreater(int(row["synthetic_beverages"]),0)
             public_json=(target/"D_Q25_Q75_AGGREGATE.json").read_text()
             for forbidden in (
                     "per_order_pseudonymous","override_events_pseudonymous",
