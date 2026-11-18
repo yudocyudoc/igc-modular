@@ -397,6 +397,25 @@ def export(report, destination):
                          "real inferida. "+x["status"])
         else:
             lines.append("**"+x["status"]+"** — "+x["signal"])
+            if name=="extraction_limits":
+                lines.append("Señal estricta extracción: **"+
+                             str(x["signal_task_min"])+" min-tarea**.")
+                lines.append("Esperas con grupo retenido postcontador "
+                             "(no necesariamente exclusivas): **"+
+                             str(x["post_auto_group_held_load_wait_task_min"])+
+                             " min-tarea**.")
+            elif name=="preparation_or_loading_limits":
+                lines.append("Espera por etapa, cualquier causa: **"+
+                             str(x["signal_task_min_ANY_CAUSE"])+
+                             " min-tarea**.")
+                lines.append("Señal manual estricta con grupo habilitado FREE: "
+                             "**"+str(x[
+                                 "signal_task_min_MANUAL_BLOCKED_WITH_GROUP_FREE"])+
+                             " min-tarea** ("+x["manual_signal_status"]+").")
+            elif name=="milk_or_handoff_limits":
+                lines.append("Espera por etapa, cualquier causa: **"+
+                             str(x["signal_task_min_ANY_CAUSE"])+
+                             " min-tarea**.")
             lines.append("Resultado del fixture, no causalidad en campo. "
                          "Debilita: "+x["weakens"])
     lines.extend([
