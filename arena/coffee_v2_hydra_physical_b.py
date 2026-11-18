@@ -27,6 +27,14 @@ from . import coffee_hydra_episodes_a as episodes_a
 
 SCHEMA="arena.coffee.p44.hydra-physical-b/1"
 RESULT_SCHEMA="arena.coffee.p44.physical-scenario/1"
+# D uses one versioned dispatch decision at a time. No extra workers or
+# resources are created; B without an explicit argument remains unchanged.
+D_DISPATCH_STAGE={
+    "FCFS_READY_ASSUMED":None,
+    "PRIORITIZE_LOAD_READY_WITH_FREE_GROUP":"load",
+    "PRIORITIZE_MILK_READY":"milk",
+    "PRIORITIZE_HANDOFF_READY":"handoff",
+}
 SKILLS=("prepare","load","remove","clean","milk","handoff")
 STAGES=("prepare","load","extract_auto","remove","clean","milk","handoff")
 STAGE_CLASSES={
@@ -197,14 +205,19 @@ def actor_available(actor, time, duration):
                for start,end in actor["availability_windows_min"])
 
 
-def _engine(positions, lines, d, horizon):
-    """B-only fixed-dispatch DES. Returns (aggregates, PRIVATE trace, completions).
+def _engine(positions, lines, d, horizon, *,
+            dispatch_policy="FCFS_READY_ASSUMED"):
+    """Versioned physical DES: B's FCFS default or one D priority at a time.
 
-    Load obtains actor+group atomically; group remains held after load and
-    automatic extraction FINISH until remove and optional clean finish.
-    No group can be reserved twice. No implicit actor/station calendars.
+    Default argument preserves the accepted B exact result/trace behavior.
+    D policy changes only which already-eligible, runnable manual task
+    receives the next atomic resource assignment. Nonpreemptive execution,
+    actor skills, calendar windows, stage dependencies and group identities
+    always use the same functions and dossier.
     """
     validate(d)
+    need(dispatch_policy in D_DISPATCH_STAGE,
+         "UNDECLARED_D_DISPATCH_POLICY")
     horizon=historical.num(horizon,"HORIZON",0,180)
     need(horizon>0,"HORIZON_POSITIVE")
     paid,refunds,beverages=historical.paid_gate(positions,lines,horizon)
@@ -227,6 +240,12 @@ def _engine(positions, lines, d, horizon):
     events=[]
     ready=[]
     trace=[]                     # PRIVATE, IDs not exported in aggregate
+    # For D variants identity must survive even when the priority NEVER
+    # overrides any assignment. The accepted B default trace stays exact.
+    if dispatch_policy!="FCFS_READY_ASSUMED":
+        trace.append({"event":"dispatch_policy_identity",
+                      "policy":dispatch_policy,
+                      "declared_as":"EXECUTED_ENGINE_POLICY_NOT_DIAGNOSIS_HINT"})
     order_counter=itertools.count()
     op_counts=Counter()
     max_group_occupied=0
@@ -500,13 +519,51 @@ def _engine(positions, lines, d, horizon):
         progress=True
         while progress:
             progress=False
-            for index,task in enumerate(ready):
-                candidate=choose(task,time)
-                if candidate is not None:
+            if dispatch_policy=="FCFS_READY_ASSUMED":
+                # Preserve the *exact* accepted B dispatcher in baseline mode.
+                for index,task in enumerate(ready):
+                    candidate=choose(task,time)
+                    if candidate is not None:
+                        ready.pop(index)
+                        start(task,candidate,time)
+                        progress=True
+                        break
+            else:
+                # Stable ready-queue order is the tie-breaker in every policy.
+                # Priority is effective only when an entire allocation is
+                # feasible NOW; no future group or actor reservation.
+                baseline=None
+                preferred=None
+                preferred_stage=D_DISPATCH_STAGE[dispatch_policy]
+                for index,task in enumerate(ready):
+                    candidate=choose(task,time)
+                    if candidate is None:
+                        continue
+                    if baseline is None:
+                        baseline=(index,task,candidate)
+                    if task["stage"]==preferred_stage:
+                        preferred=(index,task,candidate)
+                        break
+                selected=preferred or baseline
+                if selected is not None:
+                    index,task,candidate=selected
+                    if baseline is not None and baseline[0]!=index:
+                        trace.append({
+                            "event":"dispatch_override",
+                            "time":time,
+                            "policy":dispatch_policy,
+                            "baseline_first_runnable_job":baseline[1]["job"],
+                            "baseline_first_runnable_stage":baseline[1]["stage"],
+                            "selected_job":task["job"],
+                            "selected_stage":task["stage"],
+                            "selected_actor":candidate[1],
+                            "selected_group":candidate[2],
+                            "reason":"PREFERRED_STAGE_ALREADY_RUNNABLE",
+                            "work_displaced_is_not_cancelled":True,
+                        })
                     ready.pop(index)
                     start(task,candidate,time)
                     progress=True
-                    break
         need(len(occupied)==len(set(occupied)),"DUPLICATE_TOKEN_MAP")
         # Each waiting task contributes exactly once to each inter-event
         # interval. Concurrent tasks' task-minutes may overlap in clock time.
@@ -580,6 +637,11 @@ def _engine(positions, lines, d, horizon):
         "no_empirical_capacity_or_wait_conclusion":True,
         "no_new_worlds_or_provider_or_OMC":True,
     }
+    # The accepted FCFS result stays byte-for-byte identical to PR45.
+    # Nonbaseline result/trace carry a matching executed-policy identity,
+    # so a later diagnostic cannot substitute a trace from a different arm.
+    if dispatch_policy!="FCFS_READY_ASSUMED":
+        result["executed_dispatch_policy"]=dispatch_policy
     need(op_counts["prepare"]==op_counts["load"]==
          op_counts["extract_auto"]==op_counts["remove"]==beverages and
          op_counts["clean"]==(beverages if
