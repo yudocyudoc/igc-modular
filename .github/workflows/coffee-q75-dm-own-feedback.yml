@@ -1,0 +1,76 @@
+name: Coffee Q75 milk — authentic D/M own-policy feedback (no solver)
+
+on:
+  pull_request:
+    paths:
+      - "arena/coffee_q75_own_policy_cycle.py"
+      - "tests/test_coffee_q75_own_policy_cycle.py"
+      - "COFFEE_Q75_OWN_POLICY_PR50.md"
+      - ".github/workflows/coffee-q75-dm-own-feedback.yml"
+  push:
+    branches: [main]
+    paths:
+      - "arena/coffee_q75_own_policy_cycle.py"
+      - "tests/test_coffee_q75_own_policy_cycle.py"
+      - "COFFEE_Q75_OWN_POLICY_PR50.md"
+      - ".github/workflows/coffee-q75-dm-own-feedback.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  original-dm-owned-retrieval-and-policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Download eight original PUBLIC GitHub archives only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          mkdir -p "$RUNNER_TEMP/q75-public-history"
+          for id in 14094919865 14100770369 14090920829 14102098459 14150642285 14157186844 14157799232 14396368697; do
+            curl --fail --location --silent --show-error --retry 0 \
+              --connect-timeout 15 --max-time 120 \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "Accept: application/vnd.github+json" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/yudocyudoc/igc-modular/actions/artifacts/${id}/zip" \
+              --output "$RUNNER_TEMP/q75-public-history/artifact-${id}.zip"
+          done
+      - name: Original-vendor policy offline tests, plus authenticated negative cases
+        env:
+          ARENA_PUBLIC_ZIP_DIR: ${{ runner.temp }}/q75-public-history
+        run: |
+          python -m unittest discover -s tests -p test_coffee_q75_own_policy_cycle.py -v
+      - name: Authenticated Q75 pre-dispatch (no private or solver)
+        run: |
+          python -m arena.coffee_q75_milk_cycle \
+            --public-zips "$RUNNER_TEMP/q75-public-history" \
+            --out "$RUNNER_TEMP/q75-pre-dispatch"
+      - name: Execute 12 real D/M parent-scoped own-feedback loops and decision ATMS
+        run: |
+          python -m arena.coffee_q75_own_policy_cycle \
+            --pre-dispatch-json "$RUNNER_TEMP/q75-pre-dispatch/Q75_MILK_PRE_DISPATCH.json" \
+            --out "$RUNNER_TEMP/q75-original-policy-ledger"
+          cat "$RUNNER_TEMP/q75-original-policy-ledger/Q75_DM_OWN_POLICY.md" >> "$GITHUB_STEP_SUMMARY"
+          echo 'REAL_ORIGINAL_D_POLICY_6 REAL_ORIGINAL_M_POLICY_6 B_NOT_EXECUTED NEW_OMC_0 CLOUDFLARE_POST_0 PRIVATE_R2_GET_0' >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish verifiable parent-level original Ledger/ATMS and report
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-q75-real-dm-owned-feedback-${{ github.run_id }}
+          path: ${{ runner.temp }}/q75-original-policy-ledger/
+          retention-days: 90
+          if-no-files-found: error
+      - name: Destroy ephemeral source copies and ledger workdir
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/q75-public-history" "$RUNNER_TEMP/q75-pre-dispatch" "$RUNNER_TEMP/q75-original-policy-ledger"
+
+# No workflow_dispatch, no provider/R2 variables, no OMC executable.
+# Authentic D/M policies are NOT an authentic Buffalo result or a Q75 P90.
