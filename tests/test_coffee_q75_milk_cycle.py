@@ -1,0 +1,135 @@
+"""P49: authentic-source pre-dispatch tests, no privileged execution."""
+from __future__ import annotations
+
+import copy
+import json
+import os
+from pathlib import Path
+import shutil
+import tempfile
+import unittest
+
+from arena import coffee_q75_milk_cycle as q
+from arena.common import ArenaError
+
+
+class TestContractOffline(unittest.TestCase):
+    def test_no_new_policy_or_unearned_conclusion(self):
+        state=q._decision_status()
+        self.assertEqual(state["Hydra_only"],q.DECISION_BASE)
+        self.assertIn("PENDING",state["Hydra_plus_new_D_M_B"])
+        self.assertEqual(state["scientific_incremental_value"],"UNDETERMINED_NOT_ZERO")
+        self.assertEqual(q.POLICIES,("FCFS_READY_ASSUMED","PRIORITIZE_MILK_READY"))
+
+    def test_eff_inputs_do_not_claim_authentic_invocation(self):
+        process={"case":"Q75_CONSTRUCTION_SYNTHETIC_ONLY","question":q.FIXED_QUESTION}
+        scope={"D":{"method":"original"},"M":{"method":"original","registry":"coffee"},
+               "B":{"old_method":"Engine.generate"}}
+        b={"old_parent_compatible_with_new_Q75_policy":"NOT_DEMONSTRATED"}
+        x=q._effective_packets(process,scope,b)
+        self.assertEqual(set(x),{"D","M","B"})
+        self.assertTrue(all(v["status"]=="PREPARED_NOT_DELIVERED_TO_PRODUCER" for v in x.values()))
+        self.assertTrue(all(v["producer_response"]=="NOT_EXECUTED" for v in x.values()))
+        self.assertEqual(len({v["input_sha256"] for v in x.values()}),3)
+        self.assertNotIn("-3.837",json.dumps(x))
+
+    def test_budget_separate_authorization(self):
+        x={a:{"status":"PREPARED_NOT_DELIVERED_TO_PRODUCER"} for a in ("D","M","B")}
+        budget=q._budget({},x)
+        self.assertEqual(budget["new_cloudflare_posts_executed"],0)
+        self.assertEqual(budget["new_omc_executed"],0)
+        self.assertEqual(budget["new_private_R2_gets_executed"],0)
+        self.assertTrue(budget["any_new_calls_require_a_new_explicit_budget_and_user_approval"])
+        x["M"]["status"]="EXECUTED"
+        with self.assertRaises(ArenaError):q._budget({},x)
+
+    def test_atms_conditional_retraction_keeps_historical_q75(self):
+        r=q._atms_public_hydra_proof(q.ARCHIVED_SOURCE_ZIP_SHA)
+        changed=r["what_if_remove_90s"]
+        self.assertEqual(changed["Q75_MILK_ADVANTAGE_APPLIES_AT_90S_ONLY"]["after"],[])
+        self.assertTrue(r["historical_result_survives_after"])
+        self.assertFalse(r["three_method_diag_recovered_and_consumed"])
+
+    def test_invalid_sha_rejected(self):
+        with self.assertRaises(ArenaError):q._atms_public_hydra_proof("sha256:"+"0"*65)
+
+    def test_dossier_policy_drift_rejected(self):
+        # The physical gate may not silently change the reference policy.
+        fake={"schema":"arena.coffee.p44.hydra-physical-b/1",
+              "enabled_group_ids":["G01","G02","G03"],"operators":{"B01":{},"B02":{}},
+              "durations_min":{"espresso_auto_min":{"value":1.5}},
+              "dispatch_policy":"PRIORITIZE_MILK_READY", "milk_precedence":"AFTER_GROUP_RELEASE_ASSUMED"}
+        from arena.common import digest
+        with self.assertRaises(ArenaError):q._check_physics(fake,{"physical_dossier_sha256":digest(fake)})
+
+
+class TestPinnedRealPublicArtifacts(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        loc=os.environ.get("ARENA_PUBLIC_ZIP_DIR")
+        if not loc:
+            raise unittest.SkipTest("requires eight authentic GitHub archived ZIPs; dedicated workflow runs this suite")
+        cls.root=Path(loc)
+        from arena.coffee_three_arms_readback_v2 import load_sources
+        cls.z=load_sources(cls.root)
+        cls.dossier=Path("experiments/coffee_v2/HYDRA_TWO_OPERATORS_PHYSICAL_B_ASSUMPTIONS.json")
+
+    def test_q75_real_provenance_and_no_new_response(self):
+        out=q.prepare(self.root,self.dossier)
+        self.assertEqual(out["schema"],q.SCHEMA)
+        self.assertEqual(out["frozen_reference_decision"]["milk_delta_p90_sec_positive_is_worse"],-3.837)
+        self.assertEqual(out["Q75_public_case"]["paid_orders"],46)
+        self.assertEqual(out["Q75_public_case"]["beverages"],53)
+        self.assertFalse(out["ATMS_public_reference_what_if"]["three_method_diag_recovered_and_consumed"])
+        self.assertEqual(out["original_generator_scope"]["D"]["six_structures_linted"],6)
+        self.assertEqual(out["original_generator_scope"]["M"]["six_real_graphs_enumerated"],6)
+        self.assertTrue(out["historical_buffalo_B0_prompt_scope"]["excluded_barista_espresso_coupling"])
+        self.assertEqual(out["current_decision"]["scientific_incremental_value"],"UNDETERMINED_NOT_ZERO")
+
+    def test_q75_tampered_effect_rejected(self):
+        original=json.loads(self.z["hydra"].read("D_Q25_Q75_AGGREGATE.json"))
+        altered=copy.deepcopy(original)
+        row=next(x for x in altered["results"] if "Q75" in x["load_label"])
+        milk=next(x for x in row["arms"] if x["policy"]=="PRIORITIZE_MILK_READY")
+        milk["p90_paid_to_handoff_full_drain_min"]+=0.5
+        class Fake:
+            def read(self,name):return json.dumps(altered).encode()
+        z={**self.z,"hydra":Fake()}
+        with self.assertRaises(ArenaError):q._exact_hydra_source(z)
+
+    def test_q75_rival_exposure_not_needed_to_freeze_reference(self):
+        hydra,q75,_,delta=q._exact_hydra_source(self.z)
+        decision=q._historical_baseline(q75,delta)
+        self.assertEqual(decision["policy_comparator"],"FCFS_READY_ASSUMED_NOT_MEASURED_LOCAL")
+        self.assertIn("RETROSPECTIVELY",decision["status"])
+        self.assertEqual(decision["current_operational_choice"],q.DECISION_BASE)
+
+    def test_historical_B0_prompt_no_coupling_verified(self):
+        old=q._check_b0_prompt(self.z)
+        self.assertTrue(old["excluded_barista_espresso_coupling"])
+        self.assertEqual(old["old_parent_compatible_with_new_Q75_policy"],"NOT_DEMONSTRATED")
+        modified=json.loads(self.z["buffalo_initial"].read("input.json"))
+        modified["prompt"]=modified["prompt"].replace("shared barista/espresso coupling", "")
+        class Fake:
+            def read(self,name):return json.dumps(modified).encode()
+        with self.assertRaises(ArenaError):q._check_b0_prompt({**self.z,"buffalo_initial":Fake()})
+
+    def test_wrong_physics_or_operator_assumption_is_rejected(self):
+        _,q75,_,_=q._exact_hydra_source(self.z)
+        dossier=json.loads(self.dossier.read_text())
+        self.assertEqual(q._check_physics(dossier,q75)["operator_ids"],["B01","B02"])
+        changed=copy.deepcopy(dossier)
+        changed["durations_min"]["espresso_auto_min"]["value"]=0.5
+        with self.assertRaises(ArenaError):q._check_physics(changed,q75)
+
+    def test_authentic_reproduction_no_hidden_data_or_calls(self):
+        data=q.prepare(self.root,self.dossier)
+        doc=q.render_markdown(data)
+        self.assertIn("NO han recibido",doc)
+        self.assertIn("0 GET R2 privados",doc)
+        self.assertIn("PR de preparación",doc)
+        self.assertEqual(data["current_decision"]["scientific_closure"],"NOT_ALLOWED_AT_PRE_DISPATCH_STAGE")
+        self.assertTrue(all(v["producer_response"]=="NOT_EXECUTED"
+                            for v in data["producer_effective_inputs_NOT_SENT"].values()))
+
+if __name__=="__main__":unittest.main()
