@@ -34,10 +34,44 @@ jobs:
         with: {persist-credentials: false}
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
-      - name: Zero-cost contract and original SDK JS syntax
+      - name: Download eight pinned authentic public archives (zero R2/AI/OMC)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/q75-public-history"
+          for id in 14094919865 14100770369 14090920829 14102098459 14150642285 14157186844 14157799232 14396368697; do
+            curl --fail --location --silent --show-error --retry 0 \
+              --connect-timeout 15 --max-time 120 \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "Accept: application/vnd.github+json" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/yudocyudoc/igc-modular/actions/artifacts/${id}/zip" \
+              --output "$RUNNER_TEMP/q75-public-history/artifact-${id}.zip"
+          done
+      - name: Zero-cost tests on real historical source and original JS syntax
+        env:
+          ARENA_PUBLIC_ZIP_DIR: ${{ runner.temp }}/q75-public-history
         run: |
           python -m unittest discover -s tests -p test_coffee_q75_buffalo_initial.py -v
           node --check arena/coffee_q75_buffalo_initial_runner.mjs
+      - name: Generate new initial Buffalo prompt from actual authenticated Q75 source, NOT SENT
+        run: |
+          python -m arena.coffee_q75_buffalo_initial dry-run \
+            --public-zips "$RUNNER_TEMP/q75-public-history" \
+            --dossier experiments/coffee_v2/HYDRA_TWO_OPERATORS_PHYSICAL_B_ASSUMPTIONS.json \
+            --out "$RUNNER_TEMP/q75-b-initial-dry"
+          echo 'REAL_Q75_PUBLIC_PROVENANCE NEW_INITIAL_B_REQUEST_NOT_SENT CLOUDFLARE_POSTS=0 OMC=0 PRIVATE_R2=0' >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish verified unsent initial B input, no credentials
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-q75-b-initial-verified-dry-${{ github.run_id }}
+          path: ${{ runner.temp }}/q75-b-initial-dry/
+          retention-days: 90
+          if-no-files-found: error
+      - name: Remove ephemeral original archives and dry-run
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/q75-public-history" "$RUNNER_TEMP/q75-b-initial-dry"
 
   real-first-generation:
     name: First original Buffalo Engine.generate on Q75, one paid POST maximum
