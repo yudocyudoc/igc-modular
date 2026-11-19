@@ -122,6 +122,78 @@ class TestPinnedRealPublicArtifacts(unittest.TestCase):
         changed["durations_min"]["espresso_auto_min"]["value"]=0.5
         with self.assertRaises(ArenaError):q._check_physics(changed,q75)
 
+    def test_astra_one_vs_two_wands_changes_all_three_unsent_packets(self):
+        # Astra negative: the historical result is NOT changed, but a
+        # hypothetical physical dossier with two wands must NOT map to the
+        # same inputs or hashes as the authentic one-wand Q75 case.
+        from arena.common import digest
+        _, q75, _, _ = q._exact_hydra_source(self.z)
+        original = json.loads(self.dossier.read_text())
+        expanded = copy.deepcopy(original)
+        expanded["steam_wands"] = ["W01", "W02"]
+        altered_q75 = copy.deepcopy(q75)
+        altered_q75["physical_dossier_sha256"] = digest(expanded)
+        first_physics = q._check_physics(original, q75)
+        second_physics = q._check_physics(expanded, altered_q75)
+        self.assertEqual(first_physics["resource_units_from_hydra"], {
+            "barista":2,"prep_space":2,"espresso_group":3,
+            "steam_wand":1,"pickup_pass":1})
+        self.assertEqual(second_physics["resource_units_from_hydra"]["steam_wand"],2)
+        self.assertEqual(first_physics["resource_ids_from_dossier"]["steam_wand"],["W01"])
+        self.assertEqual(second_physics["resource_ids_from_dossier"]["steam_wand"],["W01","W02"])
+        self.assertEqual(first_physics["task_stage_resource_requirements_from_hydra"]["milk"],
+                         ["barista","steam_wand"])
+        self.assertEqual(first_physics["policy_selection_semantics"],
+                         second_physics["policy_selection_semantics"])
+        a=q._common_process(q75,first_physics)
+        b=q._common_process(altered_q75,second_physics)
+        scope={"D":{"method":"d"},"M":{"method":"m","registry":"m"},
+               "B":{"old_method":"Engine.generate"}}
+        buffalo={"old_parent_compatible_with_new_Q75_policy":"NOT_DEMONSTRATED"}
+        packets_a=q._effective_packets(a,scope,buffalo)
+        packets_b=q._effective_packets(b,scope,buffalo)
+        for arm in ("D","M","B"):
+            self.assertNotEqual(packets_a[arm]["input_sha256"],
+                                packets_b[arm]["input_sha256"])
+            self.assertNotEqual(packets_a[arm]["operation_known"]["physical"],
+                                packets_b[arm]["operation_known"]["physical"])
+            self.assertEqual(packets_a[arm]["operation_known"]["physical"]
+                             ["resource_units_from_hydra"]["steam_wand"],1)
+            self.assertEqual(packets_b[arm]["operation_known"]["physical"]
+                             ["resource_units_from_hydra"]["steam_wand"],2)
+        # Changed physics is NOT a valid replacement for historical Q75.
+        with self.assertRaises(ArenaError):
+            q._check_physics(expanded,q75)
+
+    def test_astra_busy_wand_allows_other_runnable_manual_tasks(self):
+        # Real Hydra engine, software-only constructed orders, no private
+        # Q75, Cloudflare, R2 or Modelica. Tests behavior not just prompt text.
+        from arena import coffee_v2_hydra_physical_b as physical_b
+        from test_coffee_v2_reference import paid, item
+        d=json.loads(self.dossier.read_text())
+        positions=[paid(str(i),time=0) for i in range(10)]
+        lines=[item(str(i),"con_leche" if i<6 else "solo_extraccion")
+               for i in range(10)]
+        _, trace, _=physical_b._engine(
+            positions, lines,d,25,dispatch_policy="PRIORITIZE_MILK_READY")
+        milk_starts=[x for x in trace if
+                     x["event"]=="start" and x["stage"]=="milk"]
+        milk_ends={(x["job"]):x["time"] for x in trace if
+                   x["event"]=="finish" and x["stage"]=="milk"}
+        self.assertEqual(len(milk_starts),6)
+        self.assertEqual(len(milk_ends),6)
+        self.assertTrue(all("W:W01" in x["tokens"] for x in milk_starts))
+        for prev,nxt in zip(milk_starts,milk_starts[1:]):
+            self.assertGreaterEqual(nxt["time"],milk_ends[prev["job"]])
+        self.assertTrue(any(
+            x["event"]=="start" and x["stage"]!="milk" and
+            x["stage"]!="extract_auto" and
+            any(m["time"]<=x["time"]<milk_ends[m["job"]]
+                for m in milk_starts)
+            for x in trace),
+            "A free barista must be able to execute another runnable "
+            "manual task while W01 is occupied")
+
     def test_authentic_reproduction_no_hidden_data_or_calls(self):
         data=q.prepare(self.root,self.dossier)
         doc=q.render_markdown(data)
