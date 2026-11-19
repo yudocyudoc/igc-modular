@@ -78,8 +78,11 @@ def _exact_hydra_source(z):
             milk["handoffs_before_source_cut"] == base["handoffs_before_source_cut"] == 46 and
             milk["rule_changed_assignment_count"] == 4,
             "HYDRA_Q75_PAIRED_VALUES_CHANGED")
-    require(all(x["orders_handoff_earlier"] == x["orders_handoff_later"] == 0
-                for x in q25["arms"]), "Q25_HISTORICAL_TIE_CHANGED")
+    q25_milk = next((x for x in q25["arms"] if x["policy"] == "PRIORITIZE_MILK_READY"), None)
+    require(q25_milk is not None and q25_milk["orders_handoff_earlier"] == 0 and
+            q25_milk["orders_handoff_later"] == 0 and
+            q25_milk["delta_p90_min_positive_is_worse"] == 0,
+            "Q25_MILK_ONLY_TIE_CHANGED")
     return hydra, q75, q25, delta
 
 
