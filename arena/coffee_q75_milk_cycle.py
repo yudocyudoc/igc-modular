@@ -15,6 +15,7 @@ from .common import ArenaError, digest, read_json, write_json
 from .coffee_three_arms_readback_v2 import readback, load_sources
 from .coffee_adapters import d as d_adapter, m as m_adapter
 from . import decision_atms, runtime
+from . import coffee_v2_hydra_physical_b as physical_b
 
 SCHEMA = "arena.coffee.q75-milk-three-arms-pre-dispatch/1"
 REPORT_SCHEMA = "arena.coffee.q75-milk-pre-dispatch-report/1"
@@ -97,7 +98,56 @@ def _check_physics(dossier, q75):
             dossier["dispatch_policy"] == "FCFS_READY_ASSUMED" and
             dossier["milk_precedence"] == "AFTER_GROUP_RELEASE_ASSUMED",
             "DOSSIER_PHYSICAL_ASSUMPTIONS_DRIFT")
+    # The effective physical constraints MUST be carried through to every arm.
+    # Use the SAME live stage requirements and resource accounting as Hydra;
+    # no hand-written default for the number of wands/stations/passes.
+    cap = physical_b.capabilities(dossier)
+    required = {stage:list(physical_b.STAGE_CLASSES[stage])
+                for stage in physical_b.STAGES}
+    require(cap["resource_units"] == {
+                "barista": len(dossier["operators"]),
+                "prep_space": len(dossier["prep_stations"]),
+                "espresso_group": len(dossier["enabled_group_ids"]),
+                "steam_wand": len(dossier["steam_wands"]),
+                "pickup_pass": len(dossier["pickup_passes"])},
+            "HYDRA_RESOURCE_CAPABILITY_DRIFT")
+    require(physical_b.D_DISPATCH_STAGE.get("PRIORITIZE_MILK_READY") == "milk"
+            and required["milk"] == ["barista", "steam_wand"]
+            and required["prepare"] == ["barista", "prep_space"]
+            and required["load"] == ["barista", "espresso_group"]
+            and required["handoff"] == ["barista", "pickup_pass"],
+            "HYDRA_STAGE_AND_PRIORITY_CONTRACT_DRIFT")
     return {
+        "resource_units_from_hydra": cap["resource_units"],
+        "resource_ids_from_dossier": {
+            "barista": sorted(dossier["operators"]),
+            "prep_space": list(dossier["prep_stations"]),
+            "espresso_group": list(dossier["enabled_group_ids"]),
+            "steam_wand": list(dossier["steam_wands"]),
+            "pickup_pass": list(dossier["pickup_passes"]),
+        },
+        "task_stage_resource_requirements_from_hydra": required,
+        "stage_predecessors_from_hydra":
+            dict(physical_b.STAGE_PREDECESSOR),
+        "policy_selection_semantics": {
+            "source":"arena.coffee_v2_hydra_physical_b._engine / choose / dispatch",
+            "ready_order":"stable eligibility FIFO, nonpreemptive manual tasks",
+            "task_executable_now":"manual stage requires a simultaneously free "
+                "eligible barista and its extra resource, including steam_wand "
+                "for milk. No future reservation; blocked tasks are skipped.",
+            "FCFS_READY_ASSUMED":"take first executable task in ready queue; "
+                "skip earlier tasks that cannot start now",
+            "PRIORITIZE_MILK_READY":"take earliest executable milk task; "
+                "if no milk task is executable now, take the first "
+                "executable task under FCFS, even with W01 occupied",
+            "steam_wand_busy":"milk cannot start without available wand AND "
+                "barista; an eligible barista may perform another executable "
+                "task, never wait idly solely because the wand is occupied",
+            "resource_claim":"atomic nonpreemptive reservation at task start; "
+                "one W01 cannot serve two milk tasks simultaneously",
+            "not_documented_shop_dispatch":"the two policies are synthetic "
+                "counterfactual rules, not observed practice",
+        },
         "installed_groups": dossier["installed_group_ids"],
         "enabled_groups_assumed": dossier["enabled_group_ids"],
         "operator_ids": sorted(dossier["operators"]),
@@ -187,6 +237,7 @@ def _common_process(q75, physics):
         "private_sequence_not_reconstructed":True,
         "physical":physics,
         "alternatives":list(POLICIES),
+        "exact_policy_selection_semantics":physics["policy_selection_semantics"],
         "decision_outcome":"P90_PAID_TO_HANDOFF_FULL_DRAIN_MIN_PER_ORDER",
         "harm_checks":["HANDOFFS_BEFORE_SOURCE_CUT",
                        "ADVANCED_DELAYED_UNCHANGED_ORDER_COUNTS"],
