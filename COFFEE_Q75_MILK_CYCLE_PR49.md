@@ -1,0 +1,27 @@
+# Arena IGC · Q75 prioridad de leche — primer tramo del ciclo completo D/M/B/ATMS
+
+**Decisión única del plan vigente de Astra, 18/11/2026:** con los tres grupos Synesso y el personal existentes, ¿hay fundamento para probar en barra `PRIORITIZE_MILK_READY`, o debemos mantener la práctica? El comparador del ensayo es `FCFS_READY_ASSUMED`; **no se ha verificado que FCFS sea la práctica del local**. No se introduce prioridad de retirada ni un nuevo caso.
+
+## Resultado de este PR — auténtico, pero todavía pre-despacho
+
+1. La fuente Q75 es el artefacto **público auténtico** del run GitHub `44234407455`, ZIP `14396368697`, SHA-256 `2fa54c8b64927140e918c693886a11c9fb3e69f80d8ec1b2dabdf16be12d2cb5`, publicado desde commit `e2da7eeaadd7c9e361ca38090a3de25a161916f3`. Se usan los **ocho archivos originales de PR48** para verificar la cadena histórica D/M/B y Hydra. La verificación se hace antes de interpretar resultados.
+2. Congela de forma **retrospectiva, no ciega** la respuesta Hydra-sola: con 46 pagos y 53 bebidas sintéticas, 90 s automáticos supuestos, priorizar leche mejoró el P90 agregado **3,837 s**, adelantó cinco pedidos, demoró cuatro y no cambió los 46 despachos al corte. La decisión es **conservar la práctica actual y mantener leche como candidata condicionada**, sin recomendar un cambio en barra. Si E1 a 30 s empata o invierte, desaparece el argumento de consistencia en ambas duraciones; si persiste, es solo sensibilidad dentro de Hydra.
+3. Comprueba sobre el código vendorizado las seis topologías válidas de la gramática D original y las seis composiciones E1 del registro M de cafetería; son **invocaciones auténticas de las primitivas de enumeración**, no ejecuciones OMC ni respuestas nuevas a la decisión Q75. Acredita por separado el B0 Buffalo original, cuya **petición efectiva excluía explícitamente** el acoplamiento barista/espresso. R1 no es automáticamente padre compatible con la política nueva.
+4. Construye tres entradas efectivas **preparadas pero no entregadas** a los productores. Todas contienen el proceso conocido, dos políticas, tareas, dos operadores, tres grupos, extracción y retirada, pero **sin las respuestas de los rivales ni el resultado de Hydra**. Las filas marcan `PREPARED_NOT_DELIVERED_TO_PRODUCER`, jamás una respuesta supuesta de la IA.
+5. Ejecuta el `Journal` ATMS **real** para la justificación del evaluador anclada al resultado público. `what_if` retira el supuesto de extracción a 90 s: desaparece el soporte para aplicar esa ventaja a ese supuesto, permanece consultable la cifra histórica y sigue en pie la cautela de no cambiar la operación sin conocer la práctica real. **No simula diagnósticos, revisiones o disposiciones nuevas de D/M/B**; esa cadena necesita su ejecución auténtica.
+6. Publica un **presupuesto preliminar no autorizado**: fuente privada Q75 con secuencia de pagos todavía no disponible en este proceso; hasta 1 generación Buffalo si no existe padre compatible y hasta 1 revisión; hasta 6 D + 6 M + 1 B candidatos por política para una posible ronda de simulación. Son techos de planificación condicionales; **no deben ejecutarse modelos que no representan la intervención**. Los hijos realmente cambiados y los GET privados se presupuestarán separadamente. Esta contabilidad no constituye autorización.
+
+## Salida reproducible
+
+`arena/coffee_q75_milk_cycle.py` + pruebas `tests/test_coffee_q75_milk_cycle.py`. Workflow `.github/workflows/coffee-q75-milk-pre-dispatch.yml` descarga los ocho ZIP públicos por ID, comprueba los hashes de PR48, valida el dossier físico por digest, lee el prompt real de Buffalo, invoca la enumeración original de D/M, usa ATMS auténtico y publica:
+
+- `Q75_MILK_PRE_DISPATCH.json` — fuente, decisión previa, supuestos, paquetes no enviados y sus SHA, ejecución original identificada, `what_if` ATMS, presupuesto y bloqueos.
+- `Q75_MILK_PRE_DISPATCH.md` — primera página decisional con alcance e incertidumbres.
+
+La suite específica exige cuatro tipos de protección: **fuente adulterada**, **unidad/escenario alterado**, **propuesta no ejecutada que se hace pasar por respuesta auténtica** y **retracción correcta sin borrar el resultado histórico**. El CI offline general puede saltar las pruebas que necesitan ocho ZIP; el workflow específico las descarga y exige su aprobación.
+
+## Próximo paso — no completado ni autorizado en este PR
+
+**Una sola pregunta, un solo lote aprobado explícitamente:** registrar la secuencia Q75 real de construcción (si es pertinente y está autorizada), comprobar si la ruta efectiva D/M/B puede codificar las dos políticas, ejecutar la primera respuesta y recoger su propio diagnóstico en Ledger, recuperar el feedback antes de revisión y **hacer llegar realmente ese diagnóstico** a cada brazo. D/M tendrán que indicar cuándo sus reglas ratifican o se abstienen; Buffalo necesita POST real y recibo. Solo ejecutar hijos cambiados. Luego ATMS compone soportes de decisiones y el contraste corresponde al mismo escenario/observable, con límites de evidencia independientes. Las respuestas inexistentes se marcan **pendientes**, no como cero o como falta de capacidad del método.
+
+**Cierre científico de este PR:** aún no autorizado. El usuario no ha autorizado aquí llamadas Cloudflare, acceso R2 ni nuevas simulaciones OMC. PR47/E1 mantiene autorización y revisión propias. El PR debe permanecer abierto hasta que Astra revise este contrato inicial; no fusionar por CI verde.
