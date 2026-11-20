@@ -106,13 +106,19 @@ def verify_dispatch_history(history, current_id, get_jobs, get_artifacts, get_ar
 
 def main():
     import subprocess
+    import sys
     token = os.environ.get("GH_TOKEN")
-    current = int(os.environ["GITHUB_RUN_ID"])
-    need(bool(token) and os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
-         and os.environ.get("GITHUB_RUN_ATTEMPT") == "1"
-         and os.environ.get("GITHUB_REF") == "refs/heads/main"
-         and os.environ.get("GITHUB_REPOSITORY") == REPO,
-         "GH_IDENTITY_REQUIRED")
+    verify_only = sys.argv[1:] == ["--verify-historical"]
+    need(bool(token) and os.environ.get("GITHUB_REPOSITORY") == REPO,
+         "GH_READ_PERMISSION_REQUIRED")
+    if not verify_only:
+        need(not sys.argv[1:] and
+             os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
+             and os.environ.get("GITHUB_RUN_ATTEMPT") == "1"
+             and os.environ.get("GITHUB_REF") == "refs/heads/main"
+             and os.environ.get("GITHUB_RUN_ID","").isdigit(),
+             "GH_MANUAL_IDENTITY_REQUIRED")
+    current = int(os.environ["GITHUB_RUN_ID"]) if not verify_only else None
 
     def api(path):
         return json.loads(subprocess.check_output(["gh", "api", path], text=True))
@@ -142,7 +148,17 @@ def main():
         need(page.get("total_count") == len(page.get("artifacts", [])),
              "PRIOR_ARTIFACT_PAGINATION_INCOMPLETE")
         return page["artifacts"]
-    proof = verify_dispatch_history(history, current, jobs, artifacts, artifact_bytes)
+    if verify_only:
+        prior = [row for row in history.get("workflow_runs", [])
+                 if row.get("id") == SAFE_PRIOR_RUN]
+        need(len(prior) == 1, "PINNED_HISTORICAL_RUN_NOT_IN_HISTORY")
+        proof = attest_prior_run(prior[0], jobs(SAFE_PRIOR_RUN),
+                                 artifacts(SAFE_PRIOR_RUN),
+                                 artifact_bytes(SAFE_PRIOR_ARTIFACT))
+        proof["status"] = "HISTORICAL_NO_POST_ARTIFACT_VERIFIED"
+    else:
+        proof = verify_dispatch_history(
+            history, current, jobs, artifacts, artifact_bytes)
     print(json.dumps(proof))
 
 
