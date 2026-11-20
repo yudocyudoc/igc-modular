@@ -34,3 +34,11 @@ Se archiva el modelo nativo original y se ejecuta diagnóstico semántico G1 sin
 4. Revisión de Astra de PR49 y PR50 ocurre **por separado**; el PR51 no se fusiona ni despacha hasta el dictamen conjunto y aprobación explícita del techo de 1 POST.
 
 **Regla de parada:** una generación G1 auténtica que declare cobertura insuficiente es un resultado útil, pero no concluye automáticamente el valor decisional incremental de los tres métodos. Una revisión requiere `currentModel` compatible con el padre auténtico, feedback propio y un segundo presupuesto.
+
+## Incidente real Q75 y corrección del modelo (20/11/2026)
+
+**Registro posterior a PR51:** En [Actions #44672512041](https://github.com/yudocyudoc/igc-modular/actions/runs/44672512041) hubo **exactamente un POST** a `@cf/zai-org/glm-5.3-flash`, con HTTP `410`, Cloudflare `5028` (`Model has been deprecated`). El recibo [artefacto 14601007266](https://github.com/yudocyudoc/igc-modular/actions/runs/44672512041/artifacts/14601007266) muestra `provider_posts=1`, `model_returned=false`, `provider_usage=null`, sin OMC ni R2 privados. **No se obtuvo modelo ni P90. El consumo monetario queda sin determinar.** Ese intento está gastado a efectos de la autorización previa.
+
+Cloudflare anunció el 5/11/2026 que el modelo sería desactivado el 20/11/2026 y recomienda `@cf/zai-org/glm-5.3`: https://developers.cloudflare.com/changelog/post/2026-11-05-planned-model-deprecations/ . Se actualiza **únicamente el destino Cloudflare de Q75** a ese modelo, manteniendo intacto el alias virtual original de OpenRouter y el adaptador histórico EV01. El prompt y las restricciones Q75 siguen siendo los mismos; la identidad de solicitud cambia porque `request.json.model` cambia. En preflight, se exige que el catálogo devuelva el nombre exacto del nuevo modelo, en vez de comprobar la disponibilidad genérica de Workers AI. Una salida del catálogo con solo el modelo retirado debe fallar **antes** de reservar.
+
+**No habilita otra llamada**: la compuerta de antecedentes continúa rechazando cualquier nuevo despacho después de #44672512041, que sí pudo consumir un POST. Para autorizar un segundo intento se requiere aprobar explícitamente otro presupuesto y conciliar su coste posible. Ningún cambio de código se interpreta como permiso para reintentar.
