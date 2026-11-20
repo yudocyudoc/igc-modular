@@ -129,7 +129,7 @@ class WorkersOnlyPreflight(TestCase):
                          "NOT_VERIFIED_DO_NOT_CLAIM_LEAST_PRIVILEGE")
         self.assertEqual(visited,[(
             "https://api.cloudflare.com/client/v4/accounts/"+
-            ("a"*32)+"/ai/models/search?per_page=1","GET")])
+            ("a"*32)+"/ai/models/search?search=glm-5.3&include_deprecated=false&per_page=25","GET")])
 
     def test_reject_bad_metadata_or_credentials(self):
         class R:
