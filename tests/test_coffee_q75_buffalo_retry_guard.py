@@ -114,7 +114,7 @@ class WorkersOnlyPreflight(TestCase):
             status=200
             def __enter__(self):return self
             def __exit__(self,*args):pass
-            def read(self,n):return b'{"success":true,"result":[]}'
+            def read(self,n):return b'{"success":true,"result":[{"name":"@cf/zai-org/glm-5.3"},{"name":"@cf/zai-org/glm-5.3-flash"}]}'
         def opener(req,timeout):
             visited.append((req.full_url, req.get_method()))
             return R()
