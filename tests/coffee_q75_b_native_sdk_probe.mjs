@@ -6,6 +6,8 @@ import {readFile,writeFile} from 'node:fs/promises';
 import {resolve,join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {createHash} from 'node:crypto';
+import {Q75_PROVIDER_MODEL,HISTORICAL_ADAPTER_MODEL,providerEndpoint}
+  from '../arena/coffee_q75_buffalo_provider_target.mjs';
 const env=process.env;
 const need=(v,reason)=>{if(!v)throw new Error('Q75_OFFLINE_SDK_'+reason);};
 need(env.COFFEE_Q75_B_INPUT && env.SDAI_ROOT && env.BUFFALO_SCRIPTS_ROOT &&
@@ -15,9 +17,13 @@ need(!['CLOUDFLARE_API_TOKEN','OPEN_ROUTER_API_KEY','GH_TOKEN','GITHUB_TOKEN',
         'AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY']
      .some(key=>Boolean(env[key])), 'NO_PRIVATE_OR_PROVIDER_CREDENTIALS_ALLOWED');
 const input=JSON.parse(await readFile(env.COFFEE_Q75_B_INPUT,'utf8'));
-const {OR_SLUG,EV01_CAP,EV01_BUDGET_AUTH,requestToCloudflareEV01}=
+const {OR_SLUG,CF_MODEL:historicalModel,EV01_CAP,EV01_BUDGET_AUTH,requestToCloudflareEV01}=
   await import(pathToFileURL(join(resolve(env.BUFFALO_SCRIPTS_ROOT),
                               'arena_b_ev01_cf_adapter.mjs')).href);
+need(input.model===Q75_PROVIDER_MODEL &&
+     historicalModel===HISTORICAL_ADAPTER_MODEL &&
+     providerEndpoint('a'.repeat(32)).endsWith('/ai/run/'+Q75_PROVIDER_MODEL),
+     'TARGET_PROVIDER_MODEL_OR_ENDPOINT_DRIFT');
 let intercepted=0, effective=null;
 const fetchBefore=globalThis.fetch;
 globalThis.fetch=async(request,opts={})=>{
@@ -70,6 +76,8 @@ const result={status:'ORIGINAL_ENGINE_SDK_EFFECTIVE_CLOUDFLARE_REQUEST_VERIFIED_
   model_native_generated:false,new_omc:0,private_R2_reads:0,
   supportsArrays:false,supportsModules:false,supportsSubTypes:false,
   effective_max_completion_tokens:effective.max_completion_tokens,
+  provider_model:Q75_PROVIDER_MODEL,
+  historical_sdk_virtual_provider:HISTORICAL_ADAPTER_MODEL,
   cloudflare_effective_request_sha256:'sha256:'+createHash('sha256')
     .update(JSON.stringify(effective)).digest('hex'),
   explicit_transport_abort:true};
