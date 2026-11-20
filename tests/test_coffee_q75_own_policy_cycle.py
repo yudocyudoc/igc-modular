@@ -68,6 +68,26 @@ class ActualPinnedQ75Sources(unittest.TestCase):
         altered["producer_effective_inputs_NOT_SENT"]["M"]["input_sha256"]="sha256:"+"0"*64
         with self.assertRaises(ArenaError):own.gate(altered)
 
+    def test_astra_revised_common_mix_and_cleaning_bound_to_feedback(self):
+        common,packets=own.gate(self.q75)
+        mix=common["aggregate_beverage_mix_from_public_Q75"]
+        self.assertEqual((mix["milk_required_beverages"],
+                          mix["no_milk_required_beverages"]),(33,20))
+        self.assertEqual(common["aggregate_clean_tasks_completed_in_archived_Q75"],0)
+        self.assertIs(common["physical"]["clean_after_every_beverage_assumed"],False)
+        for arm in ("D","M","B"):
+            self.assertEqual(packets[arm]["operation_known"],common)
+        for mutate in (
+            lambda x:x["Q75_public_case"]["aggregate_beverage_mix_from_public_Q75"]
+                .__setitem__("milk_required_beverages",32),
+            lambda x:x["Q75_public_case"]["physical"]
+                .__setitem__("clean_after_every_beverage_assumed",True)
+        ):
+            altered=copy.deepcopy(self.q75)
+            mutate(altered)
+            with self.assertRaises(ArenaError):
+                own.gate(altered)
+
     def test_authentic_ledger_atms_12_parent_dispositions_and_replay(self):
         with TemporaryDirectory() as d:
             result=own.execute(self.q75,Path(d)/"q75-ledger-cycle")
