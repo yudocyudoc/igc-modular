@@ -1,0 +1,776 @@
+{
+  "schema": "arena.coffee.three-methods-v2.retrospective-readback/1",
+  "mode": "RETROSPECTIVE_PUBLIC_ARTIFACT_READBACK_NOT_BLIND",
+  "source_registry": {
+    "g2": {
+      "repository": "yudocyudoc/igc-modular",
+      "run_id": 43550618982,
+      "artifact_id": 14094919865,
+      "commit_sha": "69638301626dd482556f58eaead298a5c620d9bf",
+      "zip_sha256": "sha256:1f10695e4dcd27ad4f29552c3c954b4ce26efb131594b0b18076f52a26701925",
+      "github_run_url": "https://github.com/yudocyudoc/igc-modular/actions/runs/43550618982",
+      "archive_kind": "D_M_ORIGINAL_B0",
+      "read_only_public": true
+    },
+    "feedback": {
+      "repository": "yudocyudoc/igc-modular",
+      "run_id": 43561168032,
+      "artifact_id": 14100770369,
+      "commit_sha": "227e7f20137d99d5da122ffb8a0ee93b069548c7",
+      "zip_sha256": "sha256:51b56dc28e5c229a280adf3f38062744992a61dc21dff48973e18f48105d10d8",
+      "github_run_url": "https://github.com/yudocyudoc/igc-modular/actions/runs/43561168032",
+      "archive_kind": "D_M_B_FEEDBACK_B0",
+      "read_only_public": true
+    },
+    "buffalo_initial": {
+      "repository": "yudocyudoc/igc-modular",
+      "run_id": 43537333254,
+      "artifact_id": 14090920829,
+      "commit_sha": "399eddbc0d674e8b2370f908a75ba73e694153c3",
+      "zip_sha256": "sha256:70f9e9f846a33cd470b00dbaf0bf189b0b6c7a029b68bd84485f7c6bbe748265",
+      "github_run_url": "https://github.com/yudocyudoc/igc-modular/actions/runs/43537333254",
+      "archive_kind": "BUFFALO_ORIGINAL_B0",
+      "read_only_public": true
+    },
+    "buffalo_r1": {
+      "repository": "yudocyudoc/igc-modular",
+      "run_id": 43565759793,
+      "artifact_id": 14102098459,
+      "commit_sha": "402cfe945839ca29718c385def6aab9e846ef117",
+      "zip_sha256": "sha256:686db7b34ca177e055a0c4d6fbbef771368baaa412491dad2ed07c1a20a59b65",
+      "github_run_url": "https://github.com/yudocyudoc/igc-modular/actions/runs/43565759793",
+      "archive_kind": "BUFFALO_REVIEW_R1_B0",
+      "read_only_public": true
+    },
+    "buffalo_score": {
+      "repository": "yudocyudoc/igc-modular",
+      "run_id": 43686325127,
+      "artifact_id": 14150642285,
+      "commit_sha": "00ed50a9311a0864b323492935802cbfb86e5101",
+      "zip_sha256": "sha256:1e06057a1d31476ca3df75a2558db8aec54ffe27652aa66db334aa780bfe81b2",
+      "github_run_url": "https://github.com/yudocyudoc/igc-modular/actions/runs/43686325127",
+      "archive_kind": "D_M_BUFFALO_SEALED_B0",
+      "read_only_public": true
+    },
+    "m_p08": {
+      "repository": "yudocyudoc/igc-modular",
+      "run_id": 43702148041,
+      "artifact_id": 14157186844,
+      "commit_sha": "68e874821d74bb26c492625e9061716a40333dda",
+      "zip_sha256": "sha256:4391d036017140ec65931f0f6a1aba221c5fba81fbb1bc2e6107b8f406ae42a8",
+      "github_run_url": "https://github.com/yudocyudoc/igc-modular/actions/runs/43702148041",
+      "archive_kind": "MOLECULES_M_P08",
+      "read_only_public": true
+    },
+    "d_p08": {
+      "repository": "yudocyudoc/igc-modular",
+      "run_id": 43705604955,
+      "artifact_id": 14157799232,
+      "commit_sha": "072cd372bb020cef9cee48f70b5403fe992dbe9f",
+      "zip_sha256": "sha256:9fcab78e7a04afeca9fc9b4543f05df76ca58c7b2044194be540471c11120799",
+      "github_run_url": "https://github.com/yudocyudoc/igc-modular/actions/runs/43705604955",
+      "archive_kind": "GRAMMAR_D_P08",
+      "read_only_public": true
+    },
+    "hydra": {
+      "repository": "yudocyudoc/igc-modular",
+      "run_id": 44234407455,
+      "artifact_id": 14396368697,
+      "commit_sha": "e2da7eeaadd7c9e361ca38090a3de25a161916f3",
+      "zip_sha256": "sha256:2fa54c8b64927140e918c693886a11c9fb3e69f80d8ec1b2dabdf16be12d2cb5",
+      "github_run_url": "https://github.com/yudocyudoc/igc-modular/actions/runs/44234407455",
+      "archive_kind": "HYDRA_Q75_90S",
+      "read_only_public": true
+    }
+  },
+  "coverage_audit": {
+    "question_H123_newly_asked_of_D_M_B_in_PR1": false,
+    "full_producer_capability_to_construct_H123_models_tested": false,
+    "new_cloudflare_Buffalo_generate_or_review_POST": 0,
+    "D_B0_grammar_version": "generic-conservative-chain-search/0.1",
+    "D_B0_grammar_examined": "ONE_TO_THREE_SERIAL_STOCKS_WITH_OPTIONAL_LOSS",
+    "D_B0_direct_topology_primitives_not_new_fitted_search": true,
+    "M_B0_registry": "arena/coffee_adapters/registry.coffee.v1.json",
+    "M_B0_declared_e0_catalog": "arena/_vendor/igc/experiments/e0/catalog.json",
+    "M_B0_distinct_classes_used": [
+      "accepted-source",
+      "bounded-queue",
+      "delivery-counter",
+      "first-order-report-filter"
+    ],
+    "M_B0_archived_graph_count": 6,
+    "M_P08_distinct_classes_used": [
+      "accepted-source",
+      "bounded-queue",
+      "delivery-counter"
+    ],
+    "M_P08_archived_topologies": 1,
+    "M_P08_parameter_scenarios": 6,
+    "additional_unexamined_molecules_may_exist": true,
+    "other_Vensim_MDL_or_alternative_catalogs_tested": false,
+    "D_accuracy_on_B0_not_causal_mechanism_identification": true
+  },
+  "original_B0": {
+    "case_sha256": "sha256:756d16d2824a9052f5494dd41c3eef1f0e8826537deffbfc7cd39b0ca2d2457f",
+    "D_candidate_count": 6,
+    "M_candidate_count": 6,
+    "G2_authenticated": 12,
+    "candidate_receipts": [
+      {
+        "method": "gramática D",
+        "arm": "D",
+        "version": "generic-conservative-chain-search/0.1",
+        "case": "B0",
+        "candidate_id": "D-5f8781847cb6",
+        "parent_sha256": "sha256:5f8781847cb61dea0c516dff3d4012d023c9aaff36ded466e848ea5dc2f121d4",
+        "native_sha256": "sha256:1fbea38618db13b9974e1e3e2ada3f9ba49f8090c7b2672368bd1646f685fabd",
+        "g2_csv_sha256": "sha256:0d30d07e470d3a3a9e14e576ef490651d4759cfae63c7591ad04f3de678e7f03",
+        "g2_status": "G2_PHYSICAL_PASS_NOT_G3",
+        "policy_status": "RATIFIED",
+        "policy_reason": null,
+        "policy_id": "D-CT03-EXPLICIT-FIXED-SET/1.0",
+        "feedback_as_known_at": "2026-11-14T05:22:00.385365+00:00",
+        "feedback_projection_hash": "6bb393ec327a266f55879f50004f626f571dde10ff8b619f1ab5f045652cfe03",
+        "model_revision": false,
+        "claims_by": "original_method_policy_for_disposition; evaluator_for_H1_H2_H3"
+      },
+      {
+        "method": "gramática D",
+        "arm": "D",
+        "version": "generic-conservative-chain-search/0.1",
+        "case": "B0",
+        "candidate_id": "D-5bc57655500f",
+        "parent_sha256": "sha256:5bc57655500fd3738d6c3532fa202debc2ff0cdfd4408dd43e2e99fd2cd1c859",
+        "native_sha256": "sha256:fd79d5b714126bd754c05590e395d0777e4a810bfc4fd1cbe6f8c0def3ba4c0e",
+        "g2_csv_sha256": "sha256:f9259c5bd529b97d56b074a594df1e2f128fc06978e065185c583f4e11c24e71",
+        "g2_status": "G2_PHYSICAL_PASS_NOT_G3",
+        "policy_status": "RATIFIED",
+        "policy_reason": null,
+        "policy_id": "D-CT03-EXPLICIT-FIXED-SET/1.0",
+        "feedback_as_known_at": "2026-11-14T05:22:00.385365+00:00",
+        "feedback_projection_hash": "1399aac20554e82df6d888439e0601b1aa34a0427b848bd15790c8c44e78ffc9",
+        "model_revision": false,
+        "claims_by": "original_method_policy_for_disposition; evaluator_for_H1_H2_H3"
+      },
+      {
+        "method": "gramática D",
+        "arm": "D",
+        "version": "generic-conservative-chain-search/0.1",
+        "case": "B0",
+        "candidate_id": "D-1b03f4d80336",
+        "parent_sha256": "sha256:1b03f4d803364a51240be0040e17bbb5f6d8e5692408d12350a78f9ea86ec47d",
+        "native_sha256": "sha256:06896adfee195228a988a1084ef8662fbdfb00bcee128fb812fa9189e4fcd139",
+        "g2_csv_sha256": "sha256:2eeccfbf4d31bffbfbb3b1b493d153c6881c217f4b2a58a8ea2ae473c7a5f8ac",
+        "g2_status": "G2_PHYSICAL_PASS_NOT_G3",
+        "policy_status": "RATIFIED",
+        "policy_reason": null,
+        "policy_id": "D-CT03-EXPLICIT-FIXED-SET/1.0",
+        "feedback_as_known_at": "2026-11-14T05:22:00.385365+00:00",
+        "feedback_projection_hash": "c3cd6a8637ec58c0b3fad120c2c4ddf9d640e971f2ccf439b82bd61c9eae33aa",
+        "model_revision": false,
+        "claims_by": "original_method_policy_for_disposition; evaluator_for_H1_H2_H3"
+      },
+      {
+        "method": "gramática D",
+        "arm": "D",
+        "version": "generic-conservative-chain-search/0.1",
+        "case": "B0",
+        "candidate_id": "D-ba433938dfc8",
+        "parent_sha256": "sha256:ba433938dfc830d2792ba219a1e869f8ef9711b0a5c3ee33dc3685c6e2d9a1e2",
+        "native_sha256": "sha256:bc1db6b808cdae094cabb890f0844deb8b6fa5a542b616629ef819a6c6c6502d",
+        "g2_csv_sha256": "sha256:cd702ffe72aadbecd271e77653fe18146478940c1cb477fcf1eccdb0d38360eb",
+        "g2_status": "G2_PHYSICAL_PASS_NOT_G3",
+        "policy_status": "RATIFIED",
+        "policy_reason": null,
+        "policy_id": "D-CT03-EXPLICIT-FIXED-SET/1.0",
+        "feedback_as_known_at": "2026-11-14T05:22:00.385365+00:00",
+        "feedback_projection_hash": "a16cbb5feb985348166afc89a6e226cd3a50763551dc624e78dead308907af22",
+        "model_revision": false,
+        "claims_by": "original_method_policy_for_disposition; evaluator_for_H1_H2_H3"
+      },
+      {
+        "method": "gramática D",
+        "arm": "D",
+        "version": "generic-conservative-chain-search/0.1",
+        "case": "B0",
+        "candidate_id": "D-9a46b6a3ba32",
+        "parent_sha256": "sha256:9a46b6a3ba32e26610f69ec15fe11bd200274efbc08bbf578f7fc02bb6bce496",
+        "native_sha256": "sha256:06aa092babec8a843fd865c7ebc7e3aed43ddc2044ca363b9f867d42eebc87d6",
+        "g2_csv_sha256": "sha256:b57a1e3c64101c733e22b0733c4be2f8f376ddc38834123c2a586ef9828f03d7",
+        "g2_status": "G2_PHYSICAL_PASS_NOT_G3",
+        "policy_status": "RATIFIED",
+        "policy_reason": null,
+        "policy_id": "D-CT03-EXPLICIT-FIXED-SET/1.0",
+        "feedback_as_known_at": "2026-11-14T05:22:00.385365+00:00",
+        "feedback_projection_hash": "d8c65dfc931ec2fe45d78d640c23baf6b5fb759572483a7794b93a56b8c80be3",
+        "model_revision": false,
+        "claims_by": "original_method_policy_for_disposition; evaluator_for_H1_H2_H3"
+      },
+      {
+        "method": "gramática D",
+        "arm": "D",
+        "version": "generic-conservative-chain-search/0.1",
+        "case": "B0",
+        "candidate_id": "D-b4030cf49cc3",
+        "parent_sha256": "sha256:b4030cf49cc35de2b44925e36acae57c39403299ac2d699657e0650b58ec8e54",
+        "native_sha256": "sha256:273e609fbe60926d2d382bae9f6bc8e3e8d9ce1e87d23722257232bad63d4858",
+        "g2_csv_sha256": "sha256:032081d4a75ca2996923dbbea7b1fa79f4401ee060248e4ed17b80d009972655",
+        "g2_status": "G2_PHYSICAL_PASS_NOT_G3",
+        "policy_status": "RATIFIED",
+        "policy_reason": null,
+        "policy_id": "D-CT03-EXPLICIT-FIXED-SET/1.0",
+        "feedback_as_known_at": "2026-11-14T05:22:00.385365+00:00",
+        "feedback_projection_hash": "82162f9d87557ce67b13f0aeb062d57323bbee5b3d90c75c25155282f87d3867",
+        "model_revision": false,
+        "claims_by": "original_method_policy_for_disposition; evaluator_for_H1_H2_H3"
+      },
+      {
+        "method": "moléculas M",
+        "arm": "M",
+        "version": "short-e1-original-typed-graph-enumeration",
+        "case": "B0",
+        "candidate_id": "M-18247fc54a54",
+        "parent_sha256": "sha256:5d887db26d1a579feba79f8770854d9e812ad8f00a2d9520dccc4b7c04a682ae",
+        "native_sha256": "sha256:a2404b5e72ac49737b4723d5c3eb925a08149374ffc05a142ff88e6cee6f15d8",
+        "g2_csv_sha256": "sha256:94e4b1bc2e09b8047f87a95c89c9b23cfd184f2607f51beb516ce3a944af81f1",
+        "g2_status": "G2_PHYSICAL_PASS_NOT_G3",
+        "policy_status": "ABSTAINED",
+        "policy_reason": "NO_TWO_LATE_CONSTRUCTION_OBSERVATIONS",
+        "policy_id": "M-E1-OWN-FEEDBACK-SET/1.0",
+        "feedback_as_known_at": "2026-11-14T05:22:00.385365+00:00",
+        "feedback_projection_hash": "faf1fa22a6bd81a00bb8bd0f5a80ba4c1ce6fd699fed1def7eb0fe374209c315",
+        "model_revision": false,
+        "claims_by": "original_method_policy_for_disposition; evaluator_for_H1_H2_H3"
+      },
+      {
+        "method": "moléculas M",
+        "arm": "M",
+        "version": "short-e1-original-typed-graph-enumeration",
+        "case": "B0",
+        "candidate_id": "M-2e8eb34b64cb",
+        "parent_sha256": "sha256:317eab89941f62f63451748c0ff0cef04c010301c8444c987ad84857c06f674e",
+        "native_sha256": "sha256:a2404b5e72ac49737b4723d5c3eb925a08149374ffc05a142ff88e6cee6f15d8",
+        "g2_csv_sha256": "sha256:827b41e217fa67354c46e1b1ad9ff03e8e4cf3fb9031ff9685af99f04b6b13b7",
+        "g2_status": "G2_PHYSICAL_PASS_NOT_G3",
+        "policy_status": "ABSTAINED",
+        "policy_reason": "NO_TWO_LATE_CONSTRUCTION_OBSERVATIONS",
+        "policy_id": "M-E1-OWN-FEEDBACK-SET/1.0",
+        "feedback_as_known_at": "2026-11-14T05:22:00.385365+00:00",
+        "feedback_projection_hash": "5ff5a20fd3ea52ca2f74df7f0ed5318106bb1d58d07f3cbf287dde94d15da1e1",
+        "model_revision": false,
+        "claims_by": "original_method_policy_for_disposition; evaluator_for_H1_H2_H3"
+      },
+      {
+        "method": "moléculas M",
+        "arm": "M",
+        "version": "short-e1-original-typed-graph-enumeration",
+        "case": "B0",
+        "candidate_id": "M-3a0c5b35e3a1",
+        "parent_sha256": "sha256:50ecdd9fad6668400acb408f214220801407c0c386aa856c5c5ca169220db164",
+        "native_sha256": "sha256:a2404b5e72ac49737b4723d5c3eb925a08149374ffc05a142ff88e6cee6f15d8",
+        "g2_csv_sha256": "sha256:b68cd64704d7cd439cd41c2438ddd820cab0ddc33a9b514129a5f1e53fa662e6",
+        "g2_status": "G2_PHYSICAL_PASS_NOT_G3",
+        "policy_status": "ABSTAINED",
+        "policy_reason": "NO_TWO_LATE_CONSTRUCTION_OBSERVATIONS",
+        "policy_id": "M-E1-OWN-FEEDBACK-SET/1.0",
+        "feedback_as_known_at": "2026-11-14T05:22:00.385365+00:00",
+        "feedback_projection_hash": "233d78a4aa7d41f63bac0241244e34655a359c31bc62a95c49012a85b1515680",
+        "model_revision": false,
+        "claims_by": "original_method_policy_for_disposition; evaluator_for_H1_H2_H3"
+      },
+      {
+        "method": "moléculas M",
+        "arm": "M",
+        "version": "short-e1-original-typed-graph-enumeration",
+        "case": "B0",
+        "candidate_id": "M-865c88bb0dba",
+        "parent_sha256": "sha256:2f80009112f999f20d32778fab69b97a9627c3653bcc3637475907291b051fb9",
+        "native_sha256": "sha256:a2404b5e72ac49737b4723d5c3eb925a08149374ffc05a142ff88e6cee6f15d8",
+        "g2_csv_sha256": "sha256:d01139339ad96a4c12e68c27336e9deeb32b41a1bd210380b0fe460112cddfec",
+        "g2_status": "G2_PHYSICAL_PASS_NOT_G3",
+        "policy_status": "ABSTAINED",
+        "policy_reason": "NO_TWO_LATE_CONSTRUCTION_OBSERVATIONS",
+        "policy_id": "M-E1-OWN-FEEDBACK-SET/1.0",
+        "feedback_as_known_at": "2026-11-14T05:22:00.385365+00:00",
+        "feedback_projection_hash": "feef4ad8307097e53cde0aa543860009291522cfddfbc439a2270aea988a4f1e",
+        "model_revision": false,
+        "claims_by": "original_method_policy_for_disposition; evaluator_for_H1_H2_H3"
+      },
+      {
+        "method": "moléculas M",
+        "arm": "M",
+        "version": "short-e1-original-typed-graph-enumeration",
+        "case": "B0",
+        "candidate_id": "M-ef5c16621e41",
+        "parent_sha256": "sha256:ea7bbf337294d4c6033d5175e3d5624cfd7c3ce45c202ea0c71f104602d13079",
+        "native_sha256": "sha256:a2404b5e72ac49737b4723d5c3eb925a08149374ffc05a142ff88e6cee6f15d8",
+        "g2_csv_sha256": "sha256:53ee8ba530b4908141501591c79609106f2ea6eaaabb44cb20fd0620d263d855",
+        "g2_status": "G2_PHYSICAL_PASS_NOT_G3",
+        "policy_status": "ABSTAINED",
+        "policy_reason": "NO_TWO_LATE_CONSTRUCTION_OBSERVATIONS",
+        "policy_id": "M-E1-OWN-FEEDBACK-SET/1.0",
+        "feedback_as_known_at": "2026-11-14T05:22:00.385365+00:00",
+        "feedback_projection_hash": "515851ca13c102580a4b77e46b99005cd1b4f837dc9907b78b7ddf1ae9fbb889",
+        "model_revision": false,
+        "claims_by": "original_method_policy_for_disposition; evaluator_for_H1_H2_H3"
+      },
+      {
+        "method": "moléculas M",
+        "arm": "M",
+        "version": "short-e1-original-typed-graph-enumeration",
+        "case": "B0",
+        "candidate_id": "M-f250c7b99b2c",
+        "parent_sha256": "sha256:2524c816505949ace3d97fd66704ff5256087059ed9e08352d4c3463152ddc3b",
+        "native_sha256": "sha256:a2404b5e72ac49737b4723d5c3eb925a08149374ffc05a142ff88e6cee6f15d8",
+        "g2_csv_sha256": "sha256:1b6a07b5cc3fc53eff527e163c87b5379aec6eaa3a3444d60e8f8ee21b20b8d5",
+        "g2_status": "G2_PHYSICAL_PASS_NOT_G3",
+        "policy_status": "ABSTAINED",
+        "policy_reason": "NO_TWO_LATE_CONSTRUCTION_OBSERVATIONS",
+        "policy_id": "M-E1-OWN-FEEDBACK-SET/1.0",
+        "feedback_as_known_at": "2026-11-14T05:22:00.385365+00:00",
+        "feedback_projection_hash": "20ff18113f71173272c6d84f4a6adf256fdc45612646ceffb0f7200365347764",
+        "model_revision": false,
+        "claims_by": "original_method_policy_for_disposition; evaluator_for_H1_H2_H3"
+      }
+    ],
+    "feedback_original_policies_invoked": {
+      "D": true,
+      "M": true,
+      "B": false
+    },
+    "historical_B_packet_prepared_not_sent": true
+  },
+  "buffalo_R1": {
+    "parent_sha256": "sha256:5c7fc9c73a5f03849d5d2cb1a3cb8352ac9c6d0117621b5e49fc6991694a8d40",
+    "child_sha256": "sha256:4dc47264883f36a0f4c1b83d072ff2c18a581ea91e5e9ab30a76784c47c87a67",
+    "arm": "B",
+    "method": "Buffalo",
+    "version": "Engine.generate currentModel R1",
+    "case": "B0",
+    "original_variables": 10,
+    "revised_variables": 11,
+    "original_relationships": 0,
+    "revised_relationships": 12,
+    "revised_variable_names": [
+      "Hypothesized Input Rate",
+      "Paid Order Rate",
+      "Waiting Paid Orders",
+      "Service Capacity",
+      "Workload Per Paid Order",
+      "Effective Service Capacity",
+      "Response Time",
+      "Pickup Rate",
+      "Post Payment Loss Fraction",
+      "Post Payment Loss",
+      "Picked Up Orders Cumulative"
+    ],
+    "own_feedback_packet_sent_in_first_feedback_run": false,
+    "later_original_currentModel_review_invoked": true,
+    "revised_g1_admissible": true,
+    "r1_scientific_gate": "G1_ONLY_NOT_G2_NOT_G3",
+    "sealed_b0_pickups_mae_orders": 0.8948896795738998,
+    "score_on_synthetic_B0_not_Q75": true,
+    "claims_by": "Engine.generate for revision; evaluator for mechanism/score"
+  },
+  "b0_sealed_scores": {
+    "status": "NATIVE_PREDICTIONS_CONTRASTED_WITH_SYNTHETIC_TRUTH",
+    "score_scope": "SYNTHETIC_B0_ONLY_NOT_FIELD_OPERATIONS",
+    "candidates": [
+      {
+        "arm": "D",
+        "candidate_id": "D-5f8781847cb6",
+        "status": "PREDICTED",
+        "mae_pickups_orders": 0.8776891627554472,
+        "rmse_pickups_orders": 1.1164165596914721,
+        "signed_errors_orders": [
+          -1.8265284288512404,
+          -0.6003723907689107,
+          0.2061666686461905
+        ]
+      },
+      {
+        "arm": "D",
+        "candidate_id": "D-5bc57655500f",
+        "status": "PREDICTED",
+        "mae_pickups_orders": 0.8948896795738998,
+        "rmse_pickups_orders": 1.156304763311896,
+        "signed_errors_orders": [
+          -1.8821426111130606,
+          -0.6720370815433494,
+          0.13048934606528917
+        ]
+      },
+      {
+        "arm": "D",
+        "candidate_id": "D-1b03f4d80336",
+        "status": "PREDICTED",
+        "mae_pickups_orders": 1.7402432857745265,
+        "rmse_pickups_orders": 1.930509632401709,
+        "signed_errors_orders": [
+          -2.8265243024212996,
+          -1.6003722721111409,
+          -0.7938332827911392
+        ]
+      },
+      {
+        "arm": "D",
+        "candidate_id": "D-ba433938dfc8",
+        "status": "PREDICTED",
+        "mae_pickups_orders": 1.80292029218984,
+        "rmse_pickups_orders": 1.9836487321820637,
+        "signed_errors_orders": [
+          -2.8771635476364494,
+          -1.6670618451123804,
+          -0.8645354838206902
+        ]
+      },
+      {
+        "arm": "D",
+        "candidate_id": "D-9a46b6a3ba32",
+        "status": "PREDICTED",
+        "mae_pickups_orders": 2.740229756940277,
+        "rmse_pickups_orders": 2.864830255752476,
+        "signed_errors_orders": [
+          -3.8264856757470707,
+          -2.600370900399531,
+          -1.7938326946742293
+        ]
+      },
+      {
+        "arm": "D",
+        "candidate_id": "D-b4030cf49cc3",
+        "status": "PREDICTED",
+        "mae_pickups_orders": 2.7979320502705605,
+        "rmse_pickups_orders": 2.917659697824446,
+        "signed_errors_orders": [
+          -3.8721509569690706,
+          -2.66208539975171,
+          -1.8595597940909006
+        ]
+      },
+      {
+        "arm": "M",
+        "candidate_id": "M-18247fc54a54",
+        "status": "PREDICTED",
+        "mae_pickups_orders": 1.74024328577453,
+        "rmse_pickups_orders": 1.9305096324017106,
+        "signed_errors_orders": [
+          -2.8265243024212996,
+          -1.6003722721111409,
+          -0.7938332827911498
+        ]
+      },
+      {
+        "arm": "M",
+        "candidate_id": "M-2e8eb34b64cb",
+        "status": "PREDICTED",
+        "mae_pickups_orders": 14.23542201048378,
+        "rmse_pickups_orders": 14.248816052899773,
+        "signed_errors_orders": [
+          -13.36869774010552,
+          -14.762967045210198,
+          -14.574601246135623
+        ]
+      },
+      {
+        "arm": "M",
+        "candidate_id": "M-3a0c5b35e3a1",
+        "status": "PREDICTED",
+        "mae_pickups_orders": 10.88530845140273,
+        "rmse_pickups_orders": 10.887114232343276,
+        "signed_errors_orders": [
+          -10.891174175153596,
+          -11.125168781011952,
+          -10.639582398042648
+        ]
+      },
+      {
+        "arm": "M",
+        "candidate_id": "M-865c88bb0dba",
+        "status": "PREDICTED",
+        "mae_pickups_orders": 14.23542201048378,
+        "rmse_pickups_orders": 14.248816052899773,
+        "signed_errors_orders": [
+          -13.36869774010552,
+          -14.762967045210198,
+          -14.574601246135623
+        ]
+      },
+      {
+        "arm": "M",
+        "candidate_id": "M-ef5c16621e41",
+        "status": "PREDICTED",
+        "mae_pickups_orders": 10.88530845140273,
+        "rmse_pickups_orders": 10.887114232343276,
+        "signed_errors_orders": [
+          -10.891174175153596,
+          -11.125168781011952,
+          -10.639582398042648
+        ]
+      },
+      {
+        "arm": "M",
+        "candidate_id": "M-f250c7b99b2c",
+        "status": "PREDICTED",
+        "mae_pickups_orders": 1.74024328577453,
+        "rmse_pickups_orders": 1.9305096324017106,
+        "signed_errors_orders": [
+          -2.8265243024212996,
+          -1.6003722721111409,
+          -0.7938332827911498
+        ]
+      },
+      {
+        "arm": "B",
+        "candidate_id": "B_ORIGINAL_R1",
+        "status": "PREDICTED",
+        "mae_pickups_orders": 0.8948896795738998,
+        "rmse_pickups_orders": 1.156304763311896,
+        "signed_errors_orders": [
+          -1.8821426111130606,
+          -0.6720370815433494,
+          0.13048934606528917
+        ]
+      }
+    ]
+  },
+  "p08": {
+    "D_method_version": "ONLY_SHARED_CAPACITY_TO_STAGE_CAP1_2_3",
+    "M_method_version": "M_EXISTING_E1_COMPOSER_AND_BACKEND_WITH_VERSIONED_ESPRESSO_ROLE",
+    "D_M_same_pulse": true,
+    "stage_mapping_to_physical_groups_validated": false,
+    "six_native_attempts_each": true,
+    "same_values_rows": [
+      {
+        "load": "LOWER_PAID_INPUT_Q25",
+        "action": "BASE",
+        "D_continuous_deliveries": 15.742861,
+        "M_continuous_deliveries": 15.742861,
+        "same_rectangular_pulse": true,
+        "not_independent_empirical_confirmation": true
+      },
+      {
+        "load": "LOWER_PAID_INPUT_Q25",
+        "action": "PREP_CAPACITY_X2",
+        "D_continuous_deliveries": 15.742861,
+        "M_continuous_deliveries": 15.742861,
+        "same_rectangular_pulse": true,
+        "not_independent_empirical_confirmation": true
+      },
+      {
+        "load": "LOWER_PAID_INPUT_Q25",
+        "action": "ESPRESSO_CAPACITY_X2",
+        "D_continuous_deliveries": 15.742861,
+        "M_continuous_deliveries": 15.742861,
+        "same_rectangular_pulse": true,
+        "not_independent_empirical_confirmation": true
+      },
+      {
+        "load": "HIGHER_PAID_INPUT_Q75",
+        "action": "BASE",
+        "D_continuous_deliveries": 18.248947,
+        "M_continuous_deliveries": 18.248947,
+        "same_rectangular_pulse": true,
+        "not_independent_empirical_confirmation": true
+      },
+      {
+        "load": "HIGHER_PAID_INPUT_Q75",
+        "action": "PREP_CAPACITY_X2",
+        "D_continuous_deliveries": 23.134332,
+        "M_continuous_deliveries": 23.134332,
+        "same_rectangular_pulse": true,
+        "not_independent_empirical_confirmation": true
+      },
+      {
+        "load": "HIGHER_PAID_INPUT_Q75",
+        "action": "ESPRESSO_CAPACITY_X2",
+        "D_continuous_deliveries": 18.248947,
+        "M_continuous_deliveries": 18.248947,
+        "same_rectangular_pulse": true,
+        "not_independent_empirical_confirmation": true
+      }
+    ],
+    "same_model_not_two_independent_confirmations": true
+  },
+  "hydra_q75": {
+    "case": "Q75",
+    "source_run_id": 44234407455,
+    "paid_orders": 46,
+    "synthetic_beverages": 53,
+    "horizon_min": 103.2370666667,
+    "automatic_extraction_s_assumed": 90,
+    "FCFS_P90_min": 3.725950000000002,
+    "load_priority_P90_delta_s": 2.163,
+    "milk_priority_P90_delta_s": -3.837,
+    "fcfs_loading_wait_task_min": 3.7995,
+    "load_policy_loading_wait_task_min": 2.0452,
+    "fcfs_all_groups_extracting_task_min": 1.4952,
+    "fcfs_manual_block_group_free_task_min": 2.1114,
+    "load_earlier": 9,
+    "load_later": 9,
+    "milk_earlier": 5,
+    "milk_later": 4,
+    "FCFS_not_observed_policy": true,
+    "H3_group_retained_in_B_state_machine_but_no_real_episode_attributed": true,
+    "provenance": {
+      "verified_adapter": "P11_P39_CONSTRUCTION_SELECT_CASE_DAY",
+      "selected_load_label": "HIGHER_PAID_INPUT_Q75",
+      "selected_case_day_digest": "sha256:a7c3cae597302f7a46daf136c5b584e6a411a4c13d01319a81fcd0fd467171b9",
+      "selection_receipt_sha256": "sha256:7784f777fe754af9a1125acee8c3107d03d9f9ed8add9a10aaa395c81ab97ec6",
+      "source_view_run_id": 43684660729,
+      "source_type": "R2_READ_ONLY_VERIFIED_RUN",
+      "source_peak_horizon_min": 103.2370666667,
+      "partition": "CONSTRUCTION",
+      "case_paid_input_digest": "sha256:1b95a0a72a4ee4600abf78b64c35168ce7ac720e63537fe23dc46ef04df4ced8"
+    }
+  },
+  "H1_H2_H3_method_matrix": [
+    {
+      "method": "gramática D",
+      "version": "original B0 6-candidate stock-flow family",
+      "case": "B0",
+      "native_location": "g2:input/native/D/manifest.json; G2 Modelica + CSV",
+      "observable": "delivered cumulative at 80/100/103.237 min",
+      "H1": "NOT_ENCODED_IN_ARCHIVED_NATIVE",
+      "H2": "NOT_ENCODED_IN_ARCHIVED_NATIVE",
+      "H3": "NOT_ENCODED_IN_ARCHIVED_NATIVE",
+      "method_decision": "RATIFIED_6_CANDIDATES",
+      "question_H123_asked": "NO",
+      "attribution": "evaluator_from_native_and_method_policy",
+      "full_method_H123_capacity_tested": false,
+      "interpretation_scope": "ARCHIVED_NATIVE_AND_EXISTING_RESULTS_ONLY"
+    },
+    {
+      "method": "moléculas M",
+      "version": "Short E1 original B0",
+      "case": "B0",
+      "native_location": "g2:input/native/M/native.mo; six full ASTs in manifest",
+      "observable": "deliveredTotal cumulative at 80/100/103.237 min",
+      "H1": "NOT_ENCODED_IN_ARCHIVED_NATIVE",
+      "H2": "NOT_ENCODED_IN_ARCHIVED_NATIVE",
+      "H3": "NOT_ENCODED_IN_ARCHIVED_NATIVE",
+      "method_decision": "ABSTAINED_6_NO_TWO_LATE_CONSTRUCTION_OBSERVATIONS",
+      "question_H123_asked": "NO",
+      "attribution": "evaluator_from_native_and_method_policy",
+      "full_method_H123_capacity_tested": false,
+      "interpretation_scope": "ARCHIVED_NATIVE_AND_EXISTING_RESULTS_ONLY"
+    },
+    {
+      "method": "Buffalo",
+      "version": "original B0→R1 currentModel",
+      "case": "B0",
+      "native_location": "buffalo_initial + buffalo_r1:provider/native-engine-result.json",
+      "observable": "Picked Up Orders Cumulative at three B0 cuts; MAE in synthetic orders",
+      "H1": "NOT_ENCODED_IN_ARCHIVED_NATIVE",
+      "H2": "NOT_ENCODED_IN_ARCHIVED_NATIVE",
+      "H3": "NOT_ENCODED_IN_ARCHIVED_NATIVE",
+      "method_decision": "REVISION_EXECUTED_G1; G2_RESULT_RECOVERED",
+      "question_H123_asked": "NO",
+      "attribution": "evaluator_from_R1_and_sealed_score",
+      "full_method_H123_capacity_tested": false,
+      "interpretation_scope": "ARCHIVED_NATIVE_AND_EXISTING_RESULTS_ONLY"
+    },
+    {
+      "method": "gramática D",
+      "version": "P08 3-stage capacity extension",
+      "case": "P08 Q25/Q75",
+      "native_location": "d_p08:DP08_*.mo + result.json",
+      "observable": "continuous deliveries at 105-minute rectangular pulse cut",
+      "H1": "AGGREGATE_ESPRESSO_PROXY_NOT_GROUP",
+      "H2": "NO_SHARED_OPERATOR",
+      "H3": "NO_RETAINED_GROUP",
+      "method_decision": "NOT_ASKED_TO_REVISE_H123",
+      "question_H123_asked": "NO",
+      "attribution": "evaluator_from_equations_and_result",
+      "full_method_H123_capacity_tested": false,
+      "interpretation_scope": "ARCHIVED_NATIVE_AND_EXISTING_RESULTS_ONLY"
+    },
+    {
+      "method": "moléculas M",
+      "version": "P08 versioned BoundedQueue espresso role",
+      "case": "P08 Q25/Q75",
+      "native_location": "m_p08:native.mo + result.json",
+      "observable": "continuous deliveredTotal at 105-minute rectangular pulse cut",
+      "H1": "AGGREGATE_ESPRESSO_PROXY_NOT_GROUP",
+      "H2": "NO_SHARED_OPERATOR",
+      "H3": "NO_RETAINED_GROUP",
+      "method_decision": "NOT_ASKED_TO_REVISE_H123",
+      "question_H123_asked": "NO",
+      "attribution": "evaluator_from_AST_and_result",
+      "full_method_H123_capacity_tested": false,
+      "interpretation_scope": "ARCHIVED_NATIVE_AND_EXISTING_RESULTS_ONLY"
+    },
+    {
+      "method": "referencia Hydra",
+      "version": "B physical + C diagnostics + policies D",
+      "case": "Q75 90s",
+      "native_location": "hydra:D_Q25_Q75_AGGREGATE.json + PR44 B state-machine",
+      "observable": "per-order simulated P90 and task-minute waits",
+      "H1": "MODEL_SIGNAL_EXTRACTION_BUSY",
+      "H2": "MODEL_SIGNAL_MANUAL_BLOCK",
+      "H3": "STATE_RETAINED_AFTER_EXTRACTION_NO_OBSERVED_LOCAL_DURATION",
+      "method_decision": "ASSUMED_FCFS_MODEL_DIAGNOSTIC",
+      "question_H123_asked": "PARTIALLY",
+      "attribution": "evaluator_from_reference_results_and_B_contract",
+      "full_method_H123_capacity_tested": false,
+      "interpretation_scope": "ASSUMED_PHYSICAL_REFERENCE_NOT_FIELD_OBSERVATION"
+    }
+  ],
+  "numeric_comparability_p08_vs_hydra": {
+    "numeric_comparable": false,
+    "mismatches": [
+      "case",
+      "input_profile",
+      "material_unit",
+      "horizon_min",
+      "cut_min",
+      "intervention",
+      "observable",
+      "observable_unit"
+    ],
+    "allowed": "MECHANISM_ONLY",
+    "not_an_empirical_confirmation": true
+  },
+  "shared_premises_example": {
+    "claim": "D/M P08 same quantitative trajectory under same pulse and capacities",
+    "shared_premises": [
+      "RECTANGULAR_105_MIN_INPUT",
+      "NOMINAL_CAPACITIES_12_15_100_PER_H",
+      "AGGREGATE_CONTINUOUS_ORDERS"
+    ],
+    "evidence": [
+      "d_p08:result.json",
+      "m_p08:result.json"
+    ],
+    "two_independent_empirical_confirmations": false,
+    "cross_arm_ATMS_what_if_executed_in_PR1": false
+  },
+  "decision_with_Hydra_only": {
+    "action": "NO_SHOP_POLICY_CHANGE",
+    "next_observation": "ONE_ELIGIBLE_LOADING_OPPORTUNITY_WITH_ALL_GROUP_STATES_AND_ELIGIBLE_OPERATOR_ACTIVITY",
+    "reason": "CONDITIONAL_AND_UNCALIBRATED_90S_MODEL; H1_H2_COINCIDE; H3_POSSIBLE_IN_STATE_MACHINE"
+  },
+  "decision_with_Hydra_plus_DMB": {
+    "action": "NO_SHOP_POLICY_CHANGE",
+    "next_observation": "ONE_ELIGIBLE_LOADING_OPPORTUNITY_WITH_ALL_GROUP_STATES_AND_ELIGIBLE_OPERATOR_ACTIVITY",
+    "incremental_operational_observation_demonstrated": false,
+    "representational_insight": "P08 AGGREGATE_PREPARATION_PROXY_SEPARATE_FROM_PHYSICAL_DISPATCH",
+    "reason": "ARCHIVED_D_M_B_NATIVES_LACK_EXPLICIT_H123_STATES_METHOD_CAPABILITIES_NOT_TESTED"
+  },
+  "contribution_assessment": {
+    "representational": "D_M_P08_AGGREGATE_STAGE_CAPACITY_CONDITIONAL_MECHANISM; BUFFALO_G1_CAUSAL_REVIEW",
+    "informative": "NO_ADDITIONAL_H1_H2_H3_OBSERVATION_DEMONSTRATED_RETROSPECTIVELY",
+    "decisional": "PENDING_INDEPENDENT_PROSPECTIVE_CONTRAST",
+    "retrospective_no_blinding": true,
+    "no_method_was_asked_H123_in_historic_B0_P08": true
+  },
+  "limits": {
+    "no_real_shop_capacity_or_dispatch_validation": true,
+    "source_data_synthetic": true,
+    "no_new_synthetic_world": true,
+    "no_model_rerun_or_provider_calls_or_R2": true,
+    "H3_timer_stopping_not_proof_of_group_release": true,
+    "no_E1_private_30s_result_assumed": true,
+    "no_new_cross_method_ATMS_what_if_executed": true
+  }
+}
