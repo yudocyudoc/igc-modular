@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from arena import coffee_q75_buffalo_initial as q
@@ -21,8 +22,12 @@ class Offline(unittest.TestCase):
                 "resource_ids_from_dossier":{"steam_wand":["W01"]},
                 "policy_selection_semantics":{
                     "PRIORITIZE_MILK_READY":"first executable milk then first executable FCFS"},
-                "duration_min_assumed_not_calibrated":{"espresso_auto_min":1.5}
+                "duration_min_assumed_not_calibrated":{"espresso_auto_min":1.5},
+                "clean_after_every_beverage_assumed":False
             },
+            "aggregate_beverage_mix_from_public_Q75":{
+                "milk_required_beverages":33,"no_milk_required_beverages":20},
+            "aggregate_clean_tasks_completed_in_archived_Q75":0,
             "question":q.FIXED_QUESTION
         }
         packet={"status":"PREPARED_NOT_DELIVERED_TO_PRODUCER",
@@ -36,6 +41,10 @@ class Offline(unittest.TestCase):
             self.assertNotIn("-3.837",req["prompt"])
             self.assertIn("W01",req["prompt"])
             self.assertIn("one pickup pass",req["prompt"])
+            self.assertIn("33 require milk on W01",req["prompt"])
+            self.assertIn("DOES NOT clean the espresso group",req["prompt"])
+            self.assertIs(req["original_engine_effective_option_profile"]
+                          ["supportsSubTypes"],False)
             self.assertFalse(req["original_B0_R1_reused"])
             self.assertEqual(req["max_provider_posts"],1)
             self.assertEqual(req["max_completion_tokens"],16000)
@@ -88,5 +97,41 @@ class AuthenticatedArchives(unittest.TestCase):
             self.assertEqual(dry["cost_ceiling"]["posts"],1)
             self.assertEqual(dry["cost_ceiling"]["completion_tokens_per_request"],16000)
             with self.assertRaises(ArenaError):q.dry_run(self.root,self.dossier,d)
+
+    def test_reserved_bytes_are_checked_again_before_node(self):
+        with tempfile.TemporaryDirectory() as t:
+            out=Path(t)/"initial"
+            inp=q.dry_run(self.root,self.dossier,out)
+            self.assertEqual(inp["original_engine_effective_option_profile"]
+                             ["scope"],
+                             "ORIGINAL_BUFFALO_HISTORICAL_SCALAR_NO_NATIVE_QUEUE_SUBTYPES")
+            request_file=out/"request.json"
+            original_bytes=request_file.read_bytes()
+            env={"CLOUDFLARE_API_TOKEN":"TEST_ONLY_NO_REAL_PROVIDER",
+                 "CLOUDFLARE_ACCOUNT_ID":"a"*32,
+                 "RUNNER_TEMP":t}
+            with patch.object(q,"manual_identity",return_value=("f"*40,123)), \
+                 patch.object(q,"public_config",return_value={
+                     "cloudflare":{"account_id":"a"*32}}), \
+                 patch.object(q.subprocess,"run",return_value=SimpleNamespace(returncode=0)) as node:
+                q.reserve(out,env=env)
+                lock=json.loads((out/"attempt.json").read_text())
+                self.assertEqual(lock["request_file_sha256"],
+                                 q.request_file_sha256(request_file))
+                attacker=json.loads(original_bytes)
+                attacker["prompt"]+=" MALICIOUS POST-RESERVATION CHANGE"
+                request_file.write_text(json.dumps(attacker),encoding="utf8")
+                with self.assertRaises(ArenaError):
+                    q.invoke(out,env=env)
+                node.assert_not_called()
+                # Still unsent; restoring byte-identical original permits
+                # the next offline *mocked Node invocation*.
+                request_file.write_bytes(original_bytes)
+                self.assertEqual(q.invoke(out,env=env)["status"],
+                                 "INITIAL_ORIGINAL_ENGINE_CALL_FINISHED")
+                node.assert_called_once()
+                self.assertEqual(lock["original_request_sha256"],
+                                 inp["request_sha256"])
+
 
 if __name__=="__main__":unittest.main()
