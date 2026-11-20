@@ -27,8 +27,24 @@ need(!['CT03_R2_ACCESS_KEY_ID','CT03_R2_SECRET_ACCESS_KEY',
        'AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','GH_TOKEN','GITHUB_TOKEN',
        'OPEN_ROUTER_API_KEY'].some(k=>Boolean(env[k])),
      'PRIVATE_OR_UNAUTHORIZED_CREDENTIALS');
-const input=JSON.parse(await readFile(env.COFFEE_Q75_B_INPUT,'utf8'));
+const inputBytes=await readFile(env.COFFEE_Q75_B_INPUT);
+const input=JSON.parse(inputBytes.toString('utf8'));
 const attempt=JSON.parse(await readFile(env.COFFEE_Q75_B_ATTEMPT,'utf8'));
+const caseView=JSON.parse(input.backgroundKnowledge).construction;
+const profile=input.original_engine_effective_option_profile;
+need(attempt.request_file_sha256===hash(inputBytes) &&
+     caseView.aggregate_beverage_mix_from_public_Q75.milk_required_beverages===33 &&
+     caseView.aggregate_beverage_mix_from_public_Q75.no_milk_required_beverages===20 &&
+     caseView.aggregate_clean_tasks_completed_in_archived_Q75===0 &&
+     caseView.physical.clean_after_every_beverage_assumed===false &&
+     caseView.physical.cleaning_stage_resource_requirement_from_hydra.join(',')==='barista,espresso_group' &&
+     input.prompt.includes('33 require milk on W01') &&
+     input.prompt.includes('DOES NOT clean the espresso group') &&
+     profile.supportsArrays===false && profile.supportsModules===false &&
+     profile.supportsSubTypes===false && profile.mentorMode===false &&
+     profile.maxTokens===16000 &&
+     profile.scope==='ORIGINAL_BUFFALO_HISTORICAL_SCALAR_NO_NATIVE_QUEUE_SUBTYPES',
+     'REQUEST_BYTES_OR_Q75_MIX_OR_ENGINE_PROFILE_DRIFT');
 need(input.schema==='arena.coffee.q75-buffalo-original-initial/1' &&
      input.round_kind==='initial' && input.parent_model===null &&
      input.original_B0_R1_reused===false &&
@@ -59,6 +75,10 @@ const receipt={
   original_request_sha256:input.request_sha256,
   original_engine:'UB-IAD/sd-ai::Engine.generate',round_kind:'initial',
   currentModel_supplied:false,
+  original_engine_effective_option_profile:profile,
+  native_queue_subtypes_enabled:false,
+  only_historical_scalar_profile_tested:true,
+  request_file_sha256:hash(inputBytes),
   provider_model:CF_MODEL,transport:CF_MODE,
   sdk_interceptions:0,provider_posts:0,
   raw_provider_saved:false,model_returned:false,
