@@ -1,0 +1,77 @@
+{
+  "schema": "arena.socrates.formulation_cases/1",
+  "source": {
+    "repository": "UB-IAD/sd-ai",
+    "commit": "58cfc86c8f2634401534fc89ff856f3f21c90bba",
+    "file": "agent/config/socrates.md",
+    "blob_sha": "2bada622725411649605b4be3f0bd7c6d3d5da8b",
+    "role": "Coach",
+    "version": "1.0",
+    "agent_mode": "manual",
+    "supported_modes": [
+      "sfd",
+      "cld"
+    ]
+  },
+  "probe": {
+    "execution": "prompt-only Cloudflare Workers AI CHAT; NOT upstream WebSocket agent",
+    "provider_model": "@cf/thinkingmachines/inkling-2-small",
+    "max_provider_posts": 6,
+    "max_per_case": 2,
+    "max_completion_tokens_per_call": 1800,
+    "reasoning_effort": "low",
+    "retry": false,
+    "include_q75_answer_or_DES_label": false,
+    "tools": false,
+    "empty_model_sync": true
+  },
+  "scenarios": [
+    {
+      "id": "Q75",
+      "role": "METHOD_MISMATCH",
+      "user_1": "Tengo una cafetería que en un día sintético recibió 46 pedidos, que contienen 53 bebidas; 33 necesitan leche y 20 no. Dos baristas comparten una sola lanza de vapor W01, dos espacios de preparación y tres grupos de espresso. Quiero saber si atender antes las tareas de leche ya ejecutables, en lugar de seguir la primera tarea ejecutable que llegó, reduce el percentil 90 del tiempo desde el pago hasta la entrega de cada pedido. ¿Cómo deberíamos modelarlo?",
+      "user_2": "Tenemos los totales y la lista de recursos, y tiempos de etapa supuestos, pero no puedo proporcionarte tiempos de llegada, recetas o finalización de cada pedido. Lo que quiero contrastar es la política de asignación de tareas, no solamente la carga total de trabajo.",
+      "blinding": "Do not reveal DES, SD unsuitability, or P90 outcome to the model."
+    },
+    {
+      "id": "DYNAMIC",
+      "role": "SD_CANDIDATE",
+      "user_1": "Una cafetería tiene periodos en los que la carga de trabajo pendiente crece; al aumentar la presión, algunos empleados renuncian y contratar reemplazos tarda varias semanas. La salida de personal puede reducir aún más la capacidad. Queremos comprender cómo cambia la acumulación durante seis meses y qué política de contratación ayuda a estabilizarla. ¿Cómo formularías el problema?",
+      "user_2": "Podemos reunir series semanales de trabajo pendiente, entradas, pedidos completados, dotación, ausencias y nuevas contrataciones. La contratación tiene un retraso y, mientras se aprende el trabajo, los nuevos empleados aportan menos capacidad. La decisión sería cuándo iniciar contrataciones, no qué bebida preparar primero.",
+      "blinding": "Do not tell model that this is SD-positive."
+    },
+    {
+      "id": "VAGUE",
+      "role": "UNDERSPECIFIED",
+      "user_1": "La cafetería tarda mucho en atender. Necesito que hagamos un modelo para decidir qué mejorar.",
+      "user_2": "El problema que menciona el equipo es la espera desde que se paga hasta que recibe su pedido. Todavía no definimos un objetivo, el plazo de decisión, ni tenemos datos de tiempos por pedido. Tampoco sabemos si el cuello de botella es el personal, el equipo o las llegadas.",
+      "blinding": "Do not tell model this is under-specified."
+    }
+  ],
+  "evaluation": {
+    "evidence": "judge transcript and actual tool effects, not just persuasive prose",
+    "positive_checks": {
+      "Q75": [
+        "ask about per-order arrivals/recipes/delivery or priority-resource mechanics",
+        "do not infer numerical per-order P90 from counts alone",
+        "avoid silently replacing atomic task selection with aggregate bias"
+      ],
+      "DYNAMIC": [
+        "identify stocks or behavior over time and relevant feedback",
+        "ask data, boundary, horizon, decision/behavior",
+        "avoid jumping to a built model"
+      ],
+      "VAGUE": [
+        "request decision metric, boundary, evidence and time horizon",
+        "avoid unsupported formulas or early model construction"
+      ]
+    },
+    "limitations": [
+      "exact three-case sample cannot establish general reliability",
+      "provider prompt-only probe is not full authentic SD-AI runtime",
+      "original Socrates persona is SD-oriented, not a universal mathematical classifier",
+      "record tool errors, status and no-retry evidence"
+    ],
+    "no_inference_value": "No scientific utility or performance claims from successful JSON/eloquence alone"
+  }
+}
