@@ -1,0 +1,72 @@
+name: Coffee Q75 milk decision — authentic pre-dispatch and ATMS
+
+on:
+  pull_request:
+    paths:
+      - "arena/coffee_q75_milk_cycle.py"
+      - "tests/test_coffee_q75_milk_cycle.py"
+      - "COFFEE_Q75_MILK_CYCLE_PR49.md"
+      - ".github/workflows/coffee-q75-milk-pre-dispatch.yml"
+  push:
+    branches: [main]
+    paths:
+      - "arena/coffee_q75_milk_cycle.py"
+      - "tests/test_coffee_q75_milk_cycle.py"
+      - "COFFEE_Q75_MILK_CYCLE_PR49.md"
+      - ".github/workflows/coffee-q75-milk-pre-dispatch.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  q75-actual-public-preread:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Eight original archived GitHub Actions ZIPs; no private world or provider
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          mkdir -p "$RUNNER_TEMP/q75-public-history"
+          for id in 14094919865 14100770369 14090920829 14102098459 14150642285 14157186844 14157799232 14396368697; do
+            curl --fail --location --silent --show-error --retry 0 \
+              --connect-timeout 15 --max-time 120 \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "Accept: application/vnd.github+json" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/yudocyudoc/igc-modular/actions/artifacts/${id}/zip" \
+              --output "$RUNNER_TEMP/q75-public-history/artifact-${id}.zip"
+          done
+      - name: Offline invariant tests plus genuine public-artifact adversarial tests
+        env:
+          ARENA_PUBLIC_ZIP_DIR: ${{ runner.temp }}/q75-public-history
+        run: |
+          python -m unittest discover -s tests -p test_coffee_q75_milk_cycle.py -v
+      - name: Freeze baseline, verify original D/M search and Buffalo B0 prompt, run real ATMS what-if
+        run: |
+          python -m arena.coffee_q75_milk_cycle \
+            --public-zips "$RUNNER_TEMP/q75-public-history" \
+            --out "$RUNNER_TEMP/q75-milk-prerun"
+          cat "$RUNNER_TEMP/q75-milk-prerun/Q75_MILK_PRE_DISPATCH.md" >> "$GITHUB_STEP_SUMMARY"
+          echo "PRE_DISPATCH_ONLY 8_AUTHENTIC_GITHUB_ZIPS NEW_CLOUDFLARE_POSTS=0 NEW_OMC=0 PRIVATE_R2_GETS=0"
+      - name: Upload verifiable baseline, effective unsent packets, cost and real ATMS conditional proof
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-q75-milk-pre-dispatch-${{ github.run_id }}
+          path: ${{ runner.temp }}/q75-milk-prerun/
+          retention-days: 90
+          if-no-files-found: error
+      - name: Remove public source copies from ephemeral runner
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/q75-public-history" "$RUNNER_TEMP/q75-milk-prerun"
+
+# Important: This workflow cannot run any private case, OMC or Buffalo request.
+# It is not a substitute for the next explicit budget, parent-compatibility review,
+# real producer dispatch and ATMS feedback/revision cycle.
