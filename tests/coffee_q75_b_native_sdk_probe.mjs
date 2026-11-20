@@ -38,8 +38,12 @@ globalThis.fetch=async(request,opts={})=>{
   need(effective.max_completion_tokens===EV01_CAP &&
        effective.stream===false && effective.reasoning_effort==='low',
        'EFFECTIVE_PROVIDER_REQUEST_BUDGET_DRIFT');
-  // Deliberately no network, regardless of SDK retry behavior.
-  throw new Error('Q75_OFFLINE_PROBE_EXPECTED_STOP_BEFORE_NETWORK');
+  // HTTP 400 constructed IN MEMORY, never network, so the pinned SDK does
+  // not automatically retry a simulated transient fetch/connection failure.
+  return new Response(JSON.stringify({error:{
+    message:'Q75_OFFLINE_PROBE_EXPECTED_STOP_BEFORE_NETWORK',
+    type:'invalid_request_error'}}),{
+    status:400,headers:{'content-type':'application/json'}});
 };
 try {
   env.OPEN_ROUTER_API_KEY='VIRTUAL_OFFLINE_SDK_PROBE_NOT_A_PROVIDER_KEY';
