@@ -1,0 +1,16 @@
+{
+  "source": "2026-11-20 GitHub Actions #44672512041 / provider/cloudflare-effective-request.json",
+  "original_effective_body_sha256": "b98b5776bfd184b46dc754d4e8ed5ba8f25df72309195afc46fbcad65deb3b3b",
+  "unchanged_body": true,
+  "model": "@cf/google/gemma-4-26b-a4b-it",
+  "call_number": 1,
+  "max_calls_total": 2,
+  "attempts": 1,
+  "new_private_R2_reads": 0,
+  "new_omc": 0,
+  "response": {
+    "status": "POST_RETURNED_ERROR",
+    "model": "@cf/google/gemma-4-26b-a4b-it",
+    "error": "Error: Cloudflare API error: POST /accounts/e0cb52526a69c0f48f001901a5b9a640/ai/run/@cf/google/gemma-4-26b-a4b-it returned HTTP 408 (Ray ID a5d4d6889f8eb6f8-ORD).\n\n{\n  \"errors\": [\n    {\n      \"message\": \"AiError: AiError: Request timeout (f03e922b-3ce6-4434-a5ab-50adf9b620f7)\",\n      \"code\": 3046\n    }\n  ],\n  \"success\": false,\n  \"result\": {},\n  \"messages\": []\n}"
+  }
+}
