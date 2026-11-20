@@ -58,6 +58,10 @@ jobs:
           python -m unittest discover -s tests -p test_coffee_q75_buffalo_initial.py -v
           node --check arena/coffee_q75_buffalo_initial_runner.mjs
           python -m unittest discover -s tests -p test_coffee_q75_buffalo_retry_guard.py -v
+      - name: Attest actual prior no-POST GitHub run and exact archive, independent of a new dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -m arena.coffee_q75_buffalo_retry_guard --verify-historical
       - name: Generate new initial Buffalo prompt from actual authenticated Q75 source, NOT SENT
         run: |
           python -m arena.coffee_q75_buffalo_initial dry-run \
