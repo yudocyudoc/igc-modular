@@ -69,7 +69,7 @@ class Offline(unittest.TestCase):
     def test_budget_separate_no_omc_no_r2(self):
         self.assertEqual(q.MAX_POSTS,1)
         self.assertEqual(q.MAX_TOKENS,16000)
-        self.assertEqual(q.MODEL,"@cf/zai-org/glm-5.3-flash")
+        self.assertEqual(q.MODEL,"@cf/zai-org/glm-5.3")
         self.assertEqual(q.WORKFLOW,".github/workflows/coffee-q75-buffalo-initial-manual.yml")
 
 
