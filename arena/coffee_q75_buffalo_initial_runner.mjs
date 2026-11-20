@@ -6,6 +6,8 @@ import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {resolve,join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {createHash} from 'node:crypto';
+import {Q75_PROVIDER_MODEL,HISTORICAL_ADAPTER_MODEL,providerEndpoint}
+  from './coffee_q75_buffalo_provider_target.mjs';
 const env=process.env;
 const need=(v,id)=>{if(!v)throw Error('Q75_B_INITIAL_'+id);};
 const hash=x=>'sha256:'+createHash('sha256').update(x).digest('hex');
@@ -49,7 +51,7 @@ need(input.schema==='arena.coffee.q75-buffalo-original-initial/1' &&
      input.round_kind==='initial' && input.parent_model===null &&
      input.original_B0_R1_reused===false &&
      input.max_provider_posts===1 && input.max_completion_tokens===16000 &&
-     input.model==='@cf/zai-org/glm-5.3-flash' &&
+     input.model===Q75_PROVIDER_MODEL &&
      input.new_omc===0 && input.new_private_R2_gets===0 &&
      input.rival_model_or_Hydra_result_sent===false &&
      input.provider_status==='NOT_SENT' &&
@@ -62,11 +64,16 @@ need(input.schema==='arena.coffee.q75-buffalo-original-initial/1' &&
 const scripts=resolve(env.BUFFALO_SCRIPTS_ROOT);
 const sdai=resolve(env.SDAI_ROOT);
 const out=resolve(env.COFFEE_Q75_B_OUT);
-const {OR_SLUG,CF_MODEL,CF_MODE,EV01_CAP,EV01_TIMEOUT_MS,
+const {OR_SLUG,CF_MODEL:historicalAdapterModel,CF_MODE,EV01_CAP,EV01_TIMEOUT_MS,
        EV01_BUDGET_AUTH,requestToCloudflareEV01,
-       responseToOpenRouter,cloudflareUrl}=
+       responseToOpenRouter}=
  await import(pathToFileURL(join(scripts,'arena_b_ev01_cf_adapter.mjs')).href);
-need(CF_MODEL===input.model && EV01_CAP===16000,'VERSIONED_PROVIDER_CAP_DRIFT');
+// Historical OpenRouter-facing transport stays untouched; only the exact
+// Cloudflare provider endpoint changes after the retired model's HTTP 410.
+need(historicalAdapterModel===HISTORICAL_ADAPTER_MODEL &&
+     Q75_PROVIDER_MODEL===input.model && EV01_CAP===16000,
+     'VERSIONED_PROVIDER_CAP_DRIFT');
+const CF_MODEL=Q75_PROVIDER_MODEL;
 const originalFetch=globalThis.fetch;
 await mkdir(out,{recursive:false});
 const receipt={
@@ -131,7 +138,7 @@ try {
       status:'REQUEST_MAY_HAVE_CONSUMED',run_id:receipt.run_id,
       effective_request_sha256:receipt.effective_request_sha256,
       no_retry:true,max_posts:1});
-    const response=await originalFetch(cloudflareUrl(env.CLOUDFLARE_ACCOUNT_ID),{
+    const response=await originalFetch(providerEndpoint(env.CLOUDFLARE_ACCOUNT_ID),{
       method:'POST',headers:{authorization:'Bearer '+env.CLOUDFLARE_API_TOKEN,
                              'content-type':'application/json'},
       body:JSON.stringify(cfBody),signal:AbortSignal.timeout(EV01_TIMEOUT_MS)});
