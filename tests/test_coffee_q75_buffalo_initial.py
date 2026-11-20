@@ -150,11 +150,13 @@ class AuthenticatedArchives(unittest.TestCase):
                     "BUFFALO_SCRIPTS_ROOT":str(Path(t)/"nonexistent-adapter"),
                     "SDAI_ROOT":str(Path(t)/"nonexistent-upstream"),
                 })
-                response=subprocess.run(["node",str(q.RUNNER)],
-                    capture_output=True,text=True,env=child,timeout=15)
-                self.assertNotEqual(response.returncode,0)
-                self.assertIn("REQUEST_BYTES_OR_Q75_MIX_OR_ENGINE_PROFILE_DRIFT",
-                              response.stderr)
+                with subprocess.Popen(["node",str(q.RUNNER)],
+                     stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+                     text=True,env=child) as proc:
+                    _,err=proc.communicate(timeout=15)
+                    self.assertNotEqual(proc.returncode,0)
+                    self.assertIn("REQUEST_BYTES_OR_Q75_MIX_OR_ENGINE_PROFILE_DRIFT",
+                                  err)
                 self.assertFalse((out/"provider").exists())
                 # Still unsent; restoring byte-identical original permits
                 # the next offline *mocked Node invocation*.
