@@ -144,8 +144,8 @@ class WorkersOnlyPreflight(TestCase):
                 {"CLOUDFLARE_ACCOUNT_ID":"a"*32},
             ):
                 with self.assertRaises(ArenaError):
-                    buffalo.provider_ai_only_preflight(env,lambda *_:R())
+                    buffalo.provider_ai_only_preflight(env,lambda *args, **kwargs:R())
             with self.assertRaises(ArenaError):
                 buffalo.provider_ai_only_preflight(
                     {"CLOUDFLARE_API_TOKEN":"X","CLOUDFLARE_ACCOUNT_ID":"a"*32},
-                    lambda *_:R())
+                    lambda *args, **kwargs:R())
