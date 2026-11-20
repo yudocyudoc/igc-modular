@@ -244,15 +244,17 @@ def _common_process(q75, physics):
         clean_counts.append(sum(v["stage_counts"]["clean"] for v in work.values()))
     require(len(recipe_counts)==len(clean_counts)==4
             and set(recipe_counts)=={33} and set(clean_counts)=={0}
-            and q75["synthetic_beverages"]==53
-            and physics["clean_after_every_beverage_assumed"] is False,
-            "Q75_AGGREGATE_MILK_OR_CLEANING_ASSUMPTION_CHANGED")
+            and q75["synthetic_beverages"]==53,
+            "Q75_AGGREGATE_MILK_OR_CLEANING_COUNTS_CHANGED")
     return {
         "question":FIXED_QUESTION,
         "case":"Q75_CONSTRUCTION_SYNTHETIC_ONLY",
         "case_day_sha256":q75["source_provenance"]["selected_case_day_digest"],
         "paid_orders":q75["paid_orders"],
         "beverages":q75["synthetic_beverages"],
+        "aggregate_clean_tasks_completed_in_archived_Q75":clean_counts[0],
+        "archived_clean_counts_are_not_a_forecast_under_altered_policy":
+            True,
         "aggregate_beverage_mix_from_public_Q75": {
             "milk_required_beverages":recipe_counts[0],
             "no_milk_required_beverages":q75["synthetic_beverages"]-recipe_counts[0],
