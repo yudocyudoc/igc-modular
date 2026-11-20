@@ -6,6 +6,8 @@ on:
       - 'arena/coffee_q75_buffalo_initial.py'
       - 'arena/coffee_q75_buffalo_initial_runner.mjs'
       - 'tests/test_coffee_q75_buffalo_initial.py'
+      - 'arena/coffee_q75_buffalo_retry_guard.py'
+      - 'tests/test_coffee_q75_buffalo_retry_guard.py'
       - 'tests/coffee_q75_b_native_sdk_probe.mjs'
       - '.github/workflows/coffee-q75-buffalo-initial-manual.yml'
       - 'COFFEE_Q75_BUFFALO_FIRST_GENERATION_PR51.md'
@@ -55,6 +57,7 @@ jobs:
         run: |
           python -m unittest discover -s tests -p test_coffee_q75_buffalo_initial.py -v
           node --check arena/coffee_q75_buffalo_initial_runner.mjs
+          python -m unittest discover -s tests -p test_coffee_q75_buffalo_retry_guard.py -v
       - name: Generate new initial Buffalo prompt from actual authenticated Q75 source, NOT SENT
         run: |
           python -m arena.coffee_q75_buffalo_initial dry-run \
@@ -101,27 +104,10 @@ jobs:
         with: {python-version: '3.12'}
       - uses: ./.github/actions/native-runtime
         with: {role: b}
-      - name: Refuse rerun if an earlier authorized or uncertain dispatch may have spent a POST
+      - name: Reconcile prior failed preflight (no reservation, no POST); reject ALL ambiguous attempts
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          python - <<'PY'
-          import os, json, subprocess
-          from pathlib import Path
-          name="coffee-q75-buffalo-initial-manual.yml"
-          endpoint=f"repos/{os.environ['GITHUB_REPOSITORY']}/actions/workflows/{name}/runs?event=workflow_dispatch&per_page=100"
-          runs=json.loads(subprocess.check_output(["gh","api",endpoint],text=True))
-          rows=runs.get("workflow_runs",[])
-          assert runs.get("total_count")==len(rows) and len(rows)<=100,"UNRECONCILED_WORKFLOW_HISTORY"
-          current=int(os.environ["GITHUB_RUN_ID"])
-          for r in rows:
-            if r["id"]==current:continue
-            j=json.loads(subprocess.check_output(["gh","api",f"repos/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{r['id']}/jobs?per_page=100"],text=True))
-            jobs=j.get("jobs",[])
-            if not jobs or any(job.get("conclusion")!="skipped" for job in jobs if job.get("name"," ")!="offline-contracts"):
-              raise SystemExit("PRIOR_POSSIBLE_OR_AUTHORIZED_POST_NEVER_RETRY")
-          print("PRIOR_POSSIBLE_POSTS_ZERO")
-          PY
+        run: python -m arena.coffee_q75_buffalo_retry_guard
       - name: Download exactly eight existing publicly attested GitHub artifacts
         env:
           GH_TOKEN: ${{ github.token }}
@@ -142,12 +128,12 @@ jobs:
             --dossier experiments/coffee_v2/HYDRA_TWO_OPERATORS_PHYSICAL_B_ASSUMPTIONS.json \
             --out "$RUNNER_TEMP/q75-buffalo"
           python -m unittest discover -s tests -p test_coffee_q75_buffalo_initial.py -v
-      - name: Provider API GET permission check, no POST
+      - name: Workers AI metadata GET check (NO R2 API requests, NO inference POST)
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          python -c 'import json; from arena.cloud import provider_preflight; print(json.dumps(provider_preflight()))'
+          python -c 'import json; from arena.coffee_q75_buffalo_initial import provider_ai_only_preflight; print(json.dumps(provider_ai_only_preflight()))'
       - name: Install pinned original Buffalo sd-ai SDK, without scripts
         working-directory: ${{ runner.temp }}/arena-native/upstream/sd-ai
         run: npm ci --ignore-scripts --omit=optional --no-audit --no-fund
@@ -184,3 +170,8 @@ jobs:
 # but as audited 2026-11-19 it has NO required-reviewer protection_rules;
 # DO NOT claim any second human approval from environment configuration.
 # Initial B response is G1, not a policy P90, business recommendation or revision.
+
+# The one allowed historical exception is run 44670461871, whose GitHub jobs
+# and exact artifact prove the provider failed before reserve/invoke. This is
+# NOT permission to retry after a possible POST. Token R2 permission scope is
+# now explicitly UNVERIFIED; Q75 preflight itself performs no R2 API request.
