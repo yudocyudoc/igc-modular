@@ -1,0 +1,186 @@
+name: Coffee Q75 — original Buffalo initial generation (manual only, max 1 POST)
+
+on:
+  pull_request:
+    paths:
+      - 'arena/coffee_q75_buffalo_initial.py'
+      - 'arena/coffee_q75_buffalo_initial_runner.mjs'
+      - 'tests/test_coffee_q75_buffalo_initial.py'
+      - 'tests/coffee_q75_b_native_sdk_probe.mjs'
+      - '.github/workflows/coffee-q75-buffalo-initial-manual.yml'
+      - 'COFFEE_Q75_BUFFALO_FIRST_GENERATION_PR51.md'
+  workflow_dispatch:
+    inputs:
+      authorized:
+        type: choice
+        options: ['no', 'yes']
+        default: 'no'
+        required: true
+        description: 'I authorize exactly ONE initial Buffalo Cloudflare AI POST, 16k completion tokens max, NO OMC or private R2'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: coffee-q75-b-original-initial-once
+  cancel-in-progress: false
+
+jobs:
+  offline-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Download eight pinned authentic public archives (zero R2/AI/OMC)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/q75-public-history"
+          for id in 14094919865 14100770369 14090920829 14102098459 14150642285 14157186844 14157799232 14396368697; do
+            curl --fail --location --silent --show-error --retry 0 \
+              --connect-timeout 15 --max-time 120 \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "Accept: application/vnd.github+json" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/yudocyudoc/igc-modular/actions/artifacts/${id}/zip" \
+              --output "$RUNNER_TEMP/q75-public-history/artifact-${id}.zip"
+          done
+      - name: Zero-cost tests on real historical source and original JS syntax
+        env:
+          ARENA_PUBLIC_ZIP_DIR: ${{ runner.temp }}/q75-public-history
+        run: |
+          python -m unittest discover -s tests -p test_coffee_q75_buffalo_initial.py -v
+          node --check arena/coffee_q75_buffalo_initial_runner.mjs
+      - name: Generate new initial Buffalo prompt from actual authenticated Q75 source, NOT SENT
+        run: |
+          python -m arena.coffee_q75_buffalo_initial dry-run \
+            --public-zips "$RUNNER_TEMP/q75-public-history" \
+            --dossier experiments/coffee_v2/HYDRA_TWO_OPERATORS_PHYSICAL_B_ASSUMPTIONS.json \
+            --out "$RUNNER_TEMP/q75-b-initial-dry"
+          echo 'REAL_Q75_PUBLIC_PROVENANCE NEW_INITIAL_B_REQUEST_NOT_SENT CLOUDFLARE_POSTS=0 OMC=0 PRIVATE_R2=0' >> "$GITHUB_STEP_SUMMARY"
+      - name: Stage pinned original Buffalo SDK for no-network probe
+        uses: ./.github/actions/native-runtime
+        with: {role: b}
+      - name: Install original pinned SDK for offline transport-path check
+        working-directory: ${{ runner.temp }}/arena-native/upstream/sd-ai
+        run: npm ci --ignore-scripts --omit=optional --no-audit --no-fund
+      - name: ORIGINAL Engine.generate reaches the effective Cloudflare SDK request, then aborts before HTTP
+        env:
+          COFFEE_Q75_B_INPUT: ${{ runner.temp }}/q75-b-initial-dry/request.json
+          COFFEE_Q75_B_PROBE_OUT: ${{ runner.temp }}/q75-b-initial-dry/sdk-effective-offline-probe.json
+          SDAI_ROOT: ${{ runner.temp }}/arena-native/upstream/sd-ai
+          BUFFALO_SCRIPTS_ROOT: ${{ runner.temp }}/arena-native/scripts
+        run: node tests/coffee_q75_b_native_sdk_probe.mjs
+      - name: Publish verified unsent initial B input, no credentials
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-q75-b-initial-verified-dry-${{ github.run_id }}
+          path: ${{ runner.temp }}/q75-b-initial-dry/
+          retention-days: 90
+          if-no-files-found: error
+      - name: Remove ephemeral original archives and dry-run
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/q75-public-history" "$RUNNER_TEMP/q75-b-initial-dry"
+
+  real-first-generation:
+    name: First original Buffalo Engine.generate on Q75, one paid POST maximum
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.run_attempt == 1 && inputs.authorized == 'yes'
+    needs: offline-contracts
+    environment: arena-provider
+    runs-on: ubuntu-24.04
+    timeout-minutes: 23
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: ./.github/actions/native-runtime
+        with: {role: b}
+      - name: Refuse rerun if an earlier authorized or uncertain dispatch may have spent a POST
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import os, json, subprocess
+          from pathlib import Path
+          name="coffee-q75-buffalo-initial-manual.yml"
+          endpoint=f"repos/{os.environ['GITHUB_REPOSITORY']}/actions/workflows/{name}/runs?event=workflow_dispatch&per_page=100"
+          runs=json.loads(subprocess.check_output(["gh","api",endpoint],text=True))
+          rows=runs.get("workflow_runs",[])
+          assert runs.get("total_count")==len(rows) and len(rows)<=100,"UNRECONCILED_WORKFLOW_HISTORY"
+          current=int(os.environ["GITHUB_RUN_ID"])
+          for r in rows:
+            if r["id"]==current:continue
+            j=json.loads(subprocess.check_output(["gh","api",f"repos/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{r['id']}/jobs?per_page=100"],text=True))
+            jobs=j.get("jobs",[])
+            if not jobs or any(job.get("conclusion")!="skipped" for job in jobs if job.get("name"," ")!="offline-contracts"):
+              raise SystemExit("PRIOR_POSSIBLE_OR_AUTHORIZED_POST_NEVER_RETRY")
+          print("PRIOR_POSSIBLE_POSTS_ZERO")
+          PY
+      - name: Download exactly eight existing publicly attested GitHub artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/q75-public-history"
+          for id in 14094919865 14100770369 14090920829 14102098459 14150642285 14157186844 14157799232 14396368697; do
+            curl --fail --location --silent --show-error --retry 0 --connect-timeout 15 --max-time 120 \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "Accept: application/vnd.github+json" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/yudocyudoc/igc-modular/actions/artifacts/${id}/zip" \
+              --output "$RUNNER_TEMP/q75-public-history/artifact-${id}.zip"
+          done
+      - name: Verify original manifests and write new Q75 initial input, NO provider yet
+        run: |
+          python -m arena.coffee_q75_buffalo_initial dry-run \
+            --public-zips "$RUNNER_TEMP/q75-public-history" \
+            --dossier experiments/coffee_v2/HYDRA_TWO_OPERATORS_PHYSICAL_B_ASSUMPTIONS.json \
+            --out "$RUNNER_TEMP/q75-buffalo"
+          python -m unittest discover -s tests -p test_coffee_q75_buffalo_initial.py -v
+      - name: Provider API GET permission check, no POST
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          python -c 'import json; from arena.cloud import provider_preflight; print(json.dumps(provider_preflight()))'
+      - name: Install pinned original Buffalo sd-ai SDK, without scripts
+        working-directory: ${{ runner.temp }}/arena-native/upstream/sd-ai
+        run: npm ci --ignore-scripts --omit=optional --no-audit --no-fund
+      - name: Reserve exactly one initial provider attempt, no credentials in shell
+        env:
+          COFFEE_Q75_B_INITIAL_AUTH: '${{ inputs.authorized }}'
+        run: python -m arena.coffee_q75_buffalo_initial reserve --out "$RUNNER_TEMP/q75-buffalo"
+      - name: One real ORIGINAL Engine.generate initial — one Cloudflare POST maximum
+        env:
+          COFFEE_Q75_B_INITIAL_AUTH: '${{ inputs.authorized }}'
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python -m arena.coffee_q75_buffalo_initial invoke --out "$RUNNER_TEMP/q75-buffalo"
+      - name: Finalize G1 even if provider failed or consumption unknown
+        if: always()
+        run: |
+          if [ -d "$RUNNER_TEMP/q75-buffalo" ]; then
+            python -m arena.coffee_q75_buffalo_initial finalize --out "$RUNNER_TEMP/q75-buffalo"
+          fi
+      - name: Archive exact request, original SDK and provider receipts; no scientific P90
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-q75-original-b-initial-${{ github.run_id }}
+          path: ${{ runner.temp }}/q75-buffalo/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Delete ephemeral input, source archives, originals and provider traces
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/q75-public-history" "$RUNNER_TEMP/q75-buffalo"
+
+# Never run paid step on pull_request, push, forks or reruns; explicit
+# authorized=yes workflow_dispatch on main ONLY. arena-provider scopes secrets,
+# but as audited 2026-11-19 it has NO required-reviewer protection_rules;
+# DO NOT claim any second human approval from environment configuration.
+# Initial B response is G1, not a policy P90, business recommendation or revision.
