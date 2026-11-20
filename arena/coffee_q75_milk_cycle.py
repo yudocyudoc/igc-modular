@@ -158,6 +158,14 @@ def _check_physics(dossier, q75):
         "duration_min_assumed_not_calibrated":
             {k:v["value"] for k,v in dossier["durations_min"].items()},
         "group_retained_until_manual_removal": True,
+        "clean_after_every_beverage_assumed":
+            dossier["clean_after_every_beverage_assumed"],
+        "cleaning_stage_effect_if_enabled":
+            "after manual removal and before group release/milk, each beverage "
+            "requires a clean task occupying one barista and its espresso group; "
+            "Q75 has this assumption DISABLED. Cleaning duration remains "
+            "an assumption, not a measured task.",
+        "cleaning_stage_resource_requirement_from_hydra": required["clean"],
         "milk_precedence": dossier["milk_precedence"],
         "baseline_dispatch_is_assumption_not_observed_policy": True,
         "physical_scope": dossier["scope"],
@@ -224,12 +232,38 @@ def _native_generator_scope():
 
 
 def _common_process(q75, physics):
+    # Public P46 aggregate contains per-actor *counts*. Only the sum of
+    # completed milk/clean stages, invariant across ALL four policy arms,
+    # is disclosed. No task clock, assignment, wait, effect or score leaks.
+    recipe_counts=[]
+    clean_counts=[]
+    for arm in q75["arms"]:
+        work=arm["work_assigned_by_actor"]
+        require(set(work)=={"B01","B02"}, "AGGREGATE_WORKER_SET_CHANGED")
+        recipe_counts.append(sum(v["stage_counts"]["milk"] for v in work.values()))
+        clean_counts.append(sum(v["stage_counts"]["clean"] for v in work.values()))
+    require(len(recipe_counts)==len(clean_counts)==4
+            and set(recipe_counts)=={33} and set(clean_counts)=={0}
+            and q75["synthetic_beverages"]==53,
+            "Q75_AGGREGATE_MILK_OR_CLEANING_COUNTS_CHANGED")
     return {
         "question":FIXED_QUESTION,
         "case":"Q75_CONSTRUCTION_SYNTHETIC_ONLY",
         "case_day_sha256":q75["source_provenance"]["selected_case_day_digest"],
         "paid_orders":q75["paid_orders"],
         "beverages":q75["synthetic_beverages"],
+        "aggregate_clean_tasks_completed_in_archived_Q75":clean_counts[0],
+        "archived_clean_counts_are_not_a_forecast_under_altered_policy":
+            True,
+        "aggregate_beverage_mix_from_public_Q75": {
+            "milk_required_beverages":recipe_counts[0],
+            "no_milk_required_beverages":q75["synthetic_beverages"]-recipe_counts[0],
+            "derivation":"sum of stage_counts.milk across BOTH operators; "
+                "invariant across all four P46 policies; one milk stage "
+                "per con_leche beverage, not per order",
+            "no_per_order_recipe_or_service_timestamps_released":True,
+            "not_an_estimated_real_shop_product_mix":True,
+        },
         "units":{"order":"paid ticket", "beverage":"individual drink",
                  "time":"minutes"},
         "horizon_min":q75["source_horizon_min"],

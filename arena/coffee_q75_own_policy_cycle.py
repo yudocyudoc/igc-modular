@@ -62,7 +62,15 @@ def gate(report):
             and phys["task_stage_resource_requirements_from_hydra"]["milk"]
             == ["barista","steam_wand"]
             and "first executable task" in phys["policy_selection_semantics"]
-            ["PRIORITIZE_MILK_READY"],
+            ["PRIORITIZE_MILK_READY"]
+            and phys["clean_after_every_beverage_assumed"] is False
+            and phys["cleaning_stage_resource_requirement_from_hydra"]
+                == ["barista","espresso_group"]
+            and common["aggregate_beverage_mix_from_public_Q75"]
+                ["milk_required_beverages"] == 33
+            and common["aggregate_beverage_mix_from_public_Q75"]
+                ["no_milk_required_beverages"] == 20
+            and common["aggregate_clean_tasks_completed_in_archived_Q75"] == 0,
             "PHYSICAL_STAGE_OR_MILK_FALLBACK_LOST")
     packets=report["producer_effective_inputs_NOT_SENT"]
     require(set(packets)=={"D","M","B"}, "MISSING_METHOD_PACKET")

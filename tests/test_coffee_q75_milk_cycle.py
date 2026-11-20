@@ -165,6 +165,47 @@ class TestPinnedRealPublicArtifacts(unittest.TestCase):
         with self.assertRaises(ArenaError):
             q._check_physics(expanded,q75)
 
+    def test_astra_milk_mix_and_cleaning_flag_affect_all_three_packages(self):
+        from arena.common import digest
+        _, q75, _, _=q._exact_hydra_source(self.z)
+        dossier=json.loads(self.dossier.read_text())
+        physics=q._check_physics(dossier,q75)
+        shared=q._common_process(q75,physics)
+        self.assertEqual(shared["aggregate_beverage_mix_from_public_Q75"]
+                         ["milk_required_beverages"],33)
+        self.assertEqual(shared["aggregate_beverage_mix_from_public_Q75"]
+                         ["no_milk_required_beverages"],20)
+        self.assertEqual(shared["aggregate_clean_tasks_completed_in_archived_Q75"],0)
+        self.assertIs(physics["clean_after_every_beverage_assumed"],False)
+        self.assertEqual(physics["cleaning_stage_resource_requirement_from_hydra"],
+                         ["barista","espresso_group"])
+        scope={"D":{"method":"d"},"M":{"method":"m","registry":"m"},
+               "B":{"old_method":"Engine.generate"}}
+        buffalo={"old_parent_compatible_with_new_Q75_policy":"NOT_DEMONSTRATED"}
+        base=q._effective_packets(shared,scope,buffalo)
+        changed_dossier=copy.deepcopy(dossier)
+        changed_dossier["clean_after_every_beverage_assumed"]=True
+        hypothetical_q75=copy.deepcopy(q75)
+        hypothetical_q75["physical_dossier_sha256"]=digest(changed_dossier)
+        hypothetical_physics=q._check_physics(changed_dossier,hypothetical_q75)
+        hypothetical=q._common_process(hypothetical_q75,hypothetical_physics)
+        changed=q._effective_packets(hypothetical,scope,buffalo)
+        for arm in ("D","M","B"):
+            self.assertNotEqual(base[arm]["input_sha256"],changed[arm]["input_sha256"])
+            self.assertIs(changed[arm]["operation_known"]["physical"]
+                          ["clean_after_every_beverage_assumed"],True)
+            self.assertEqual(changed[arm]["operation_known"]
+                             ["aggregate_clean_tasks_completed_in_archived_Q75"],0)
+        # A hypothetical copy cannot silently become the real Q75 case.
+        with self.assertRaises(ArenaError):
+            q._check_physics(changed_dossier,q75)
+        # Public counts are not allowed to drift, even if aggregate result
+        # includes the same effect score.
+        corrupt=copy.deepcopy(q75)
+        corrupt["arms"][0]["work_assigned_by_actor"]["B01"]["stage_counts"]["milk"]+=1
+        with self.assertRaises(ArenaError):
+            q._common_process(corrupt,physics)
+
     def test_astra_busy_wand_allows_other_runnable_manual_tasks(self):
         # Real Hydra engine, software-only constructed orders, no private
         # Q75, Cloudflare, R2 or Modelica. Tests behavior not just prompt text.
