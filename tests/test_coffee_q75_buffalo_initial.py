@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from types import SimpleNamespace
@@ -124,6 +125,37 @@ class AuthenticatedArchives(unittest.TestCase):
                 with self.assertRaises(ArenaError):
                     q.invoke(out,env=env)
                 node.assert_not_called()
+                # Exercise the ACTUAL Node runner's byte-level guard. The
+                # provider adapter and SDK paths are deliberately invalid:
+                # even a regression cannot reach a provider from this test.
+                child=dict(os.environ)
+                for secret in ("GH_TOKEN","GITHUB_TOKEN","OPEN_ROUTER_API_KEY",
+                               "CT03_R2_ACCESS_KEY_ID","CT03_R2_SECRET_ACCESS_KEY"):
+                    child.pop(secret,None)
+                child.update({
+                    "COFFEE_Q75_B_INITIAL_AUTH":"yes",
+                    "GITHUB_REPOSITORY":q.REPOSITORY,
+                    "GITHUB_EVENT_NAME":"workflow_dispatch",
+                    "GITHUB_REF":"refs/heads/main",
+                    "GITHUB_RUN_ATTEMPT":"1",
+                    "GITHUB_RUN_ID":"123",
+                    "GITHUB_SHA":"f"*40,
+                    "GITHUB_WORKFLOW_REF":q.REPOSITORY+"/"+q.WORKFLOW+
+                        "@refs/heads/main",
+                    "CLOUDFLARE_ACCOUNT_ID":"a"*32,
+                    "CLOUDFLARE_API_TOKEN":"FAKE_OFFLINE_TEST_NEVER_TRANSMITTED",
+                    "COFFEE_Q75_B_INPUT":str(request_file.resolve()),
+                    "COFFEE_Q75_B_ATTEMPT":str((out/"attempt.json").resolve()),
+                    "COFFEE_Q75_B_OUT":str((out/"provider").resolve()),
+                    "BUFFALO_SCRIPTS_ROOT":str(Path(t)/"nonexistent-adapter"),
+                    "SDAI_ROOT":str(Path(t)/"nonexistent-upstream"),
+                })
+                response=subprocess.run(["node",str(q.RUNNER)],
+                    capture_output=True,text=True,env=child,timeout=15)
+                self.assertNotEqual(response.returncode,0)
+                self.assertIn("REQUEST_BYTES_OR_Q75_MIX_OR_ENGINE_PROFILE_DRIFT",
+                              response.stderr)
+                self.assertFalse((out/"provider").exists())
                 # Still unsent; restoring byte-identical original permits
                 # the next offline *mocked Node invocation*.
                 request_file.write_bytes(original_bytes)
