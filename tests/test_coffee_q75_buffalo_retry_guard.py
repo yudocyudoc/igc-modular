@@ -131,6 +131,22 @@ class WorkersOnlyPreflight(TestCase):
             "https://api.cloudflare.com/client/v4/accounts/"+
             ("a"*32)+"/ai/models/search?search=glm-5.3&include_deprecated=false&per_page=25","GET")])
 
+    def test_deprecated_flash_only_catalog_does_not_unlock_post(self):
+        class R:
+            status=200
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+            def read(self,n):
+                return b'{"success":true,"result":[{"name":"@cf/zai-org/glm-5.3-flash"}]}'
+        with patch.object(buffalo,"public_config",return_value={
+            "cloudflare":{"account_id":"a"*32}}):
+            with self.assertRaises(ArenaError) as ctx:
+                buffalo.provider_ai_only_preflight(
+                    {"CLOUDFLARE_API_TOKEN":"OFFLINE_FAKE",
+                     "CLOUDFLARE_ACCOUNT_ID":"a"*32},
+                    lambda *args, **kwargs:R())
+        self.assertIn("TARGET_MODEL_NOT_IN_LIVE_CATALOG",str(ctx.exception))
+
     def test_reject_bad_metadata_or_credentials(self):
         class R:
             status=200
