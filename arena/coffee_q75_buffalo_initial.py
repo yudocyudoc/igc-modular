@@ -26,7 +26,7 @@ SCHEMA = "arena.coffee.q75-buffalo-original-initial/1"
 WORKFLOW = ".github/workflows/coffee-q75-buffalo-initial-manual.yml"
 RUNNER = Path(__file__).with_name("coffee_q75_buffalo_initial_runner.mjs")
 REPOSITORY = "yudocyudoc/igc-modular"
-MODEL = "@cf/zai-org/glm-5.3-flash"
+MODEL = "@cf/zai-org/glm-5.3"  # Nov 20, 2026 replacement; deprecated -flash returned HTTP 410
 MAX_POSTS = 1
 MAX_TOKENS = 16000
 
@@ -182,9 +182,11 @@ def provider_ai_only_preflight(env=None, opener=None):
     token = env.get("CLOUDFLARE_API_TOKEN", "")
     need(not supplied or supplied == account, "PREFLIGHT_WRONG_ACCOUNT")
     need(bool(token), "PREFLIGHT_TOKEN_MISSING")
+    # One exact-name catalog lookup. A generic "some AI model is available"
+    # preflight missed the provider model's scheduled 2026-11-20 removal.
     req = urllib.request.Request(
         "https://api.cloudflare.com/client/v4/accounts/" + account +
-        "/ai/models/search?per_page=1",
+        "/ai/models/search?search=glm-5.3&include_deprecated=false&per_page=25",
         headers={"Authorization": "Bearer " + token},
         method="GET")
     fetch = opener or urllib.request.urlopen
@@ -199,10 +201,17 @@ def provider_ai_only_preflight(env=None, opener=None):
                          str(exc.code)) from None
     except (OSError, ValueError):
         raise ArenaError("COFFEE_Q75_B_INITIAL_WORKERS_AI_METADATA_UNAVAILABLE") from None
-    need(status == 200 and payload.get("success") is True,
+    need(status == 200 and payload.get("success") is True
+         and type(payload.get("result")) is list,
          "PREFLIGHT_WORKERS_AI_METADATA_NOT_AVAILABLE")
+    exact = [m for m in payload["result"] if
+             isinstance(m, dict) and m.get("name") == MODEL]
+    need(len(exact) == 1,
+         "PREFLIGHT_TARGET_MODEL_NOT_IN_LIVE_CATALOG")
     return {
         "workers_ai_metadata": "AVAILABLE",
+        "provider_model": MODEL,
+        "target_present_in_catalog": True,
         "workers_ai_metadata_requests": 1,
         "r2_requests": 0,
         "private_R2_reads": 0,
