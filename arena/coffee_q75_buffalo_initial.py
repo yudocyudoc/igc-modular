@@ -7,6 +7,7 @@ Never turn B0/R1 into a fake Q75 currentModel. No OMC or private R2 use.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -51,7 +52,14 @@ def make_request(prepared):
             "steam_wand": 1, "pickup_pass": 1}
          and physics["resource_ids_from_dossier"]["steam_wand"] == ["W01"]
          and common["alternatives"] == ["FCFS_READY_ASSUMED",
-                                         "PRIORITIZE_MILK_READY"],
+                                         "PRIORITIZE_MILK_READY"]
+         and common["aggregate_beverage_mix_from_public_Q75"]
+             ["milk_required_beverages"] == 33
+         and common["aggregate_beverage_mix_from_public_Q75"]
+             ["no_milk_required_beverages"] == 20
+         and common["aggregate_clean_tasks_completed_in_archived_Q75"] == 0
+         and physics["clean_after_every_beverage_assumed"] is False,
+
          "SINGLE_W01_OR_POLICY_NOT_TRANSMITTED")
     common_json = json.dumps(common, sort_keys=True, ensure_ascii=False,
                              separators=(",", ":"), allow_nan=False)
@@ -63,7 +71,12 @@ def make_request(prepared):
               "Preserve the explicit single steam wand W01, two shared "
               "baristas, two preparation stations, three espresso groups, "
               "one pickup pass, operator windows, stage precedence and "
-              "nonpreemptive runnable-task fallback. A milk stage starts only "
+              "nonpreemptive runnable-task fallback. Of the 53 synthetic "
+              "beverages, 33 require milk on W01 and 20 do not. "
+              "The base Q75 scenario DOES NOT clean the espresso group "
+              "after every beverage; if cleaning were enabled, each clean "
+              "would occupy one barista AND the espresso group before release. "
+              "A milk stage starts only "
               "with a free qualified barista AND a free steam wand. If W01 is "
               "busy, another executable task may start on the second barista. "
               "Do not invent a second wand or idle the barista solely because "
@@ -107,6 +120,13 @@ def make_request(prepared):
                                           ensure_ascii=False, allow_nan=False),
         "max_provider_posts": 1,
         "max_completion_tokens": MAX_TOKENS,
+        "original_engine_effective_option_profile": {
+            "supportsArrays":False,"supportsModules":False,
+            "supportsSubTypes":False,"mentorMode":False,
+            "maxTokens":MAX_TOKENS,
+            "scope":"ORIGINAL_BUFFALO_HISTORICAL_SCALAR_NO_NATIVE_QUEUE_SUBTYPES",
+            "not_entire_buffalo_representational_capability":True,
+        },
         "model": MODEL,
         "new_omc": 0,
         "new_private_R2_gets": 0,
@@ -164,6 +184,11 @@ def manual_identity(env):
     return env["GITHUB_SHA"], int(env["GITHUB_RUN_ID"])
 
 
+def request_file_sha256(path):
+    """Hash exactly the persisted input bytes, independently of the JSON digest."""
+    return "sha256:" + hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
 def reserve(out, env=None):
     """Reserve a single attempt before any Node call; never retry."""
     env = dict(os.environ if env is None else env)
@@ -182,6 +207,7 @@ def reserve(out, env=None):
         "status": "RESERVED_BEFORE_HTTP",
         "run_id": run, "run_sha": sha,
         "original_request_sha256": request["request_sha256"],
+        "request_file_sha256":request_file_sha256(out/"request.json"),
         "posts_max": 1, "no_retry": True,
         "provider_consumption_after_failure": "UNKNOWN_NOT_ZERO",
     }, exclusive=True)
@@ -203,7 +229,15 @@ def invoke(out, env=None):
     need(attempt["status"] == "RESERVED_BEFORE_HTTP"
          and attempt["run_id"] == run and attempt["run_sha"] == sha
          and attempt["original_request_sha256"] == request["request_sha256"]
-         and not (out/"provider").exists(), "ATTEMPT_ALREADY_SPENT_OR_SCOPE_CHANGED")
+         and attempt["request_file_sha256"] ==
+             request_file_sha256(out/"request.json")
+         and request["request_sha256"] ==
+             digest({k:v for k,v in request.items() if k != "request_sha256"})
+         and read_json(out/"dry-run.json")["Q75_request_sha256"] ==
+             request["request_sha256"]
+         and not (out/"provider").exists()
+         and not (out/"process.json").exists(),
+         "ATTEMPT_ALREADY_SPENT_OR_INPUT_BYTES_CHANGED")
     child = dict(env)
     for key in ("GH_TOKEN", "GITHUB_TOKEN", "CT03_R2_ACCESS_KEY_ID",
                 "CT03_R2_SECRET_ACCESS_KEY"):
