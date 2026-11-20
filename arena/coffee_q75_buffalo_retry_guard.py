@@ -126,11 +126,17 @@ def main():
     def artifact_bytes(artifact_id):
         url = ("https://api.github.com/repos/" + REPO +
                "/actions/artifacts/" + str(artifact_id) + "/zip")
-        req = Request(url, headers={"Authorization": "Bearer " + token,
-                                    "Accept": "application/vnd.github+json",
-                                    "X-GitHub-Api-Version": "2022-11-28"})
-        with urlopen(req, timeout=45) as response:
-            data = response.read(2_000_001)
+        # Use the exact GitHub Actions artifact downloader already proven for
+        # the eight original archives. urllib's cross-host redirect lost auth
+        # on the signed artifact redirect in PR CI (HTTP 401).
+        data = subprocess.check_output([
+            "curl", "--fail", "--location", "--silent", "--show-error",
+            "--retry", "0", "--connect-timeout", "15", "--max-time", "120",
+            "--header", "Authorization: Bearer " + token,
+            "--header", "Accept: application/vnd.github+json",
+            "--header", "X-GitHub-Api-Version: 2022-11-28",
+            url,
+        ])
         need(len(data) <= 2_000_000, "ARTIFACT_TOO_LARGE")
         return data
 
