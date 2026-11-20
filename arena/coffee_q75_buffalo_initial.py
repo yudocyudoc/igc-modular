@@ -167,6 +167,51 @@ def dry_run(zip_dir, dossier, out):
     return request
 
 
+def provider_ai_only_preflight(env=None, opener=None):
+    """Check Workers AI reachability without any R2 operation.
+
+    This workflow requires zero R2 access but cannot certify the R2 *scope*
+    of a pre-existing broad token. The old 403-only R2 GET assertion blocked
+    a proved no-POST run; no token is silently represented as least-privilege.
+    """
+    import urllib.error
+    import urllib.request
+    env = dict(os.environ if env is None else env)
+    account = public_config()["cloudflare"]["account_id"]
+    supplied = env.get("CLOUDFLARE_ACCOUNT_ID")
+    token = env.get("CLOUDFLARE_API_TOKEN", "")
+    need(not supplied or supplied == account, "PREFLIGHT_WRONG_ACCOUNT")
+    need(bool(token), "PREFLIGHT_TOKEN_MISSING")
+    req = urllib.request.Request(
+        "https://api.cloudflare.com/client/v4/accounts/" + account +
+        "/ai/models/search?per_page=1",
+        headers={"Authorization": "Bearer " + token},
+        method="GET")
+    fetch = opener or urllib.request.urlopen
+    try:
+        with fetch(req, timeout=30) as response:
+            status = response.status
+            raw = response.read(150_001)
+        need(len(raw) <= 150_000, "PREFLIGHT_RESPONSE_TOO_LARGE")
+        payload = json.loads(raw)
+    except urllib.error.HTTPError as exc:
+        raise ArenaError("COFFEE_Q75_B_INITIAL_WORKERS_AI_METADATA_HTTP_" +
+                         str(exc.code)) from None
+    except (OSError, ValueError):
+        raise ArenaError("COFFEE_Q75_B_INITIAL_WORKERS_AI_METADATA_UNAVAILABLE") from None
+    need(status == 200 and payload.get("success") is True,
+         "PREFLIGHT_WORKERS_AI_METADATA_NOT_AVAILABLE")
+    return {
+        "workers_ai_metadata": "AVAILABLE",
+        "workers_ai_metadata_requests": 1,
+        "r2_requests": 0,
+        "private_R2_reads": 0,
+        "token_r2_permission_scope": "NOT_VERIFIED_DO_NOT_CLAIM_LEAST_PRIVILEGE",
+        "provider_posts": 0,
+        "inference_write_permission": "NOT_TESTED_UNTIL_AUTHORIZED_POST",
+    }
+
+
 def manual_identity(env):
     need(env.get("GITHUB_REPOSITORY") == REPOSITORY
          and env.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
