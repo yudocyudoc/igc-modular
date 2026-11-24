@@ -28,6 +28,15 @@ def parser():
     p = argparse.ArgumentParser(prog="arena", description="Modular experiment coordinator; no credential copies between experiments.")
     p.add_argument("--connections", type=Path, default=Path("connections.toml"))
     commands = p.add_subparsers(dest="command", required=True)
+    merlin = commands.add_parser("private-merlin", help="Submit or reconnect to a private Merlin task")
+    operations = merlin.add_subparsers(dest="operation", required=True)
+    for name in ("submit", "read"):
+        op = operations.add_parser(name)
+        op.add_argument("--phase", choices=("R", "I"), required=True)
+        op.add_argument("--task-id", required=True)
+        op.add_argument("--port", type=int, default=8791)
+        if name == "submit":
+            op.add_argument("--model", type=Path, required=True)
     c = commands.add_parser("check", help="Check data/access before spending compute")
     c.add_argument("experiment", type=Path)
     c = commands.add_parser("run", help="Run the whole experiment through one entry point")
@@ -66,7 +75,10 @@ def main(argv=None):
     try:
         # Offline fixture and data operations do not even open a credential store.
         connections = Connections.load(args.connections) if args.connections.exists() else Connections({})
-        if args.command == "check":
+        if args.command == "private-merlin":
+            from .buffalo.private_merlin import private_merlin
+            result = private_merlin(args.operation, args.phase, args.task_id, getattr(args, "model", None), args.port)
+        elif args.command == "check":
             result = orchestrator.check(args.experiment, connections)
         elif args.command == "run":
             result = _summary(orchestrator.run(args.experiment, args.out, connections, authorize=args.authorize), args.out)
