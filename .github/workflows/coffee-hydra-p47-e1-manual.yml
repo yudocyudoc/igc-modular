@@ -1,0 +1,103 @@
+name: Coffee P47 E1 — Q75 30s extraction sensitivity (2 new arms)
+
+on:
+  workflow_dispatch:
+    inputs:
+      authorize_two_scenarios:
+        description: "I authorize exactly Q75 FCFS vs milk priority at 30s, read-only historical R2 views; no new corpus or provider"
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: coffee-p47-e1-q75-two-arm-private-dispatch
+  cancel-in-progress: false
+
+jobs:
+  e1-q75-30s-two-new-arms:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.authorize_two_scenarios == true && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    environment: arena-custodian
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Retrieve accepted PUBLIC D aggregate from pinned historical run; no private R2
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/e1-historical"
+          gh run download 44234407455 \
+            --repo "$GITHUB_REPOSITORY" \
+            --name coffee-p46-d-verified-q25-q75-44234407455 \
+            --dir "$RUNNER_TEMP/e1-historical"
+          test -f "$RUNNER_TEMP/e1-historical/D_Q25_Q75_AGGREGATE.json"
+      - name: Verify historical D 90s artifact identity before any private R2 GET
+        run: |
+          python -m arena.coffee_v2_hydra_sensitivity_e1 \
+            --mode verify-archive \
+            --source-run-id 43684660729 \
+            --authorize-two-scenarios \
+            --historical "$RUNNER_TEMP/e1-historical/D_Q25_Q75_AGGREGATE.json" \
+            --dossier experiments/coffee_v2/HYDRA_TWO_OPERATORS_PHYSICAL_B_ASSUMPTIONS.json \
+            --historical-receipt "$RUNNER_TEMP/e1-history-verified.json" \
+            --out "$RUNNER_TEMP/e1-history-verified.json"
+      - name: Custodian reads only eight existing CONSTRUCTION view files, source 43684660729
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CT03_R2_BUCKET: ${{ vars.CT03_R2_BUCKET || 'igc-ct03-private-custody' }}
+          CT03_R2_ACCESS_KEY_ID: ${{ secrets.CT03_R2_ACCESS_KEY_ID }}
+          CT03_R2_SECRET_ACCESS_KEY: ${{ secrets.CT03_R2_SECRET_ACCESS_KEY }}
+        run: |
+          python -m arena.coffee_v2_hydra_sensitivity_e1 \
+            --mode fetch \
+            --source-run-id 43684660729 \
+            --authorize-two-scenarios \
+            --historical "$RUNNER_TEMP/e1-historical/D_Q25_Q75_AGGREGATE.json" \
+            --dossier experiments/coffee_v2/HYDRA_TWO_OPERATORS_PHYSICAL_B_ASSUMPTIONS.json \
+            --historical-receipt "$RUNNER_TEMP/e1-history-verified.json" \
+            --source-receipt "$RUNNER_TEMP/e1-r2-receipt.json" \
+            --out "$RUNNER_TEMP/e1-private-views"
+      - name: Execute EXACTLY two Q75 30s B scenarios, compare to archived 90s; no R2 creds
+        run: |
+          python -m arena.coffee_v2_hydra_sensitivity_e1 \
+            --mode compare \
+            --source-run-id 43684660729 \
+            --authorize-two-scenarios \
+            --historical "$RUNNER_TEMP/e1-historical/D_Q25_Q75_AGGREGATE.json" \
+            --dossier experiments/coffee_v2/HYDRA_TWO_OPERATORS_PHYSICAL_B_ASSUMPTIONS.json \
+            --historical-receipt "$RUNNER_TEMP/e1-history-verified.json" \
+            --source-receipt "$RUNNER_TEMP/e1-r2-receipt.json" \
+            --views "$RUNNER_TEMP/e1-private-views" \
+            --out "$RUNNER_TEMP/e1-public"
+          cat "$RUNNER_TEMP/e1-public/E1_Q75_DECISION.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish only E1 public aggregates, without private order or task rows
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-p47-e1-q75-30s-public-${{ github.run_id }}
+          path: ${{ runner.temp }}/e1-public/
+          retention-days: 90
+          if-no-files-found: error
+      - name: Publish historical verification and R2 read-attempt receipts, even after failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coffee-p47-e1-read-attempt-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/e1-history-verified.json
+            ${{ runner.temp }}/e1-r2-receipt.json
+          retention-days: 90
+          if-no-files-found: warn
+      - name: Delete all private source views and temporary outputs
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/e1-private-views" "$RUNNER_TEMP/e1-historical" "$RUNNER_TEMP/e1-public" "$RUNNER_TEMP/e1-history-verified.json" "$RUNNER_TEMP/e1-r2-receipt.json"
+
+# This authorized workflow is unavailable from PR CI and never auto-dispatches.
+# No Q25 or four-policy rerun, and no new OMC, provider, video, or corpus.
